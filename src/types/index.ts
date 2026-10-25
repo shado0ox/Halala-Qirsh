@@ -1,6 +1,7 @@
 export interface Category {
   id: string;
   name: string;
+  nameEn?: string;
   icon: string;
   color: string;
   bgColor: string;
@@ -30,7 +31,7 @@ export interface RecurringBill {
   dueDay: number; // 1 - 31
   isPaid: boolean;
   notes?: string;
-  reminderEnabled?: boolean; // whether local notifications are scheduled for this bill
+  reminderEnabled?: boolean;
 }
 
 export interface GroceryItem {
@@ -47,14 +48,19 @@ export type CurrencyCode = 'SAR' | 'EGP' | 'AED' | 'KWD' | 'QAR' | 'USD' | 'EUR'
 
 export interface BudgetSettings {
   budgetMode: 'sum_categories' | 'custom_total';
-  totalMonthlyBudget: number; // Used when budgetMode is 'custom_total'
+  totalMonthlyBudget: number;
   salaryDay: number;
   currency: CurrencyCode;
   soundEnabled: boolean;
-  deviceFrameMode: boolean; // toggle between iPhone frame mockup on desktop and full width
+  deviceFrameMode: boolean;
   selectedMonth: string; // YYYY-MM
   notificationsEnabled: boolean;
-  notificationLeadDays: number; // 0 = same day, 1 = 1 day before, 3 = 3 days before
+  notificationLeadDays: number;
+  dailyReminderEnabled: boolean;
+  dailyReminderTime: string; // "HH:MM" e.g. "21:00"
+  language: 'ar' | 'en';
+  isPasscodeEnabled: boolean;
+  passcode: string; // 4-digit PIN
   lastNotificationCheckDate?: string;
 }
 

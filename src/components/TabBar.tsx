@@ -7,7 +7,7 @@ import {
   SlidersHorizontal,
   Plus,
 } from 'lucide-react';
-import { sound } from '../utils/audio';
+import { nativeHaptics } from '../utils/nativeHaptics';
 
 export type TabId = 'dashboard' | 'expenses' | 'budgets' | 'bills_groceries' | 'analytics_settings';
 
@@ -17,6 +17,7 @@ interface TabBarProps {
   onOpenAddExpense: () => void;
   unpaidBillsCount?: number;
   soundEnabled?: boolean;
+  language?: 'ar' | 'en';
 }
 
 export const TabBar: React.FC<TabBarProps> = ({
@@ -25,22 +26,24 @@ export const TabBar: React.FC<TabBarProps> = ({
   onOpenAddExpense,
   unpaidBillsCount = 0,
   soundEnabled = true,
+  language = 'ar',
 }) => {
+  const isEn = language === 'en';
   const tabs = [
-    { id: 'dashboard' as TabId, label: 'الرئيسية', icon: LayoutDashboard },
-    { id: 'expenses' as TabId, label: 'المصاريف', icon: ReceiptText },
-    { id: 'budgets' as TabId, label: 'الميزانية', icon: PieChart },
+    { id: 'dashboard' as TabId, label: isEn ? 'Dashboard' : 'الرئيسية', icon: LayoutDashboard },
+    { id: 'expenses' as TabId, label: isEn ? 'Expenses' : 'المصاريف', icon: ReceiptText },
+    { id: 'budgets' as TabId, label: isEn ? 'Budgets' : 'الميزانية', icon: PieChart },
     {
       id: 'bills_groceries' as TabId,
-      label: 'فواتير ومشتريات',
+      label: isEn ? 'Bills & List' : 'فواتير ومشتريات',
       icon: ListTodo,
       badge: unpaidBillsCount > 0 ? unpaidBillsCount : undefined,
     },
-    { id: 'analytics_settings' as TabId, label: 'الإعدادات', icon: SlidersHorizontal },
+    { id: 'analytics_settings' as TabId, label: isEn ? 'Settings' : 'الإعدادات', icon: SlidersHorizontal },
   ];
 
   const handleTabClick = (tabId: TabId) => {
-    sound.playTap(soundEnabled);
+    nativeHaptics.tap(soundEnabled);
     onChangeTab(tabId);
   };
 
@@ -50,7 +53,7 @@ export const TabBar: React.FC<TabBarProps> = ({
       <div className="absolute -top-6 left-1/2 -translate-x-1/2 z-40">
         <button
           onClick={() => {
-            sound.playTap(soundEnabled);
+            nativeHaptics.tap(soundEnabled);
             onOpenAddExpense();
           }}
           className="w-13 h-13 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/30 flex items-center justify-center transition-all duration-200 active:scale-95 active:shadow-md cursor-pointer border-4 border-[#F2F2F7] dark:border-[#1C1C1E]"

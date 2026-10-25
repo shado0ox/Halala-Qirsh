@@ -15,7 +15,8 @@ import {
 import { Category, Expense, RecurringBill, BudgetSettings } from '../../types';
 import { CategoryIcon } from '../CategoryIcon';
 import { formatMoney } from '../../utils/storage';
-import { sound } from '../../utils/audio';
+import { nativeHaptics } from '../../utils/nativeHaptics';
+import { translations } from '../../utils/i18n';
 
 interface DashboardTabProps {
   categories: Category[];
@@ -82,13 +83,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   // Category map
   const catMap = new Map(categories.map((c) => [c.id, c]));
+  const lang = settings.language || 'ar';
+  const t = translations[lang];
+  const isEn = lang === 'en';
 
-  // Month title in Arabic
   const monthNamesArabic = [
     'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
     'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
   ];
-  const monthArabic = `${monthNamesArabic[month - 1]} ${year}`;
+  const monthNamesEnglish = [
+    'January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December'
+  ];
+  const monthFormatted = isEn
+    ? `${monthNamesEnglish[month - 1]} ${year}`
+    : `${monthNamesArabic[month - 1]} ${year}`;
 
   // Gauge color logic
   const isDanger = percentageSpent >= 100;
@@ -107,23 +116,23 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         <div>
           <span className="text-xs font-semibold text-[#8E8E93] flex items-center gap-1">
             <Calendar size={13} />
-            <span>ميزانية شهر {monthArabic}</span>
+            <span>{t.monthlyBudgetTitle} {monthFormatted}</span>
           </span>
           <h1 className="text-xl font-extrabold text-[#1C1C1E] dark:text-white tracking-tight">
-            لوحة مصاريف البيت
+            {t.dashboardHeading}
           </h1>
         </div>
 
         <button
           onClick={() => {
-            sound.playTap(settings.soundEnabled);
+            nativeHaptics.tap(settings.soundEnabled);
             onOpenCategoryManager();
           }}
           className="p-2 rounded-xl bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-slate-800 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center gap-1 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           title="تعديل الميزانية والتصنيفات"
         >
           <Sliders size={14} />
-          <span>التصنيفات</span>
+          <span>{t.categoriesBtn}</span>
         </button>
       </div>
 
@@ -208,7 +217,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
       <div className="grid grid-cols-3 gap-2">
         <button
           onClick={() => {
-            sound.playTap(settings.soundEnabled);
+            nativeHaptics.tap(settings.soundEnabled);
             onOpenAddExpense();
           }}
           className="p-3 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white flex flex-col items-center justify-center gap-1.5 shadow-md shadow-blue-500/20 active:scale-95 transition-all cursor-pointer"
@@ -216,12 +225,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="w-8 h-8 rounded-full bg-white/20 flex items-center justify-center">
             <Plus size={18} strokeWidth={2.8} />
           </div>
-          <span className="text-xs font-bold">تسجيل مصروف</span>
+          <span className="text-xs font-bold">{t.recordExpense}</span>
         </button>
 
         <button
           onClick={() => {
-            sound.playTap(settings.soundEnabled);
+            nativeHaptics.tap(settings.soundEnabled);
             onNavigateToTab('bills_groceries');
           }}
           className="p-3 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 flex flex-col items-center justify-center gap-1.5 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800/60 active:scale-95 transition-all cursor-pointer"
@@ -229,12 +238,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
             <ShoppingBag size={18} />
           </div>
-          <span className="text-xs font-bold">نواقص البيت</span>
+          <span className="text-xs font-bold">{t.groceryShortage}</span>
         </button>
 
         <button
           onClick={() => {
-            sound.playTap(settings.soundEnabled);
+            nativeHaptics.tap(settings.soundEnabled);
             onNavigateToTab('budgets');
           }}
           className="p-3 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-slate-800 text-slate-800 dark:text-slate-100 flex flex-col items-center justify-center gap-1.5 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800/60 active:scale-95 transition-all cursor-pointer"
@@ -242,7 +251,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div className="w-8 h-8 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
             <Wallet size={18} />
           </div>
-          <span className="text-xs font-bold">أظرف الميزانية</span>
+          <span className="text-xs font-bold">{t.budgetEnvelopes}</span>
         </button>
       </div>
 

@@ -1,9 +1,21 @@
 @import "tailwindcss";
 
 @layer base {
-  html {
+  html, body {
     font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro AR", "IBM Plex Sans Arabic", "Segoe UI", Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
+    -webkit-touch-callout: none;
+    overscroll-behavior-y: none;
+    overscroll-behavior-x: none;
+    height: 100%;
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Prevent iOS WebKit from auto-zooming on input focus */
+  input, select, textarea {
+    font-size: 16px !important;
   }
 }
 
@@ -22,4 +34,10 @@
 }
 .pt-safe {
   padding-top: env(safe-area-inset-top, 44px);
+}
+.pl-safe {
+  padding-left: env(safe-area-inset-left, 0px);
+}
+.pr-safe {
+  padding-right: env(safe-area-inset-right, 0px);
 }

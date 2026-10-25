@@ -13,21 +13,26 @@ import {
   BudgetSettings,
   InAppNotification,
 } from './types';
-import { loadAppData, saveAppData, getDefaultAppData } from './utils/storage';
-import { sound } from './utils/audio';
+import {
+  loadAppData,
+  loadAppDataFromPreferences,
+  saveAppData,
+  getDefaultAppData,
+} from './utils/storage';
+import { nativeHaptics } from './utils/nativeHaptics';
 import {
   getNotificationPermission,
-  requestNotificationPermission,
-  checkAndScheduleBillReminders,
-  sendTestBillNotification,
   NotificationPermissionState,
 } from './utils/notifications';
+import { NativeNotificationService } from './utils/nativeNotifications';
 
 import { IPhoneFrame } from './components/IPhoneFrame';
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
 import { CategoryManagerModal } from './components/CategoryManagerModal';
 import { IOSNotificationBanner } from './components/IOSNotificationBanner';
+import { PasscodeLockModal } from './components/PasscodeLockModal';
+import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 
 import { DashboardTab } from './components/tabs/DashboardTab';
 import { ExpensesTab } from './components/tabs/ExpensesTab';
@@ -43,13 +48,40 @@ export default function App() {
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
+  // Native Passcode Lock & Privacy Modal state
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    const init = loadAppData();
+    return Boolean(init.settings.isPasscodeEnabled && init.settings.passcode);
+  });
+  const [passcodeModalMode, setPasscodeModalMode] = useState<'unlock' | 'set' | 'change' | null>(null);
+  const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
+
   // Local Notifications state
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(
     () => getNotificationPermission()
   );
   const [currentNotification, setCurrentNotification] = useState<InAppNotification | null>(null);
 
-  // Sync to localStorage whenever data changes
+  // Hydrate from Capacitor Preferences on native load with migration
+  useEffect(() => {
+    loadAppDataFromPreferences().then((prefData) => {
+      setData(prefData);
+      if (prefData.settings.isPasscodeEnabled && prefData.settings.passcode) {
+        setIsLocked(true);
+      }
+    });
+  }, []);
+
+  // Sync document RTL/LTR and language attribute
+  useEffect(() => {
+    const lang = data.settings.language || 'ar';
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = lang;
+      document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
+    }
+  }, [data.settings.language]);
+
+  // Sync to Capacitor Preferences & localStorage whenever data changes
   useEffect(() => {
     saveAppData(data);
   }, [data]);
@@ -64,40 +96,47 @@ export default function App() {
 
   // Update notification permission state on mount
   useEffect(() => {
-    setNotificationPermission(getNotificationPermission());
+    NativeNotificationService.checkPermissions().then((status) => {
+      setNotificationPermission(status === 'granted' ? 'granted' : status === 'denied' ? 'denied' : 'default');
+    });
   }, []);
 
+  // Schedule daily expense reminder whenever settings change
+  useEffect(() => {
+    NativeNotificationService.scheduleDailyReminder(data.settings);
+  }, [data.settings.dailyReminderEnabled, data.settings.dailyReminderTime, data.settings.language]);
+
   // Evaluate and schedule local bill notifications
-  const runBillNotificationCheck = useCallback(() => {
+  const runBillNotificationCheck = useCallback(async () => {
     if (!data.settings.notificationsEnabled) return;
-    const reminders = checkAndScheduleBillReminders(data.bills, data.settings);
+    const reminders = await NativeNotificationService.scheduleBillReminders(data.bills, data.settings);
     if (reminders.length > 0 && !currentNotification) {
       setCurrentNotification(reminders[0]);
     }
   }, [data.bills, data.settings, currentNotification]);
 
   useEffect(() => {
-    // Check reminders on mount and every 30 seconds
     runBillNotificationCheck();
     const interval = setInterval(runBillNotificationCheck, 30000);
     return () => clearInterval(interval);
   }, [runBillNotificationCheck]);
 
-  // Request browser Notification API permission
+  // Request browser / native Notification permission
   const handleRequestNotificationPermission = async () => {
-    sound.playTap(data.settings.soundEnabled);
-    const perm = await requestNotificationPermission();
-    setNotificationPermission(perm);
-    if (perm === 'granted') {
-      sound.playSuccess(data.settings.soundEnabled);
+    nativeHaptics.tap(data.settings.soundEnabled);
+    const granted = await NativeNotificationService.requestPermissions();
+    setNotificationPermission(granted ? 'granted' : 'denied');
+    if (granted) {
+      nativeHaptics.success(data.settings.soundEnabled);
       runBillNotificationCheck();
+      NativeNotificationService.scheduleDailyReminder(data.settings);
     }
   };
 
   // Send a test notification
-  const handleSendTestNotification = () => {
-    sound.playSuccess(data.settings.soundEnabled);
-    const res = sendTestBillNotification(data.settings.currency);
+  const handleSendTestNotification = async () => {
+    nativeHaptics.success(data.settings.soundEnabled);
+    const res = await NativeNotificationService.sendTest(data.settings);
     setCurrentNotification({
       id: `test-${Date.now()}`,
       title: res.title,
@@ -119,6 +158,7 @@ export default function App() {
 
   // Add or Edit Expense
   const handleSaveExpense = (expenseData: Omit<Expense, 'id' | 'createdAt'>) => {
+    nativeHaptics.success(data.settings.soundEnabled);
     if (editingExpense) {
       // Edit
       setData((prev) => ({
@@ -150,6 +190,7 @@ export default function App() {
   };
 
   const handleDeleteExpense = (expenseId: string) => {
+    nativeHaptics.warning(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       expenses: prev.expenses.filter((e) => e.id !== expenseId),
@@ -158,6 +199,7 @@ export default function App() {
 
   // Categories
   const handleSaveCategory = (catToSave: Category) => {
+    nativeHaptics.success(data.settings.soundEnabled);
     setData((prev) => {
       const exists = prev.categories.some((c) => c.id === catToSave.id);
       if (exists) {
@@ -175,10 +217,10 @@ export default function App() {
   };
 
   const handleDeleteCategory = (categoryId: string) => {
+    nativeHaptics.warning(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       categories: prev.categories.filter((c) => c.id !== categoryId),
-      // fallback expenses category to food or first available
       expenses: prev.expenses.map((e) =>
         e.categoryId === categoryId ? { ...e, categoryId: prev.categories[0]?.id || 'food' } : e
       ),
@@ -186,6 +228,7 @@ export default function App() {
   };
 
   const handleUpdateCategoryLimit = (categoryId: string, newLimit: number) => {
+    nativeHaptics.tap(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       categories: prev.categories.map((c) =>
@@ -196,6 +239,7 @@ export default function App() {
 
   // Bills
   const handleToggleBill = (billId: string) => {
+    nativeHaptics.success(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       bills: prev.bills.map((b) => (b.id === billId ? { ...b, isPaid: !b.isPaid } : b)),
@@ -203,6 +247,7 @@ export default function App() {
   };
 
   const handleToggleBillReminder = (billId: string) => {
+    nativeHaptics.tap(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       bills: prev.bills.map((b) =>
@@ -212,6 +257,7 @@ export default function App() {
   };
 
   const handleAddBill = (billData: Omit<RecurringBill, 'id'>) => {
+    nativeHaptics.success(data.settings.soundEnabled);
     const newBill: RecurringBill = {
       ...billData,
       id: `bill-${Date.now()}`,
@@ -223,6 +269,7 @@ export default function App() {
   };
 
   const handleDeleteBill = (billId: string) => {
+    nativeHaptics.warning(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       bills: prev.bills.filter((b) => b.id !== billId),
@@ -231,6 +278,7 @@ export default function App() {
 
   // Groceries
   const handleToggleGrocery = (itemId: string) => {
+    nativeHaptics.tap(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       groceries: prev.groceries.map((g) => (g.id === itemId ? { ...g, isBought: !g.isBought } : g)),
@@ -238,6 +286,7 @@ export default function App() {
   };
 
   const handleAddGrocery = (itemData: Omit<GroceryItem, 'id'>) => {
+    nativeHaptics.success(data.settings.soundEnabled);
     const newGroc: GroceryItem = {
       ...itemData,
       id: `groc-${Date.now()}`,
@@ -249,6 +298,7 @@ export default function App() {
   };
 
   const handleDeleteGrocery = (itemId: string) => {
+    nativeHaptics.warning(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       groceries: prev.groceries.filter((g) => g.id !== itemId),
@@ -256,22 +306,22 @@ export default function App() {
   };
 
   const handleConvertBoughtToExpense = (items: GroceryItem[]) => {
+    nativeHaptics.success(data.settings.soundEnabled);
     const totalAmount = items.reduce((sum, i) => sum + i.estimatedPrice * i.quantity, 0);
     const itemNames = items.map((i) => i.name).join('، ');
 
     const newExpense: Expense = {
       id: `exp-${Date.now()}`,
-      title: 'مشتريات ونواقص تموين البيت',
+      title: data.settings.language === 'en' ? 'Household Grocery Purchase' : 'مشتريات ونواقص تموين البيت',
       amount: totalAmount > 0 ? totalAmount : 150,
       categoryId: data.categories[0]?.id || 'food',
       date: new Date().toISOString().split('T')[0],
       paymentMethod: 'card',
       payer: 'مشترك',
-      notes: `أصناف مشتراة: ${itemNames}`,
+      notes: `${data.settings.language === 'en' ? 'Purchased items:' : 'أصناف مشتراة:'} ${itemNames}`,
       createdAt: Date.now(),
     };
 
-    // Remove bought items from list and add expense
     setData((prev) => ({
       ...prev,
       expenses: [newExpense, ...prev.expenses],
@@ -300,7 +350,21 @@ export default function App() {
     }));
   };
 
-  // Unpaid bills count for TabBar badge
+  // Passcode modal success handlers
+  const handlePasscodeSuccess = (newPin?: string) => {
+    if (isLocked) {
+      setIsLocked(false);
+    } else if (newPin) {
+      handleUpdateSettings({ isPasscodeEnabled: true, passcode: newPin });
+      setPasscodeModalMode(null);
+    }
+  };
+
+  const handleDisablePasscode = () => {
+    handleUpdateSettings({ isPasscodeEnabled: false, passcode: '' });
+  };
+
+  const isEn = data.settings.language === 'en';
   const unpaidBillsCount = data.bills.filter((b) => !b.isPaid).length;
 
   return (
@@ -402,6 +466,9 @@ export default function App() {
             onRequestNotificationPermission={handleRequestNotificationPermission}
             onSendTestNotification={handleSendTestNotification}
             notificationPermission={notificationPermission}
+            onOpenPasscodeModal={(mode) => setPasscodeModalMode(mode)}
+            onDisablePasscode={handleDisablePasscode}
+            onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
           />
         )}
       </div>
@@ -416,6 +483,7 @@ export default function App() {
         }}
         unpaidBillsCount={unpaidBillsCount}
         soundEnabled={data.settings.soundEnabled}
+        language={data.settings.language}
       />
 
       {/* Bottom Sheet for Adding/Editing Expense */}
@@ -440,6 +508,39 @@ export default function App() {
         currency={data.settings.currency}
         onSaveCategory={handleSaveCategory}
         onDeleteCategory={handleDeleteCategory}
+        soundEnabled={data.settings.soundEnabled}
+      />
+
+      {/* Passcode Unlock Screen (shown if app is locked) */}
+      <PasscodeLockModal
+        isOpen={isLocked}
+        mode="unlock"
+        correctPasscode={data.settings.passcode}
+        onSuccess={() => setIsLocked(false)}
+        isDark={isDarkMode}
+        soundEnabled={data.settings.soundEnabled}
+        isEnglish={isEn}
+      />
+
+      {/* Passcode Set / Change Modal */}
+      {passcodeModalMode && (
+        <PasscodeLockModal
+          isOpen={true}
+          mode={passcodeModalMode}
+          correctPasscode={data.settings.passcode}
+          onSuccess={handlePasscodeSuccess}
+          onCancel={() => setPasscodeModalMode(null)}
+          isDark={isDarkMode}
+          soundEnabled={data.settings.soundEnabled}
+          isEnglish={isEn}
+        />
+      )}
+
+      {/* Privacy Policy Modal */}
+      <PrivacyPolicyModal
+        isOpen={isPrivacyPolicyOpen}
+        onClose={() => setIsPrivacyPolicyOpen(false)}
+        isEnglish={isEn}
         soundEnabled={data.settings.soundEnabled}
       />
     </IPhoneFrame>

@@ -1,21 +1,24 @@
+import { Preferences } from '@capacitor/preferences';
 import { AppData, Category, Expense, RecurringBill, GroceryItem, CurrencyCode } from '../types';
+import { NativeShareService } from './nativeShare';
 
 const STORAGE_KEY = 'ios_home_expenses_store_v1';
 
-export const CURRENCY_SYMBOLS: Record<CurrencyCode, { symbol: string; name: string }> = {
-  SAR: { symbol: 'ر.س', name: 'ريال سعودي' },
-  EGP: { symbol: 'ج.م', name: 'جنيه مصري' },
-  AED: { symbol: 'د.إ', name: 'درهم إماراتي' },
-  KWD: { symbol: 'د.ك', name: 'دينار كويتي' },
-  QAR: { symbol: 'ر.ق', name: 'ريال قطري' },
-  USD: { symbol: '$', name: 'دولار أمريكي' },
-  EUR: { symbol: '€', name: 'يورو' },
+export const CURRENCY_SYMBOLS: Record<CurrencyCode, { symbol: string; name: string; nameEn: string }> = {
+  SAR: { symbol: 'ر.س', name: 'ريال سعودي', nameEn: 'Saudi Riyal' },
+  EGP: { symbol: 'ج.م', name: 'جنيه مصري', nameEn: 'Egyptian Pound' },
+  AED: { symbol: 'د.إ', name: 'درهم إماراتي', nameEn: 'UAE Dirham' },
+  KWD: { symbol: 'د.ك', name: 'دينار كويتي', nameEn: 'Kuwaiti Dinar' },
+  QAR: { symbol: 'ر.ق', name: 'ريال قطري', nameEn: 'Qatari Riyal' },
+  USD: { symbol: '$', name: 'دولار أمريكي', nameEn: 'US Dollar' },
+  EUR: { symbol: '€', name: 'يورو', nameEn: 'Euro' },
 };
 
 export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'food',
     name: 'البقالة والسوبرماركت',
+    nameEn: 'Groceries & Food',
     icon: 'ShoppingCart',
     color: '#10B981',
     bgColor: '#ECFDF5',
@@ -24,6 +27,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'bills',
     name: 'فواتير وخدمات المنزل',
+    nameEn: 'Utilities & Bills',
     icon: 'Zap',
     color: '#F59E0B',
     bgColor: '#FFFBEB',
@@ -32,6 +36,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'housing',
     name: 'إيجار وسكن',
+    nameEn: 'Rent & Housing',
     icon: 'Home',
     color: '#3B82F6',
     bgColor: '#EFF6FF',
@@ -40,6 +45,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'kids',
     name: 'الأطفال والمدارس',
+    nameEn: 'Kids & School',
     icon: 'Baby',
     color: '#EC4899',
     bgColor: '#FDF2F8',
@@ -48,6 +54,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'maintenance',
     name: 'صيانة وتجهيزات البيت',
+    nameEn: 'Home Maintenance',
     icon: 'Wrench',
     color: '#8B5CF6',
     bgColor: '#F5F3FF',
@@ -56,6 +63,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'health',
     name: 'الصحة والأدوية',
+    nameEn: 'Health & Medical',
     icon: 'HeartPulse',
     color: '#EF4444',
     bgColor: '#FEF2F2',
@@ -64,6 +72,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'transport',
     name: 'بنزين ومواصلات',
+    nameEn: 'Transport & Fuel',
     icon: 'Car',
     color: '#6366F1',
     bgColor: '#EEF2FF',
@@ -72,6 +81,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'entertainment',
     name: 'ترفيه ومطاعم عائلية',
+    nameEn: 'Outings & Dining',
     icon: 'Coffee',
     color: '#14B8A6',
     bgColor: '#F0FDFA',
@@ -80,6 +90,7 @@ export const DEFAULT_CATEGORIES: Category[] = [
   {
     id: 'emergency',
     name: 'طوارئ ومتفرقات',
+    nameEn: 'Emergency & Misc',
     icon: 'Shield',
     color: '#64748B',
     bgColor: '#F8FAFC',
@@ -330,9 +341,17 @@ export const getDefaultAppData = (): AppData => ({
     selectedMonth: getCurrentMonthString(),
     notificationsEnabled: true,
     notificationLeadDays: 1,
+    dailyReminderEnabled: true,
+    dailyReminderTime: '21:00',
+    language: 'ar',
+    isPasscodeEnabled: false,
+    passcode: '',
   },
 });
 
+/**
+ * Synchronous memory cache & fallback loader
+ */
 export const loadAppData = (): AppData => {
   if (typeof window === 'undefined') return getDefaultAppData();
   try {
@@ -361,52 +380,131 @@ export const loadAppData = (): AppData => {
   }
 };
 
-export const saveAppData = (data: AppData): void => {
-  if (typeof window === 'undefined') return;
+/**
+ * Asynchronously loads from Capacitor Preferences (Native iOS NSUserDefaults)
+ * with automatic migration from localStorage if needed.
+ */
+export const loadAppDataFromPreferences = async (): Promise<AppData> => {
+  const defaultData = getDefaultAppData();
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const { value } = await Preferences.get({ key: STORAGE_KEY });
+
+    if (value) {
+      const parsed = JSON.parse(value) as Partial<AppData>;
+      const merged: AppData = {
+        categories: parsed.categories && parsed.categories.length > 0 ? parsed.categories : defaultData.categories,
+        expenses: parsed.expenses || defaultData.expenses,
+        bills: parsed.bills || defaultData.bills,
+        groceries: parsed.groceries || defaultData.groceries,
+        settings: {
+          ...defaultData.settings,
+          ...(parsed.settings || {}),
+        },
+      };
+      // Keep localStorage in sync as well
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
+      return merged;
+    }
+
+    // Migration step: If not in Preferences, check localStorage
+    const localRaw = typeof window !== 'undefined' ? localStorage.getItem(STORAGE_KEY) : null;
+    if (localRaw) {
+      console.log('Migrating existing localStorage data into Capacitor Preferences...');
+      const parsed = JSON.parse(localRaw) as Partial<AppData>;
+      const merged: AppData = {
+        categories: parsed.categories && parsed.categories.length > 0 ? parsed.categories : defaultData.categories,
+        expenses: parsed.expenses || defaultData.expenses,
+        bills: parsed.bills || defaultData.bills,
+        groceries: parsed.groceries || defaultData.groceries,
+        settings: {
+          ...defaultData.settings,
+          ...(parsed.settings || {}),
+        },
+      };
+      await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(merged) });
+      return merged;
+    }
+
+    // If completely new, save default to Preferences
+    await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(defaultData) });
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
+    return defaultData;
   } catch (err) {
-    console.error('Failed to save to local storage:', err);
+    console.error('Preferences read error, using localStorage fallback:', err);
+    return loadAppData();
   }
 };
 
-export const exportDataAsJSON = (data: AppData): void => {
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `home_expenses_backup_${new Date().toISOString().split('T')[0]}.json`;
-  a.click();
-  URL.revokeObjectURL(url);
+/**
+ * Saves both to Capacitor Preferences (persistent against iOS eviction)
+ * and to localStorage.
+ */
+export const saveAppData = (data: AppData): void => {
+  if (typeof window === 'undefined') return;
+  const json = JSON.stringify(data);
+  try {
+    localStorage.setItem(STORAGE_KEY, json);
+  } catch (err) {
+    console.error('Failed to save to local storage:', err);
+  }
+
+  // Persist to Capacitor Preferences
+  Preferences.set({ key: STORAGE_KEY, value: json }).catch((err) => {
+    console.error('Failed to save to Capacitor Preferences:', err);
+  });
 };
 
-export const exportExpensesToCSV = (expenses: Expense[], categories: Category[], currencySymbol: string): void => {
-  const catMap = new Map(categories.map(c => [c.id, c.name]));
-  const headers = ['التاريخ', 'البند', 'المبلغ', 'العملة', 'الفئة', 'طريقة الدفع', 'المسؤول', 'ملاحظات'];
+export const exportDataAsJSON = async (data: AppData, useShareSheet: boolean = true): Promise<void> => {
+  const json = JSON.stringify(data, null, 2);
+  const fileName = `home_expenses_backup_${new Date().toISOString().split('T')[0]}.json`;
 
-  const rows = expenses.map(e => [
+  if (useShareSheet) {
+    await NativeShareService.shareFile(fileName, json, 'application/json');
+  } else {
+    const blob = new Blob([json], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = fileName;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+};
+
+export const exportExpensesToCSV = async (
+  expenses: Expense[],
+  categories: Category[],
+  currencySymbol: string,
+  isEnglish: boolean = false
+): Promise<void> => {
+  const catMap = new Map(categories.map((c) => [c.id, isEnglish && c.nameEn ? c.nameEn : c.name]));
+  const headers = isEnglish
+    ? ['Date', 'Item', 'Amount', 'Currency', 'Category', 'Payment Method', 'Payer', 'Notes']
+    : ['التاريخ', 'البند', 'المبلغ', 'العملة', 'الفئة', 'طريقة الدفع', 'المسؤول', 'ملاحظات'];
+
+  const rows = expenses.map((e) => [
     `"${e.date}"`,
     `"${e.title.replace(/"/g, '""')}"`,
     e.amount,
     `"${currencySymbol}"`,
-    `"${catMap.get(e.categoryId) || 'غير محدد'}"`,
+    `"${catMap.get(e.categoryId) || (isEnglish ? 'General' : 'غير محدد')}"`,
     `"${e.paymentMethod}"`,
     `"${e.payer}"`,
     `"${(e.notes || '').replace(/"/g, '""')}"`,
   ]);
 
-  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
-  const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = `home_expenses_report_${new Date().toISOString().split('T')[0]}.csv`;
-  a.click();
-  URL.revokeObjectURL(url);
+  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const fileName = `expenses_report_${new Date().toISOString().split('T')[0]}.csv`;
+
+  await NativeShareService.shareFile(fileName, csvContent, 'text/csv');
 };
 
-export const formatMoney = (amount: number, currency: CurrencyCode): string => {
+export const formatMoney = (amount: number, currency: CurrencyCode, lang: 'ar' | 'en' = 'ar'): string => {
   const sym = CURRENCY_SYMBOLS[currency]?.symbol || 'ر.س';
-  return `${amount.toLocaleString('ar-SA', { minimumFractionDigits: 0, maximumFractionDigits: 1 })} ${sym}`;
+  const formattedNum = amount.toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 1,
+  });
+
+  return lang === 'ar' ? `${formattedNum} ${sym}` : `${sym} ${formattedNum}`;
 };

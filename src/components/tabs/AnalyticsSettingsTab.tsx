@@ -6,13 +6,17 @@ import {
   FileSpreadsheet,
   RotateCcw,
   Trash2,
-  DollarSign,
   Calendar,
   Volume2,
-  Smartphone,
   ShieldCheck,
-  CreditCard,
   Users,
+  BellRing,
+  Sparkles,
+  Lock,
+  Clock,
+  Globe,
+  Share2,
+  FileText,
 } from 'lucide-react';
 import {
   Category,
@@ -28,9 +32,9 @@ import {
   exportDataAsJSON,
   exportExpensesToCSV,
 } from '../../utils/storage';
-import { sound } from '../../utils/audio';
+import { nativeHaptics } from '../../utils/nativeHaptics';
 import { NotificationPermissionState } from '../../utils/notifications';
-import { Bell, BellRing, Sparkles } from 'lucide-react';
+import { translations } from '../../utils/i18n';
 
 interface AnalyticsSettingsTabProps {
   categories: Category[];
@@ -44,6 +48,9 @@ interface AnalyticsSettingsTabProps {
   onRequestNotificationPermission: () => Promise<void>;
   onSendTestNotification: () => void;
   notificationPermission: NotificationPermissionState;
+  onOpenPasscodeModal: (mode: 'set' | 'change') => void;
+  onDisablePasscode: () => void;
+  onOpenPrivacyPolicy: () => void;
 }
 
 export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
@@ -58,8 +65,14 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   onRequestNotificationPermission,
   onSendTestNotification,
   notificationPermission,
+  onOpenPasscodeModal,
+  onDisablePasscode,
+  onOpenPrivacyPolicy,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lang = settings.language || 'ar';
+  const t = translations[lang];
+  const isEn = lang === 'en';
 
   const currentMonth = settings.selectedMonth;
   const monthlyExpenses = expenses.filter((e) => e.date.startsWith(currentMonth));
@@ -85,15 +98,18 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
     payerMap.set(e.payer, (payerMap.get(e.payer) || 0) + e.amount);
   });
 
-  // Payment method breakdown
-  const paymentMap = new Map<string, number>();
-  monthlyExpenses.forEach((e) => {
-    paymentMap.set(e.paymentMethod, (paymentMap.get(e.paymentMethod) || 0) + e.amount);
-  });
-
   const handleCurrencyChange = (curr: CurrencyCode) => {
-    sound.playTap(settings.soundEnabled);
+    nativeHaptics.tap(settings.soundEnabled);
     onUpdateSettings({ currency: curr });
+  };
+
+  const handleLanguageToggle = (newLang: 'ar' | 'en') => {
+    nativeHaptics.tap(settings.soundEnabled);
+    onUpdateSettings({ language: newLang });
+    if (typeof document !== 'undefined') {
+      document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
+      document.documentElement.lang = newLang;
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -105,14 +121,14 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (parsed.categories && parsed.expenses) {
-          sound.playSuccess(settings.soundEnabled);
+          nativeHaptics.success(settings.soundEnabled);
           onImportData(parsed);
-          alert('تم استعادة النسخة الاحتياطية بنجاح!');
+          alert(isEn ? 'Backup restored successfully!' : 'تم استعادة النسخة الاحتياطية بنجاح!');
         } else {
-          alert('ملف النسخة الاحتياطية غير صالح.');
+          alert(isEn ? 'Invalid backup file format.' : 'ملف النسخة الاحتياطية غير صالح.');
         }
       } catch {
-        alert('حدث خطأ أثناء قراءة الملف.');
+        alert(isEn ? 'Error reading backup file.' : 'حدث خطأ أثناء قراءة الملف.');
       }
     };
     reader.readAsText(file);
@@ -124,11 +140,9 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
       {/* Title */}
       <div>
         <h1 className="text-xl font-extrabold text-[#1C1C1E] dark:text-white tracking-tight">
-          التقارير وإعدادات التطبيق
+          {t.reportsSettings}
         </h1>
-        <p className="text-xs text-[#8E8E93]">
-          تحليل مصاريف البيت، العملة، والنسخ الاحتياطي المحلي
-        </p>
+        <p className="text-xs text-[#8E8E93]">{t.reportsSubtitle}</p>
       </div>
 
       {/* SECTION 1: VISUAL ANALYTICS */}
@@ -136,10 +150,10 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-[#8E8E93] flex items-center gap-1.5">
             <PieChart size={14} className="text-blue-500" />
-            <span>توزيع المصروفات حسب التصنيف</span>
+            <span>{t.spendByCategory}</span>
           </span>
           <span className="text-xs font-bold text-[#1C1C1E] dark:text-white tabular-nums">
-            {formatMoney(totalSpent, settings.currency)}
+            {formatMoney(totalSpent, settings.currency, lang)}
           </span>
         </div>
 
@@ -147,16 +161,17 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         <div className="space-y-2.5">
           {sortedCategoriesBySpend.map((c) => {
             const pct = totalSpent > 0 ? Math.round((c.spent / totalSpent) * 100) : 0;
+            const categoryName = isEn && c.nameEn ? c.nameEn : c.name;
             return (
               <div key={c.id} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
                     <CategoryIcon iconName={c.icon} color={c.color} bgColor={c.bgColor} size="sm" />
-                    <span className="font-semibold text-[#1C1C1E] dark:text-white">{c.name}</span>
+                    <span className="font-semibold text-[#1C1C1E] dark:text-white">{categoryName}</span>
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="font-extrabold tabular-nums text-[#1C1C1E] dark:text-white">
-                      {formatMoney(c.spent, settings.currency)}
+                      {formatMoney(c.spent, settings.currency, lang)}
                     </span>
                     <span className="text-[11px] text-[#8E8E93] tabular-nums font-semibold w-8 text-left">
                       {pct}%
@@ -176,7 +191,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
 
           {sortedCategoriesBySpend.length === 0 && (
             <div className="py-4 text-center text-xs text-[#8E8E93]">
-              لا توجد مصاريف لتحليلها لهذا الشهر حتى الآن.
+              {isEn ? 'No expenses recorded for this month yet.' : 'لا توجد مصاريف لتحليلها لهذا الشهر حتى الآن.'}
             </div>
           )}
         </div>
@@ -186,17 +201,19 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           <div className="pt-3 border-t border-[#E5E5EA] dark:border-[#2C2C2E] space-y-2">
             <span className="text-[11px] font-bold text-[#8E8E93] flex items-center gap-1">
               <Users size={12} />
-              <span>توزيع الدفع في الأسرة</span>
+              <span>{t.familyPaymentShare}</span>
             </span>
             <div className="grid grid-cols-3 gap-2 text-center text-xs">
               {(['الزوج', 'الزوجة', 'مشترك'] as const).map((p) => {
                 const amount = payerMap.get(p) || 0;
                 const pct = totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0;
+                const payerLabel = isEn ? (p === 'الزوج' ? t.husband : p === 'الزوجة' ? t.wife : t.joint) : p;
+
                 return (
                   <div key={p} className="p-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
-                    <span className="text-[10px] text-[#8E8E93] block font-medium">{p}</span>
+                    <span className="text-[10px] text-[#8E8E93] block font-medium">{payerLabel}</span>
                     <span className="font-bold text-[#1C1C1E] dark:text-white tabular-nums block">
-                      {formatMoney(amount, settings.currency)}
+                      {formatMoney(amount, settings.currency, lang)}
                     </span>
                     <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold tabular-nums">
                       {pct}%
@@ -209,16 +226,152 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         )}
       </div>
 
-      {/* SECTION 2: APP PREFERENCES */}
+      {/* SECTION 2: NATIVE SECURITY & APP PREFERENCES */}
       <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-2xs space-y-3.5">
         <span className="text-xs font-bold text-[#8E8E93] block">
-          تخصيص العملة وتفضيلات التطبيق
+          {isEn ? 'System & Native App Preferences' : 'تفضيلات التطبيق والأمان'}
         </span>
+
+        {/* Language Switcher */}
+        <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
+          <div className="flex items-center gap-2">
+            <Globe size={16} className="text-blue-500" />
+            <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
+              {t.languageSwitcher}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-1 bg-white dark:bg-[#1C1C1E] p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+            <button
+              onClick={() => handleLanguageToggle('ar')}
+              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer ${
+                lang === 'ar' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              العربية
+            </button>
+            <button
+              onClick={() => handleLanguageToggle('en')}
+              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer ${
+                lang === 'en' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              English
+            </button>
+          </div>
+        </div>
+
+        {/* Passcode Lock (Face ID) */}
+        <div className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Lock size={16} className="text-purple-500" />
+              <div>
+                <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
+                  {t.passcodeLockTitle}
+                </span>
+                <span className="text-[10px] text-[#8E8E93]">{t.passcodeLockSubtitle}</span>
+              </div>
+            </div>
+
+            <span
+              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                settings.isPasscodeEnabled
+                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
+                  : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+              }`}
+            >
+              {settings.isPasscodeEnabled ? (isEn ? 'Enabled' : 'مفعل') : (isEn ? 'Disabled' : 'معطل')}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2 pt-1 border-t border-[#E5E5EA] dark:border-[#3A3A3C]">
+            {!settings.isPasscodeEnabled ? (
+              <button
+                type="button"
+                onClick={() => {
+                  nativeHaptics.tap(settings.soundEnabled);
+                  onOpenPasscodeModal('set');
+                }}
+                className="flex-1 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
+              >
+                <Lock size={13} />
+                <span>{t.setPasscode}</span>
+              </button>
+            ) : (
+              <>
+                <button
+                  type="button"
+                  onClick={() => {
+                    nativeHaptics.tap(settings.soundEnabled);
+                    onOpenPasscodeModal('change');
+                  }}
+                  className="flex-1 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] text-purple-600 dark:text-purple-400 font-bold text-xs flex items-center justify-center gap-1 border border-purple-200 dark:border-purple-800 cursor-pointer"
+                >
+                  <span>{t.changePasscode}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    nativeHaptics.warning(settings.soundEnabled);
+                    onDisablePasscode();
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 font-bold text-xs cursor-pointer"
+                >
+                  <span>{t.disablePasscode}</span>
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {/* Daily Expense Logging Reminder */}
+        <div className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] space-y-2">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Clock size={16} className="text-amber-500" />
+              <div>
+                <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
+                  {t.dailyReminderTitle}
+                </span>
+                <span className="text-[10px] text-[#8E8E93]">{t.dailyReminderSubtitle}</span>
+              </div>
+            </div>
+
+            <button
+              onClick={() => {
+                nativeHaptics.tap(settings.soundEnabled);
+                onUpdateSettings({ dailyReminderEnabled: !settings.dailyReminderEnabled });
+              }}
+              className={`w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer shrink-0 ${
+                settings.dailyReminderEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
+              }`}
+            >
+              <div
+                className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
+                  settings.dailyReminderEnabled ? (isEn ? 'translate-x-5' : 'translate-x-5') : 'translate-x-0'
+                }`}
+              />
+            </button>
+          </div>
+
+          {settings.dailyReminderEnabled && (
+            <div className="flex items-center justify-between pt-1 border-t border-[#E5E5EA] dark:border-[#3A3A3C] text-xs">
+              <span className="text-[#8E8E93]">{isEn ? 'Reminder Time:' : 'وقت التذكير المسائي:'}</span>
+              <input
+                type="time"
+                value={settings.dailyReminderTime || '21:00'}
+                onChange={(e) => onUpdateSettings({ dailyReminderTime: e.target.value })}
+                className="px-2 py-1 bg-white dark:bg-[#1C1C1E] border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
+              />
+            </div>
+          )}
+        </div>
 
         {/* Currency Switcher */}
         <div>
           <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-            عملة التطبيق (الحالية: {CURRENCY_SYMBOLS[settings.currency]?.name})
+            {t.appCurrency} ({CURRENCY_SYMBOLS[settings.currency]?.[isEn ? 'nameEn' : 'name']})
           </label>
           <div className="grid grid-cols-4 gap-1.5">
             {(Object.keys(CURRENCY_SYMBOLS) as CurrencyCode[]).map((c) => {
@@ -246,7 +399,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           <div className="flex items-center gap-2">
             <Calendar size={16} className="text-blue-500" />
             <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-              يوم نزول الراتب / الدخل الشهري
+              {t.salaryDay}
             </span>
           </div>
           <div className="flex items-center gap-1">
@@ -260,21 +413,21 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
               }
               className="w-12 text-center text-xs font-bold px-1 py-1 rounded-lg bg-white dark:bg-[#1C1C1E] border border-slate-300 dark:border-slate-700 tabular-nums"
             />
-            <span className="text-xs text-[#8E8E93]">من الشهر</span>
+            <span className="text-xs text-[#8E8E93]">{isEn ? 'of month' : 'من الشهر'}</span>
           </div>
         </div>
 
-        {/* Sound toggle */}
+        {/* Sound & Haptics toggle */}
         <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
           <div className="flex items-center gap-2">
             <Volume2 size={16} className="text-blue-500" />
             <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-              أصوات النقر اللمسية لـ iOS
+              {t.soundHaptics}
             </span>
           </div>
           <button
             onClick={() => {
-              sound.playTap(!settings.soundEnabled);
+              nativeHaptics.tap(!settings.soundEnabled);
               onUpdateSettings({ soundEnabled: !settings.soundEnabled });
             }}
             className={`w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer ${
@@ -296,17 +449,17 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
               <BellRing size={16} className="text-blue-500" />
               <div>
                 <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
-                  تنبيهات الفواتير الدورية (Local Notifications)
+                  {t.localNotifications}
                 </span>
                 <span className="text-[10px] text-[#8E8E93]">
-                  إشعار محلي من المتصفح لتذكيرك قبل حلول موعد الاستحقاق
+                  {isEn ? 'Local on-device alerts before due dates' : 'إشعار محلي لتذكيرك قبل حلول موعد الاستحقاق'}
                 </span>
               </div>
             </div>
 
             <button
               onClick={() => {
-                sound.playTap(settings.soundEnabled);
+                nativeHaptics.tap(settings.soundEnabled);
                 onUpdateSettings({ notificationsEnabled: !settings.notificationsEnabled });
               }}
               className={`w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer shrink-0 ${
@@ -323,9 +476,10 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
 
           {settings.notificationsEnabled && (
             <div className="space-y-2 bg-[#F2F2F7] dark:bg-[#2C2C2E] p-2.5 rounded-2xl text-xs">
-              {/* Permission status row */}
               <div className="flex items-center justify-between">
-                <span className="text-[#8E8E93] text-[11px] font-semibold">حالة إذن المتصفح:</span>
+                <span className="text-[#8E8E93] text-[11px] font-semibold">
+                  {isEn ? 'Notification Permission:' : 'حالة إذن المتصفح / الجهاز:'}
+                </span>
                 <span
                   className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
                     notificationPermission === 'granted'
@@ -336,42 +490,13 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
                   }`}
                 >
                   {notificationPermission === 'granted'
-                    ? 'مسموح ومفعل ✓'
+                    ? isEn ? 'Granted ✓' : 'مسموح ومفعل ✓'
                     : notificationPermission === 'denied'
-                    ? 'محظور من إعدادات المتصفح'
-                    : 'يتطلب الموافقة'}
+                    ? isEn ? 'Denied in Settings' : 'محظور من الإعدادات'
+                    : isEn ? 'Needs Permission' : 'يتطلب الموافقة'}
                 </span>
               </div>
 
-              {/* Lead Days selector */}
-              <div className="flex items-center justify-between pt-1 border-t border-[#E5E5EA] dark:border-[#3A3A3C]">
-                <span className="text-[#8E8E93] text-[11px] font-semibold">موعد إرسال التذكير:</span>
-                <div className="flex items-center gap-1 font-semibold text-[10px]">
-                  {[
-                    { days: 0, label: 'في نفس اليوم' },
-                    { days: 1, label: 'قبل يوم' },
-                    { days: 3, label: 'قبل 3 أيام' },
-                  ].map((opt) => (
-                    <button
-                      key={opt.days}
-                      type="button"
-                      onClick={() => {
-                        sound.playTap(settings.soundEnabled);
-                        onUpdateSettings({ notificationLeadDays: opt.days });
-                      }}
-                      className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
-                        settings.notificationLeadDays === opt.days
-                          ? 'bg-blue-600 text-white font-bold shadow-2xs'
-                          : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                      }`}
-                    >
-                      {opt.label}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Action Buttons */}
               <div className="pt-1 flex items-center gap-2">
                 {notificationPermission !== 'granted' ? (
                   <button
@@ -379,8 +504,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
                     onClick={onRequestNotificationPermission}
                     className="flex-1 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
                   >
-                    <Bell size={13} />
-                    <span>طلب إذن إشعارات المتصفح</span>
+                    <span>{isEn ? 'Request Notification Permission' : 'طلب إذن الإشعارات'}</span>
                   </button>
                 ) : (
                   <button
@@ -389,7 +513,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
                     className="flex-1 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center gap-1 border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50"
                   >
                     <Sparkles size={13} />
-                    <span>إرسال إشعار تجريبي الآن</span>
+                    <span>{isEn ? 'Send Test Notification' : 'إرسال إشعار تجريبي الآن'}</span>
                   </button>
                 )}
               </div>
@@ -403,37 +527,37 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         <div className="flex items-center gap-2">
           <ShieldCheck size={16} className="text-emerald-500" />
           <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-            النسخ الاحتياطي والتخزين المحلي
+            {t.backupAndStorage}
           </span>
         </div>
-        <p className="text-[11px] text-[#8E8E93]">
-          جميع بياناتك مخزنة 100% داخل متصفح جهازك بدون أي خوادم خارجية لضمان الخصوصية التامة. يمكنك أخذ نسخة احتياطية في أي وقت.
+        <p className="text-[11px] text-[#8E8E93] leading-relaxed">
+          {t.storageEngineNotice}
         </p>
 
-        {/* Action Grid */}
+        {/* Native Sharing & Export Grid */}
         <div className="grid grid-cols-2 gap-2">
           {/* Export JSON */}
           <button
             onClick={() => {
-              sound.playSuccess(settings.soundEnabled);
+              nativeHaptics.success(settings.soundEnabled);
               exportDataAsJSON(fullData);
             }}
             className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/50 flex flex-col items-center justify-center gap-1.5 hover:bg-blue-100 transition-colors cursor-pointer text-xs font-bold"
           >
             <Download size={18} />
-            <span>تنزيل نسخة احتياطية (JSON)</span>
+            <span>{t.downloadJSONBackup}</span>
           </button>
 
           {/* Import JSON */}
           <button
             onClick={() => {
-              sound.playTap(settings.soundEnabled);
+              nativeHaptics.tap(settings.soundEnabled);
               fileInputRef.current?.click();
             }}
             className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-800 dark:text-slate-100 border border-slate-200/60 dark:border-slate-800 flex flex-col items-center justify-center gap-1.5 hover:bg-slate-200/60 transition-colors cursor-pointer text-xs font-bold"
           >
             <Upload size={18} />
-            <span>استعادة نسخة احتياطية</span>
+            <span>{t.restoreJSONBackup}</span>
           </button>
           <input
             ref={fileInputRef}
@@ -443,20 +567,33 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
             className="hidden"
           />
 
-          {/* Export CSV */}
+          {/* Export & Share CSV through Native iOS Share Sheet */}
           <button
             onClick={() => {
-              sound.playSuccess(settings.soundEnabled);
+              nativeHaptics.success(settings.soundEnabled);
               exportExpensesToCSV(
                 expenses,
                 categories,
-                CURRENCY_SYMBOLS[settings.currency]?.symbol || 'ر.س'
+                CURRENCY_SYMBOLS[settings.currency]?.symbol || 'ر.س',
+                isEn
               );
             }}
-            className="col-span-2 p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/40 flex items-center justify-center gap-2 hover:bg-emerald-50 transition-colors cursor-pointer text-xs font-bold"
+            className="col-span-2 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/40 flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors cursor-pointer text-xs font-bold"
           >
-            <FileSpreadsheet size={16} />
-            <span>تصدير المصاريف لملف إكسل (Excel CSV)</span>
+            <Share2 size={16} />
+            <span>{t.exportShareCSV}</span>
+          </button>
+
+          {/* Privacy Policy Trigger */}
+          <button
+            onClick={() => {
+              nativeHaptics.tap(settings.soundEnabled);
+              onOpenPrivacyPolicy();
+            }}
+            className="col-span-2 p-2.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer text-xs font-semibold"
+          >
+            <FileText size={15} className="text-blue-500" />
+            <span>{t.privacyPolicy}</span>
           </button>
         </div>
 
@@ -464,28 +601,34 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         <div className="pt-2 border-t border-[#E5E5EA] dark:border-[#2C2C2E] flex items-center justify-between">
           <button
             onClick={() => {
-              if (confirm('هل تريد استعادة البيانات النموذجية الأولية؟')) {
-                sound.playTap(settings.soundEnabled);
+              if (confirm(isEn ? 'Reset app to sample household data?' : 'هل تريد استعادة البيانات النموذجية الأولية؟')) {
+                nativeHaptics.tap(settings.soundEnabled);
                 onResetData();
               }
             }}
             className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-600 flex items-center gap-1 cursor-pointer"
           >
             <RotateCcw size={13} />
-            <span>استعادة البيانات النموذجية</span>
+            <span>{t.resetSampleData}</span>
           </button>
 
           <button
             onClick={() => {
-              if (confirm('تحذير: سيتم مسح كافة المصاريف والفواتير والتصنيفات! هل أنت متأكد؟')) {
-                sound.playDelete(settings.soundEnabled);
+              if (
+                confirm(
+                  isEn
+                    ? 'Warning: All expenses, bills, and categories will be permanently erased. Proceed?'
+                    : 'تحذير: سيتم مسح كافة المصاريف والفواتير والتصنيفات نهائياً! هل أنت متأكد؟'
+                )
+              ) {
+                nativeHaptics.warning(settings.soundEnabled);
                 onClearAllData();
               }
             }}
             className="text-xs font-semibold text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer"
           >
             <Trash2 size={13} />
-            <span>مسح كافة البيانات</span>
+            <span>{t.clearAllData}</span>
           </button>
         </div>
       </div>
