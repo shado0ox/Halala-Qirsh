@@ -1,7 +1,15 @@
 import { Share } from '@capacitor/share';
+import { Filesystem, Directory, Encoding } from '@capacitor/filesystem';
 
 export class NativeShareService {
-  static async shareText(title: string, text: string, dialogTitle: string = 'Share Report') {
+  private static isNative(): boolean {
+    return (
+      typeof window !== 'undefined' &&
+      !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
+    );
+  }
+
+  static async shareText(title: string, text: string, dialogTitle: string = 'Share Report'): Promise<boolean> {
     try {
       const canShare = await Share.canShare();
       if (canShare.value) {
@@ -13,7 +21,7 @@ export class NativeShareService {
         return true;
       }
     } catch {
-      // fallback to navigator.share or clipboard
+      // fallback
     }
 
     if (typeof navigator !== 'undefined' && navigator.share) {
@@ -21,15 +29,13 @@ export class NativeShareService {
         await navigator.share({ title, text });
         return true;
       } catch {
-        // user cancelled or failed
+        // user cancelled
       }
     }
 
-    // Fallback: copy to clipboard
     if (typeof navigator !== 'undefined' && navigator.clipboard) {
       try {
         await navigator.clipboard.writeText(text);
-        alert(title.includes('تقرير') ? 'تم نسخ التقرير إلى الحافظة' : 'Report copied to clipboard');
         return true;
       } catch {
         // ignore
@@ -39,35 +45,58 @@ export class NativeShareService {
     return false;
   }
 
-  static async shareFile(fileName: string, content: string, mimeType: string = 'text/csv') {
-    const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
-    const url = URL.createObjectURL(blob);
+  static async shareFile(fileName: string, content: string, mimeType: string = 'text/csv'): Promise<boolean> {
+    // 1. On Native iOS, save file to Cache directory using Filesystem, then pass file URI to Share sheet
+    if (this.isNative()) {
+      try {
+        const writeResult = await Filesystem.writeFile({
+          path: fileName,
+          data: content,
+          directory: Directory.Cache,
+          encoding: Encoding.UTF8,
+        });
 
-    // Try Web Share with files if supported
+        await Share.share({
+          title: fileName,
+          url: writeResult.uri,
+          dialogTitle: fileName,
+        });
+        return true;
+      } catch (err) {
+        console.error('Native Filesystem/Share failed:', err);
+      }
+    }
+
+    // 2. Web Share API with File object
+    const blob = new Blob([content], { type: `${mimeType};charset=utf-8;` });
     if (typeof navigator !== 'undefined' && navigator.canShare) {
-      const file = new File([blob], fileName, { type: mimeType });
-      if (navigator.canShare({ files: [file] })) {
-        try {
+      try {
+        const file = new File([blob], fileName, { type: mimeType });
+        if (navigator.canShare({ files: [file] })) {
           await navigator.share({
             files: [file],
             title: fileName,
           });
-          URL.revokeObjectURL(url);
           return true;
-        } catch {
-          // cancelled or failed
         }
+      } catch {
+        // User cancelled or share failed
       }
     }
 
-    // Direct download trigger (saves to iOS Files or Downloads)
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
-    setTimeout(() => URL.revokeObjectURL(url), 1000);
-    return true;
+    // 3. Fallback: Browser download anchor
+    try {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+      return true;
+    } catch {
+      return false;
+    }
   }
 }

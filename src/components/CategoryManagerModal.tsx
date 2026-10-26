@@ -14,6 +14,7 @@ interface CategoryManagerModalProps {
   onSaveCategory: (category: Category) => void;
   onDeleteCategory: (categoryId: string) => void;
   soundEnabled?: boolean;
+  onShowToast?: (msg: string) => void;
 }
 
 export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
@@ -24,6 +25,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   onSaveCategory,
   onDeleteCategory,
   soundEnabled = true,
+  onShowToast,
 }) => {
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
@@ -97,12 +99,10 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا التصنيف؟')) {
-      sound.playDelete(soundEnabled);
-      onDeleteCategory(id);
-      if (editingCategory?.id === id) {
-        cancelEdit();
-      }
+    sound.playDelete(soundEnabled);
+    onDeleteCategory(id);
+    if (editingCategory?.id === id) {
+      cancelEdit();
     }
   };
 

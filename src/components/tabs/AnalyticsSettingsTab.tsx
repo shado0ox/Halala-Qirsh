@@ -3,8 +3,6 @@ import {
   PieChart,
   Download,
   Upload,
-  FileSpreadsheet,
-  RotateCcw,
   Trash2,
   Calendar,
   Volume2,
@@ -17,6 +15,9 @@ import {
   Globe,
   Share2,
   FileText,
+  Moon,
+  Sun,
+  Smartphone,
 } from 'lucide-react';
 import {
   Category,
@@ -31,6 +32,7 @@ import {
   formatMoney,
   exportDataAsJSON,
   exportExpensesToCSV,
+  validateBackupData,
 } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { NotificationPermissionState } from '../../utils/notifications';
@@ -43,7 +45,6 @@ interface AnalyticsSettingsTabProps {
   fullData: AppData;
   onUpdateSettings: (newSettings: Partial<BudgetSettings>) => void;
   onImportData: (data: AppData) => void;
-  onResetData: () => void;
   onClearAllData: () => void;
   onRequestNotificationPermission: () => Promise<void>;
   onSendTestNotification: () => void;
@@ -51,6 +52,7 @@ interface AnalyticsSettingsTabProps {
   onOpenPasscodeModal: (mode: 'set' | 'change') => void;
   onDisablePasscode: () => void;
   onOpenPrivacyPolicy: () => void;
+  onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
 }
 
 export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
@@ -60,7 +62,6 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   fullData,
   onUpdateSettings,
   onImportData,
-  onResetData,
   onClearAllData,
   onRequestNotificationPermission,
   onSendTestNotification,
@@ -68,6 +69,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   onOpenPasscodeModal,
   onDisablePasscode,
   onOpenPrivacyPolicy,
+  onShowToast,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const lang = settings.language || 'ar';
@@ -112,6 +114,11 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
     }
   };
 
+  const handleThemeModeChange = (mode: 'system' | 'light' | 'dark') => {
+    nativeHaptics.tap(settings.soundEnabled);
+    onUpdateSettings({ themeMode: mode });
+  };
+
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -120,15 +127,15 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
     reader.onload = (event) => {
       try {
         const parsed = JSON.parse(event.target?.result as string);
-        if (parsed.categories && parsed.expenses) {
+        if (validateBackupData(parsed)) {
           nativeHaptics.success(settings.soundEnabled);
           onImportData(parsed);
-          alert(isEn ? 'Backup restored successfully!' : 'تم استعادة النسخة الاحتياطية بنجاح!');
+          onShowToast?.(isEn ? 'Backup restored successfully' : 'تم استعادة النسخة الاحتياطية بنجاح', 'success');
         } else {
-          alert(isEn ? 'Invalid backup file format.' : 'ملف النسخة الاحتياطية غير صالح.');
+          onShowToast?.(isEn ? 'Invalid backup file format' : 'ملف النسخة الاحتياطية غير صالح', 'error');
         }
       } catch {
-        alert(isEn ? 'Error reading backup file.' : 'حدث خطأ أثناء قراءة الملف.');
+        onShowToast?.(isEn ? 'Error reading backup file' : 'حدث خطأ أثناء قراءة الملف', 'error');
       }
     };
     reader.readAsText(file);
@@ -158,31 +165,38 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         </div>
 
         {/* Categories Bars */}
-        <div className="space-y-2.5">
-          {sortedCategoriesBySpend.map((c) => {
-            const pct = totalSpent > 0 ? Math.round((c.spent / totalSpent) * 100) : 0;
-            const categoryName = isEn && c.nameEn ? c.nameEn : c.name;
+        <div className="space-y-2 pt-1">
+          {sortedCategoriesBySpend.map((cat) => {
+            const pct = totalSpent > 0 ? Math.round((cat.spent / totalSpent) * 100) : 0;
             return (
-              <div key={c.id} className="space-y-1">
+              <div key={cat.id} className="space-y-1">
                 <div className="flex items-center justify-between text-xs">
                   <div className="flex items-center gap-2">
-                    <CategoryIcon iconName={c.icon} color={c.color} bgColor={c.bgColor} size="sm" />
-                    <span className="font-semibold text-[#1C1C1E] dark:text-white">{categoryName}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold tabular-nums text-[#1C1C1E] dark:text-white">
-                      {formatMoney(c.spent, settings.currency, lang)}
+                    <CategoryIcon
+                      iconName={cat.icon}
+                      color={cat.color}
+                      bgColor={cat.bgColor}
+                      size="sm"
+                    />
+                    <span className="font-semibold text-[#1C1C1E] dark:text-white">
+                      {isEn && cat.nameEn ? cat.nameEn : cat.name}
                     </span>
-                    <span className="text-[11px] text-[#8E8E93] tabular-nums font-semibold w-8 text-left">
+                  </div>
+                  <div className="flex items-center gap-2 tabular-nums">
+                    <span className="font-bold text-[#1C1C1E] dark:text-white">
+                      {formatMoney(cat.spent, settings.currency, lang)}
+                    </span>
+                    <span className="text-[10px] text-[#8E8E93] w-7 text-left">
                       {pct}%
                     </span>
                   </div>
                 </div>
 
-                <div className="w-full h-1.5 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] overflow-hidden">
+                {/* Progress bar */}
+                <div className="w-full h-1.5 bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-full overflow-hidden">
                   <div
-                    className="h-full rounded-full transition-all duration-500"
-                    style={{ width: `${pct}%`, backgroundColor: c.color }}
+                    className="h-full rounded-full transition-all duration-300"
+                    style={{ width: `${pct}%`, backgroundColor: cat.color }}
                   />
                 </div>
               </div>
@@ -190,13 +204,13 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           })}
 
           {sortedCategoriesBySpend.length === 0 && (
-            <div className="py-4 text-center text-xs text-[#8E8E93]">
-              {isEn ? 'No expenses recorded for this month yet.' : 'لا توجد مصاريف لتحليلها لهذا الشهر حتى الآن.'}
+            <div className="py-6 text-center text-xs text-[#8E8E93]">
+              {isEn ? 'No expenses recorded for this month yet.' : 'لا توجد مصاريف مسجلة لهذا الشهر بعد.'}
             </div>
           )}
         </div>
 
-        {/* Payer Distribution */}
+        {/* Family Payer Breakdown */}
         {monthlyExpenses.length > 0 && (
           <div className="pt-3 border-t border-[#E5E5EA] dark:border-[#2C2C2E] space-y-2">
             <span className="text-[11px] font-bold text-[#8E8E93] flex items-center gap-1">
@@ -232,6 +246,55 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           {isEn ? 'System & Native App Preferences' : 'تفضيلات التطبيق والأمان'}
         </span>
 
+        {/* Appearance / Dark Mode */}
+        <div className="p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-bold text-[#1C1C1E] dark:text-white flex items-center gap-1.5">
+              <Moon size={15} className="text-blue-500" />
+              <span>{isEn ? 'Appearance' : 'مظهر التطبيق'}</span>
+            </span>
+          </div>
+
+          <div className="grid grid-cols-3 gap-1 bg-white dark:bg-[#1C1C1E] p-1 rounded-xl border border-slate-200 dark:border-slate-700">
+            <button
+              type="button"
+              onClick={() => handleThemeModeChange('system')}
+              className={`py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all ${
+                settings.themeMode === 'system'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              <Smartphone size={13} />
+              <span>{isEn ? 'Auto' : 'تلقائي'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleThemeModeChange('light')}
+              className={`py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all ${
+                settings.themeMode === 'light'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              <Sun size={13} />
+              <span>{isEn ? 'Light' : 'فاتح'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleThemeModeChange('dark')}
+              className={`py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all ${
+                settings.themeMode === 'dark'
+                  ? 'bg-blue-600 text-white shadow-2xs'
+                  : 'text-slate-600 dark:text-slate-300'
+              }`}
+            >
+              <Moon size={13} />
+              <span>{isEn ? 'Dark' : 'داكن'}</span>
+            </button>
+          </div>
+        </div>
+
         {/* Language Switcher */}
         <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
           <div className="flex items-center gap-2">
@@ -261,7 +324,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           </div>
         </div>
 
-        {/* Passcode Lock (Face ID) */}
+        {/* Passcode Lock (Face ID / PIN) */}
         <div className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] space-y-2">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
@@ -349,7 +412,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
             >
               <div
                 className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
-                  settings.dailyReminderEnabled ? (isEn ? 'translate-x-5' : 'translate-x-5') : 'translate-x-0'
+                  settings.dailyReminderEnabled ? 'translate-x-5' : 'translate-x-0'
                 }`}
               />
             </button>
@@ -597,35 +660,14 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           </button>
         </div>
 
-        {/* Reset & Clear */}
-        <div className="pt-2 border-t border-[#E5E5EA] dark:border-[#2C2C2E] flex items-center justify-between">
+        {/* Clear All Data */}
+        <div className="pt-2 border-t border-[#E5E5EA] dark:border-[#2C2C2E] flex items-center justify-end">
           <button
             onClick={() => {
-              if (confirm(isEn ? 'Reset app to sample household data?' : 'هل تريد استعادة البيانات النموذجية الأولية؟')) {
-                nativeHaptics.tap(settings.soundEnabled);
-                onResetData();
-              }
+              nativeHaptics.warning(settings.soundEnabled);
+              onClearAllData();
             }}
-            className="text-xs font-semibold text-slate-600 dark:text-slate-400 hover:text-blue-600 flex items-center gap-1 cursor-pointer"
-          >
-            <RotateCcw size={13} />
-            <span>{t.resetSampleData}</span>
-          </button>
-
-          <button
-            onClick={() => {
-              if (
-                confirm(
-                  isEn
-                    ? 'Warning: All expenses, bills, and categories will be permanently erased. Proceed?'
-                    : 'تحذير: سيتم مسح كافة المصاريف والفواتير والتصنيفات نهائياً! هل أنت متأكد؟'
-                )
-              ) {
-                nativeHaptics.warning(settings.soundEnabled);
-                onClearAllData();
-              }
-            }}
-            className="text-xs font-semibold text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer"
+            className="text-xs font-semibold text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer py-1 px-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
           >
             <Trash2 size={13} />
             <span>{t.clearAllData}</span>

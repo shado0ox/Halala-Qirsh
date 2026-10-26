@@ -1,8 +1,17 @@
 node_modules/
-build/
 dist/
 coverage/
 .DS_Store
 *.log
 .env*
-!.env.example
+
+# Capacitor & iOS build artifacts (keep ios folder, ignore build files & user data)
+ios/App/Pods/
+ios/App/Podfile.lock
+ios/App/build/
+ios/App/App.xcarchive
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/
+*.xcodeproj/project.xcworkspace/xcuserdata/
+DerivedData/
+.build/

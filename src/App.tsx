@@ -4,6 +4,8 @@
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { App as CapApp } from '@capacitor/app';
+import { StatusBar, Style } from '@capacitor/status-bar';
 import {
   AppData,
   Category,
@@ -25,20 +27,31 @@ import {
   NotificationPermissionState,
 } from './utils/notifications';
 import { NativeNotificationService } from './utils/nativeNotifications';
+import { SecurityService } from './utils/security';
 
-import { IPhoneFrame } from './components/IPhoneFrame';
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
 import { CategoryManagerModal } from './components/CategoryManagerModal';
 import { IOSNotificationBanner } from './components/IOSNotificationBanner';
 import { PasscodeLockModal } from './components/PasscodeLockModal';
 import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
+import { ConfirmModal } from './components/ConfirmModal';
+import { Toast } from './components/Toast';
 
 import { DashboardTab } from './components/tabs/DashboardTab';
 import { ExpensesTab } from './components/tabs/ExpensesTab';
 import { BudgetsTab } from './components/tabs/BudgetsTab';
 import { BillsAndGroceriesTab } from './components/tabs/BillsAndGroceriesTab';
 import { AnalyticsSettingsTab } from './components/tabs/AnalyticsSettingsTab';
+
+interface ConfirmState {
+  isOpen: boolean;
+  title: string;
+  message: string;
+  confirmText?: string;
+  isDestructive?: boolean;
+  onConfirm: () => void;
+}
 
 export default function App() {
   const [data, setData] = useState<AppData>(() => loadAppData());
@@ -49,24 +62,38 @@ export default function App() {
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
   // Native Passcode Lock & Privacy Modal state
-  const [isLocked, setIsLocked] = useState<boolean>(() => {
-    const init = loadAppData();
-    return Boolean(init.settings.isPasscodeEnabled && init.settings.passcode);
-  });
-  const [passcodeModalMode, setPasscodeModalMode] = useState<'unlock' | 'set' | 'change' | null>(null);
+  const [isLocked, setIsLocked] = useState<boolean>(false);
+  const [passcodeModalMode, setPasscodeModalMode] = useState<'set' | 'change' | null>(null);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
 
-  // Local Notifications state
+  // App-wide Alert & Toast Dialogs
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
+
+  const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+  }, []);
+
+  // Notifications state
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(
     () => getNotificationPermission()
   );
   const [currentNotification, setCurrentNotification] = useState<InAppNotification | null>(null);
 
-  // Hydrate from Capacitor Preferences on native load with migration
+  // Hydrate from Capacitor Preferences with plain-text passcode migration
   useEffect(() => {
-    loadAppDataFromPreferences().then((prefData) => {
+    loadAppDataFromPreferences().then(async (prefData) => {
       setData(prefData);
-      if (prefData.settings.isPasscodeEnabled && prefData.settings.passcode) {
+      // Check if secure passcode exists
+      const hasPass = await SecurityService.hasPasscode();
+      if (prefData.settings.isPasscodeEnabled && hasPass) {
         setIsLocked(true);
       }
     });
@@ -86,13 +113,55 @@ export default function App() {
     saveAppData(data);
   }, [data]);
 
-  // Handle system dark mode preference
+  // Live dark mode handling (system listener or user preference)
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.matchMedia) {
+    const applyTheme = (dark: boolean) => {
+      setIsDarkMode(dark);
+      if (typeof document !== 'undefined') {
+        if (dark) {
+          document.documentElement.classList.add('dark');
+          document.body.style.backgroundColor = '#000000';
+        } else {
+          document.documentElement.classList.remove('dark');
+          document.body.style.backgroundColor = '#F2F2F7';
+        }
+      }
+      // Adapt native iOS status bar text color
+      try {
+        StatusBar.setStyle({
+          style: dark ? Style.Dark : Style.Light,
+        }).catch(() => {});
+      } catch {
+        // ignore
+      }
+    };
+
+    if (data.settings.themeMode === 'system') {
       const match = window.matchMedia('(prefers-color-scheme: dark)');
-      setIsDarkMode(match.matches);
+      applyTheme(match.matches);
+
+      const listener = (e: MediaQueryListEvent) => applyTheme(e.matches);
+      match.addEventListener('change', listener);
+      return () => match.removeEventListener('change', listener);
+    } else {
+      applyTheme(data.settings.themeMode === 'dark');
     }
-  }, []);
+  }, [data.settings.themeMode]);
+
+  // Lock the app again when it returns from background (Guideline 4.2 native security)
+  useEffect(() => {
+    const listenerPromise = CapApp.addListener('appStateChange', (state) => {
+      if (state.isActive) {
+        if (data.settings.isPasscodeEnabled) {
+          setIsLocked(true);
+        }
+      }
+    });
+
+    return () => {
+      listenerPromise.then((handle) => handle.remove()).catch(() => {});
+    };
+  }, [data.settings.isPasscodeEnabled]);
 
   // Update notification permission state on mount
   useEffect(() => {
@@ -106,7 +175,7 @@ export default function App() {
     NativeNotificationService.scheduleDailyReminder(data.settings);
   }, [data.settings.dailyReminderEnabled, data.settings.dailyReminderTime, data.settings.language]);
 
-  // Evaluate and schedule local bill notifications
+  // Evaluate bill notifications once on data change
   const runBillNotificationCheck = useCallback(async () => {
     if (!data.settings.notificationsEnabled) return;
     const reminders = await NativeNotificationService.scheduleBillReminders(data.bills, data.settings);
@@ -117,17 +186,16 @@ export default function App() {
 
   useEffect(() => {
     runBillNotificationCheck();
-    const interval = setInterval(runBillNotificationCheck, 30000);
-    return () => clearInterval(interval);
   }, [runBillNotificationCheck]);
 
-  // Request browser / native Notification permission
+  // Request native Notification permission
   const handleRequestNotificationPermission = async () => {
     nativeHaptics.tap(data.settings.soundEnabled);
     const granted = await NativeNotificationService.requestPermissions();
     setNotificationPermission(granted ? 'granted' : 'denied');
     if (granted) {
       nativeHaptics.success(data.settings.soundEnabled);
+      showToast(data.settings.language === 'en' ? 'Notifications enabled' : 'تم تفعيل التنبيهات بنجاح');
       runBillNotificationCheck();
       NativeNotificationService.scheduleDailyReminder(data.settings);
     }
@@ -160,7 +228,6 @@ export default function App() {
   const handleSaveExpense = (expenseData: Omit<Expense, 'id' | 'createdAt'>) => {
     nativeHaptics.success(data.settings.soundEnabled);
     if (editingExpense) {
-      // Edit
       setData((prev) => ({
         ...prev,
         expenses: prev.expenses.map((e) =>
@@ -170,8 +237,8 @@ export default function App() {
         ),
       }));
       setEditingExpense(null);
+      showToast(data.settings.language === 'en' ? 'Expense updated' : 'تم تحديث المصروف');
     } else {
-      // Create
       const newExp: Expense = {
         ...expenseData,
         id: `exp-${Date.now()}`,
@@ -181,6 +248,7 @@ export default function App() {
         ...prev,
         expenses: [newExp, ...prev.expenses],
       }));
+      showToast(data.settings.language === 'en' ? 'Expense recorded' : 'تم تسجيل المصروف بنجاح');
     }
   };
 
@@ -190,11 +258,20 @@ export default function App() {
   };
 
   const handleDeleteExpense = (expenseId: string) => {
-    nativeHaptics.warning(data.settings.soundEnabled);
-    setData((prev) => ({
-      ...prev,
-      expenses: prev.expenses.filter((e) => e.id !== expenseId),
-    }));
+    setConfirmDialog({
+      isOpen: true,
+      title: data.settings.language === 'en' ? 'Delete Expense' : 'حذف المصروف',
+      message: data.settings.language === 'en' ? 'Are you sure you want to delete this expense?' : 'هل أنت متأكد من حذف هذا المصروف؟',
+      isDestructive: true,
+      onConfirm: () => {
+        setData((prev) => ({
+          ...prev,
+          expenses: prev.expenses.filter((e) => e.id !== expenseId),
+        }));
+        setConfirmDialog((c) => ({ ...c, isOpen: false }));
+        showToast(data.settings.language === 'en' ? 'Expense deleted' : 'تم حذف المصروف');
+      },
+    });
   };
 
   // Categories
@@ -214,17 +291,27 @@ export default function App() {
         };
       }
     });
+    showToast(data.settings.language === 'en' ? 'Category saved' : 'تم حفظ التصنيف');
   };
 
   const handleDeleteCategory = (categoryId: string) => {
-    nativeHaptics.warning(data.settings.soundEnabled);
-    setData((prev) => ({
-      ...prev,
-      categories: prev.categories.filter((c) => c.id !== categoryId),
-      expenses: prev.expenses.map((e) =>
-        e.categoryId === categoryId ? { ...e, categoryId: prev.categories[0]?.id || 'food' } : e
-      ),
-    }));
+    setConfirmDialog({
+      isOpen: true,
+      title: data.settings.language === 'en' ? 'Delete Category' : 'حذف التصنيف',
+      message: data.settings.language === 'en' ? 'Are you sure you want to delete this category? Associated expenses will move to General.' : 'هل أنت متأكد من حذف هذا التصنيف؟ سيتم نقل مصاريفه للتصنيف العام.',
+      isDestructive: true,
+      onConfirm: () => {
+        setData((prev) => ({
+          ...prev,
+          categories: prev.categories.filter((c) => c.id !== categoryId),
+          expenses: prev.expenses.map((e) =>
+            e.categoryId === categoryId ? { ...e, categoryId: prev.categories[0]?.id || 'food' } : e
+          ),
+        }));
+        setConfirmDialog((c) => ({ ...c, isOpen: false }));
+        showToast(data.settings.language === 'en' ? 'Category deleted' : 'تم حذف التصنيف');
+      },
+    });
   };
 
   const handleUpdateCategoryLimit = (categoryId: string, newLimit: number) => {
@@ -240,10 +327,14 @@ export default function App() {
   // Bills
   const handleToggleBill = (billId: string) => {
     nativeHaptics.success(data.settings.soundEnabled);
-    setData((prev) => ({
-      ...prev,
-      bills: prev.bills.map((b) => (b.id === billId ? { ...b, isPaid: !b.isPaid } : b)),
-    }));
+    setData((prev) => {
+      const updated = prev.bills.map((b) => (b.id === billId ? { ...b, isPaid: !b.isPaid } : b));
+      const target = updated.find((b) => b.id === billId);
+      if (target?.isPaid) {
+        NativeNotificationService.cancelBillNotification(billId);
+      }
+      return { ...prev, bills: updated };
+    });
   };
 
   const handleToggleBillReminder = (billId: string) => {
@@ -251,7 +342,7 @@ export default function App() {
     setData((prev) => ({
       ...prev,
       bills: prev.bills.map((b) =>
-        b.id === billId ? { ...b, reminderEnabled: b.reminderEnabled === false ? true : false } : b
+        b.id === billId ? { ...b, reminderEnabled: b.reminderEnabled === false } : b
       ),
     }));
   };
@@ -266,14 +357,25 @@ export default function App() {
       ...prev,
       bills: [...prev.bills, newBill],
     }));
+    showToast(data.settings.language === 'en' ? 'Bill added' : 'تمت إضافة الفاتورة');
   };
 
   const handleDeleteBill = (billId: string) => {
-    nativeHaptics.warning(data.settings.soundEnabled);
-    setData((prev) => ({
-      ...prev,
-      bills: prev.bills.filter((b) => b.id !== billId),
-    }));
+    setConfirmDialog({
+      isOpen: true,
+      title: data.settings.language === 'en' ? 'Delete Bill' : 'حذف الفاتورة',
+      message: data.settings.language === 'en' ? 'Delete this recurring bill reminder?' : 'هل تريد حذف هذه الفاتورة الدورية؟',
+      isDestructive: true,
+      onConfirm: () => {
+        NativeNotificationService.cancelBillNotification(billId);
+        setData((prev) => ({
+          ...prev,
+          bills: prev.bills.filter((b) => b.id !== billId),
+        }));
+        setConfirmDialog((c) => ({ ...c, isOpen: false }));
+        showToast(data.settings.language === 'en' ? 'Bill deleted' : 'تم حذف الفاتورة');
+      },
+    });
   };
 
   // Groceries
@@ -295,10 +397,11 @@ export default function App() {
       ...prev,
       groceries: [newGroc, ...prev.groceries],
     }));
+    showToast(data.settings.language === 'en' ? 'Item added to grocery list' : 'تمت إضافة السلعة للقائمة');
   };
 
   const handleDeleteGrocery = (itemId: string) => {
-    nativeHaptics.warning(data.settings.soundEnabled);
+    nativeHaptics.tap(data.settings.soundEnabled);
     setData((prev) => ({
       ...prev,
       groceries: prev.groceries.filter((g) => g.id !== itemId),
@@ -329,57 +432,69 @@ export default function App() {
     }));
 
     setActiveTab('expenses');
+    showToast(data.settings.language === 'en' ? 'Groceries recorded as expense' : 'تم ترحيل المشتريات كمصروف');
   };
 
   // Data management
   const handleImportData = (imported: AppData) => {
     setData(imported);
-  };
-
-  const handleResetData = () => {
-    const defaultData = getDefaultAppData();
-    setData(defaultData);
+    showToast(data.settings.language === 'en' ? 'Backup restored successfully' : 'تمت استعادة البيانات بنجاح');
   };
 
   const handleClearAllData = () => {
-    setData((prev) => ({
-      ...prev,
-      expenses: [],
-      bills: [],
-      groceries: [],
-    }));
+    setConfirmDialog({
+      isOpen: true,
+      title: data.settings.language === 'en' ? 'Erase All Data' : 'مسح كافة البيانات',
+      message:
+        data.settings.language === 'en'
+          ? 'Warning: All expenses, bills, and grocery items will be permanently erased. Proceed?'
+          : 'تحذير: سيتم مسح كافة المصاريف والفواتير وقوائم النواقص نهائياً من الجهاز. هل أنت متأكد؟',
+      isDestructive: true,
+      confirmText: data.settings.language === 'en' ? 'Erase All' : 'مسح الكل',
+      onConfirm: () => {
+        setData((prev) => ({
+          ...prev,
+          expenses: [],
+          bills: [],
+          groceries: [],
+        }));
+        setConfirmDialog((c) => ({ ...c, isOpen: false }));
+        showToast(data.settings.language === 'en' ? 'All data erased' : 'تم مسح كافة البيانات', 'info');
+      },
+    });
   };
 
   // Passcode modal success handlers
-  const handlePasscodeSuccess = (newPin?: string) => {
+  const handlePasscodeSuccess = () => {
     if (isLocked) {
       setIsLocked(false);
-    } else if (newPin) {
-      handleUpdateSettings({ isPasscodeEnabled: true, passcode: newPin });
+    } else {
+      handleUpdateSettings({ isPasscodeEnabled: true });
       setPasscodeModalMode(null);
+      showToast(data.settings.language === 'en' ? 'Passcode enabled' : 'تم تفعيل رمز الدخول بنجاح');
     }
   };
 
   const handleDisablePasscode = () => {
-    handleUpdateSettings({ isPasscodeEnabled: false, passcode: '' });
+    setConfirmDialog({
+      isOpen: true,
+      title: data.settings.language === 'en' ? 'Remove Passcode' : 'إلغاء رمز الدخول',
+      message: data.settings.language === 'en' ? 'Disable passcode security for this app?' : 'هل تريد تعطيل قفل الرمز السري للتطبيق؟',
+      isDestructive: true,
+      onConfirm: async () => {
+        await SecurityService.removePasscode();
+        handleUpdateSettings({ isPasscodeEnabled: false });
+        setConfirmDialog((c) => ({ ...c, isOpen: false }));
+        showToast(data.settings.language === 'en' ? 'Passcode removed' : 'تم إلغاء رمز الدخول');
+      },
+    });
   };
 
   const isEn = data.settings.language === 'en';
   const unpaidBillsCount = data.bills.filter((b) => !b.isPaid).length;
 
   return (
-    <IPhoneFrame
-      frameMode={data.settings.deviceFrameMode}
-      onToggleFrameMode={() =>
-        handleUpdateSettings({ deviceFrameMode: !data.settings.deviceFrameMode })
-      }
-      soundEnabled={data.settings.soundEnabled}
-      onToggleSound={() =>
-        handleUpdateSettings({ soundEnabled: !data.settings.soundEnabled })
-      }
-      isDark={isDarkMode}
-      onToggleDark={() => setIsDarkMode((prev) => !prev)}
-    >
+    <div className="h-[100dvh] w-full flex flex-col bg-[#F2F2F7] dark:bg-black text-[#1C1C1E] dark:text-white pt-safe pb-safe overflow-hidden select-none">
       {/* iOS Dropdown Notification Banner */}
       <IOSNotificationBanner
         notification={currentNotification}
@@ -390,8 +505,27 @@ export default function App() {
         }}
       />
 
+      {/* App-wide Toast Notification */}
+      <Toast
+        message={toastMessage}
+        type={toastType}
+        onClose={() => setToastMessage(null)}
+      />
+
+      {/* App-wide Native-styled Confirmation Modal */}
+      <ConfirmModal
+        isOpen={confirmDialog.isOpen}
+        title={confirmDialog.title}
+        message={confirmDialog.message}
+        confirmText={confirmDialog.confirmText}
+        isDestructive={confirmDialog.isDestructive}
+        onConfirm={confirmDialog.onConfirm}
+        onCancel={() => setConfirmDialog((c) => ({ ...c, isOpen: false }))}
+        isEnglish={isEn}
+      />
+
       {/* Active Tab View */}
-      <div className="flex-1 w-full flex flex-col overflow-hidden">
+      <main className="flex-1 w-full flex flex-col overflow-hidden">
         {activeTab === 'dashboard' && (
           <DashboardTab
             categories={data.categories}
@@ -461,7 +595,6 @@ export default function App() {
             fullData={data}
             onUpdateSettings={handleUpdateSettings}
             onImportData={handleImportData}
-            onResetData={handleResetData}
             onClearAllData={handleClearAllData}
             onRequestNotificationPermission={handleRequestNotificationPermission}
             onSendTestNotification={handleSendTestNotification}
@@ -469,11 +602,12 @@ export default function App() {
             onOpenPasscodeModal={(mode) => setPasscodeModalMode(mode)}
             onDisablePasscode={handleDisablePasscode}
             onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
+            onShowToast={showToast}
           />
         )}
-      </div>
+      </main>
 
-      {/* iOS TabBar */}
+      {/* iOS Native TabBar with Safe Area Padding */}
       <TabBar
         activeTab={activeTab}
         onChangeTab={setActiveTab}
@@ -509,13 +643,13 @@ export default function App() {
         onSaveCategory={handleSaveCategory}
         onDeleteCategory={handleDeleteCategory}
         soundEnabled={data.settings.soundEnabled}
+        onShowToast={showToast}
       />
 
       {/* Passcode Unlock Screen (shown if app is locked) */}
       <PasscodeLockModal
         isOpen={isLocked}
         mode="unlock"
-        correctPasscode={data.settings.passcode}
         onSuccess={() => setIsLocked(false)}
         isDark={isDarkMode}
         soundEnabled={data.settings.soundEnabled}
@@ -527,7 +661,6 @@ export default function App() {
         <PasscodeLockModal
           isOpen={true}
           mode={passcodeModalMode}
-          correctPasscode={data.settings.passcode}
           onSuccess={handlePasscodeSuccess}
           onCancel={() => setPasscodeModalMode(null)}
           isDark={isDarkMode}
@@ -543,6 +676,6 @@ export default function App() {
         isEnglish={isEn}
         soundEnabled={data.settings.soundEnabled}
       />
-    </IPhoneFrame>
+    </div>
   );
 }

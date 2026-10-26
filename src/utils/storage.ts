@@ -98,246 +98,30 @@ export const DEFAULT_CATEGORIES: Category[] = [
   },
 ];
 
-const getCurrentMonthString = (): string => {
+export const getCurrentMonthString = (): string => {
   const d = new Date();
   const year = d.getFullYear();
   const month = String(d.getMonth() + 1).padStart(2, '0');
   return `${year}-${month}`;
 };
 
-const getSampleExpenses = (): Expense[] => {
-  const currentMonth = getCurrentMonthString();
-  return [
-    {
-      id: 'exp-1',
-      title: 'تموين السوبرماركت الشهري',
-      amount: 860,
-      categoryId: 'food',
-      date: `${currentMonth}-03`,
-      paymentMethod: 'card',
-      payer: 'الزوج',
-      notes: 'شراء أساسيات الشهر من كارفور / لولو',
-      createdAt: Date.now() - 86400000 * 5,
-    },
-    {
-      id: 'exp-2',
-      title: 'سداد فاتورة الكهرباء',
-      amount: 420,
-      categoryId: 'bills',
-      date: `${currentMonth}-05`,
-      paymentMethod: 'digital',
-      payer: 'الزوج',
-      notes: 'فاتورة الصيف عبر تطبيق سداد',
-      createdAt: Date.now() - 86400000 * 4,
-    },
-    {
-      id: 'exp-3',
-      title: 'لحوم طازجة وخضار أسبوعي',
-      amount: 290,
-      categoryId: 'food',
-      date: `${currentMonth}-08`,
-      paymentMethod: 'card',
-      payer: 'الزوجة',
-      notes: 'ملحمة الحي وسوق الخضار',
-      createdAt: Date.now() - 86400000 * 3,
-    },
-    {
-      id: 'exp-4',
-      title: 'بنزين السيارة وصيانة سريعة',
-      amount: 180,
-      categoryId: 'transport',
-      date: `${currentMonth}-11`,
-      paymentMethod: 'card',
-      payer: 'الزوج',
-      notes: 'تعبئة فل بنزين 95',
-      createdAt: Date.now() - 86400000 * 2,
-    },
-    {
-      id: 'exp-5',
-      title: 'مستلزمات صيدلية للأولاد',
-      amount: 135,
-      categoryId: 'health',
-      date: `${currentMonth}-12`,
-      paymentMethod: 'card',
-      payer: 'الزوجة',
-      notes: 'فيتامينات ومسكن للحرارة',
-      createdAt: Date.now() - 86400000 * 1,
-    },
-    {
-      id: 'exp-6',
-      title: 'عشاء مطعم عائلي في الويكند',
-      amount: 230,
-      categoryId: 'entertainment',
-      date: `${currentMonth}-14`,
-      paymentMethod: 'digital',
-      payer: 'مشترك',
-      notes: 'مطعم مع الأبناء بمناسبة نجاحهم',
-      createdAt: Date.now() - 3600000 * 8,
-    },
-    {
-      id: 'exp-7',
-      title: 'اشتراك الإنترنت المنزلي الفايبر',
-      amount: 280,
-      categoryId: 'bills',
-      date: `${currentMonth}-15`,
-      paymentMethod: 'digital',
-      payer: 'الزوج',
-      notes: 'سداد شهري لخدمة 500 ميجا',
-      createdAt: Date.now() - 3600000 * 3,
-    },
-  ];
-};
-
-const getSampleBills = (): RecurringBill[] => [
-  {
-    id: 'bill-1',
-    title: 'إيجار المنزل الشهري',
-    amount: 4000,
-    categoryId: 'housing',
-    dueDay: 1,
-    isPaid: true,
-    reminderEnabled: true,
-    notes: 'تحويل للمالك أول كل شهر',
-  },
-  {
-    id: 'bill-2',
-    title: 'فاتورة الكهرباء والتكييف',
-    amount: 420,
-    categoryId: 'bills',
-    dueDay: 25,
-    isPaid: true,
-    reminderEnabled: true,
-    notes: 'تصدر الفاتورة يوم 25',
-  },
-  {
-    id: 'bill-3',
-    title: 'اشتراك إنترنت فايبر المنزلي',
-    amount: 280,
-    categoryId: 'bills',
-    dueDay: 28,
-    isPaid: true,
-    reminderEnabled: true,
-    notes: 'سداد تلقائي',
-  },
-  {
-    id: 'bill-4',
-    title: 'فاتورة المياه والصرف',
-    amount: 95,
-    categoryId: 'bills',
-    dueDay: 18,
-    isPaid: false,
-    reminderEnabled: true,
-    notes: 'شركة المياه الوطنية',
-  },
-  {
-    id: 'bill-5',
-    title: 'قسط باقة جوال العائلة',
-    amount: 230,
-    categoryId: 'bills',
-    dueDay: 27,
-    isPaid: false,
-    reminderEnabled: true,
-    notes: 'باقة مشتركة',
-  },
-  {
-    id: 'bill-6',
-    title: 'قسط باص ونشاط المدرسة للأولاد',
-    amount: 450,
-    categoryId: 'kids',
-    dueDay: 5,
-    isPaid: true,
-    reminderEnabled: true,
-    notes: 'اشتراك نقل ومسبح مدرسي',
-  },
-];
-
-const getSampleGroceries = (): GroceryItem[] => [
-  {
-    id: 'groc-1',
-    name: 'حليب المراعي طازج قليل الدسم',
-    category: 'ألبان وأجبان',
-    estimatedPrice: 18,
-    isBought: true,
-    quantity: 2,
-    unit: 'لتر',
-  },
-  {
-    id: 'groc-2',
-    name: 'طبق بيض بلدي طازج (30 بيضة)',
-    category: 'بيض وألبان',
-    estimatedPrice: 24,
-    isBought: true,
-    quantity: 1,
-    unit: 'طبق',
-  },
-  {
-    id: 'groc-3',
-    name: 'صدور دجاج مبردة ومتبلة',
-    category: 'لحوم ودواجن',
-    estimatedPrice: 42,
-    isBought: true,
-    quantity: 2,
-    unit: 'كجم',
-  },
-  {
-    id: 'groc-4',
-    name: 'أرز بسمتي عنبر هندي درجة أولى',
-    category: 'تموين ومؤونة',
-    estimatedPrice: 78,
-    isBought: false,
-    quantity: 1,
-    unit: 'كيس 10كجم',
-  },
-  {
-    id: 'groc-5',
-    name: 'زيت زيتون بكر ممتاز عصرة أولى',
-    category: 'زيوت وتوابل',
-    estimatedPrice: 38,
-    isBought: false,
-    quantity: 1,
-    unit: 'لتر',
-  },
-  {
-    id: 'groc-6',
-    name: 'صابون غسيل ملابس أوتوماتيك + منعم',
-    category: 'منظفات ومستلزمات',
-    estimatedPrice: 65,
-    isBought: false,
-    quantity: 1,
-    unit: 'علبة',
-  },
-  {
-    id: 'groc-7',
-    name: 'فواكه مشكلة (موز، تفاح، برتقال)',
-    category: 'خضار وفواكه',
-    estimatedPrice: 35,
-    isBought: false,
-    quantity: 3,
-    unit: 'كجم',
-  },
-  {
-    id: 'groc-8',
-    name: 'خبز توست حبوب كاملة وشابورة',
-    category: 'مخبوزات',
-    estimatedPrice: 14,
-    isBought: false,
-    quantity: 2,
-    unit: 'كيس',
-  },
-];
-
+/**
+ * Clean default app state for new App Store users:
+ * Zero seeded transactions, zero seeded bills, zero seeded groceries.
+ * Only default categories and sensible default settings.
+ */
 export const getDefaultAppData = (): AppData => ({
   categories: DEFAULT_CATEGORIES,
-  expenses: getSampleExpenses(),
-  bills: getSampleBills(),
-  groceries: getSampleGroceries(),
+  expenses: [],
+  bills: [],
+  groceries: [],
   settings: {
     budgetMode: 'sum_categories',
     totalMonthlyBudget: 12000,
     salaryDay: 27,
     currency: 'SAR',
     soundEnabled: true,
-    deviceFrameMode: true,
+    themeMode: 'system',
     selectedMonth: getCurrentMonthString(),
     notificationsEnabled: true,
     notificationLeadDays: 1,
@@ -345,9 +129,35 @@ export const getDefaultAppData = (): AppData => ({
     dailyReminderTime: '21:00',
     language: 'ar',
     isPasscodeEnabled: false,
-    passcode: '',
+    biometricsEnabled: false,
   },
 });
+
+/**
+ * Validates the structure of imported JSON backup
+ */
+export const validateBackupData = (raw: unknown): raw is AppData => {
+  if (!raw || typeof raw !== 'object') return false;
+  const candidate = raw as Partial<AppData>;
+
+  if (!Array.isArray(candidate.categories) || candidate.categories.length === 0) {
+    return false;
+  }
+  if (!Array.isArray(candidate.expenses)) {
+    return false;
+  }
+  if (!Array.isArray(candidate.bills)) {
+    return false;
+  }
+  if (!Array.isArray(candidate.groceries)) {
+    return false;
+  }
+  if (!candidate.settings || typeof candidate.settings !== 'object') {
+    return false;
+  }
+
+  return true;
+};
 
 /**
  * Synchronous memory cache & fallback loader
@@ -365,10 +175,10 @@ export const loadAppData = (): AppData => {
     const defaultData = getDefaultAppData();
 
     return {
-      categories: parsed.categories && parsed.categories.length > 0 ? parsed.categories : defaultData.categories,
-      expenses: parsed.expenses || defaultData.expenses,
-      bills: parsed.bills || defaultData.bills,
-      groceries: parsed.groceries || defaultData.groceries,
+      categories: Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : defaultData.categories,
+      expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+      bills: Array.isArray(parsed.bills) ? parsed.bills : [],
+      groceries: Array.isArray(parsed.groceries) ? parsed.groceries : [],
       settings: {
         ...defaultData.settings,
         ...(parsed.settings || {}),
@@ -392,16 +202,15 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
     if (value) {
       const parsed = JSON.parse(value) as Partial<AppData>;
       const merged: AppData = {
-        categories: parsed.categories && parsed.categories.length > 0 ? parsed.categories : defaultData.categories,
-        expenses: parsed.expenses || defaultData.expenses,
-        bills: parsed.bills || defaultData.bills,
-        groceries: parsed.groceries || defaultData.groceries,
+        categories: Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : defaultData.categories,
+        expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+        bills: Array.isArray(parsed.bills) ? parsed.bills : [],
+        groceries: Array.isArray(parsed.groceries) ? parsed.groceries : [],
         settings: {
           ...defaultData.settings,
           ...(parsed.settings || {}),
         },
       };
-      // Keep localStorage in sync as well
       localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
       return merged;
     }
@@ -412,10 +221,10 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
       console.log('Migrating existing localStorage data into Capacitor Preferences...');
       const parsed = JSON.parse(localRaw) as Partial<AppData>;
       const merged: AppData = {
-        categories: parsed.categories && parsed.categories.length > 0 ? parsed.categories : defaultData.categories,
-        expenses: parsed.expenses || defaultData.expenses,
-        bills: parsed.bills || defaultData.bills,
-        groceries: parsed.groceries || defaultData.groceries,
+        categories: Array.isArray(parsed.categories) && parsed.categories.length > 0 ? parsed.categories : defaultData.categories,
+        expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
+        bills: Array.isArray(parsed.bills) ? parsed.bills : [],
+        groceries: Array.isArray(parsed.groceries) ? parsed.groceries : [],
         settings: {
           ...defaultData.settings,
           ...(parsed.settings || {}),
@@ -425,7 +234,7 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
       return merged;
     }
 
-    // If completely new, save default to Preferences
+    // If completely new user, save empty default to Preferences
     await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(defaultData) });
     localStorage.setItem(STORAGE_KEY, JSON.stringify(defaultData));
     return defaultData;
@@ -448,35 +257,29 @@ export const saveAppData = (data: AppData): void => {
     console.error('Failed to save to local storage:', err);
   }
 
-  // Persist to Capacitor Preferences
   Preferences.set({ key: STORAGE_KEY, value: json }).catch((err) => {
     console.error('Failed to save to Capacitor Preferences:', err);
   });
 };
 
-export const exportDataAsJSON = async (data: AppData, useShareSheet: boolean = true): Promise<void> => {
+/**
+ * Exports full app data as JSON and triggers native iOS Share Sheet
+ */
+export const exportDataAsJSON = async (data: AppData): Promise<boolean> => {
   const json = JSON.stringify(data, null, 2);
   const fileName = `home_expenses_backup_${new Date().toISOString().split('T')[0]}.json`;
-
-  if (useShareSheet) {
-    await NativeShareService.shareFile(fileName, json, 'application/json');
-  } else {
-    const blob = new Blob([json], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = fileName;
-    a.click();
-    URL.revokeObjectURL(url);
-  }
+  return await NativeShareService.shareFile(fileName, json, 'application/json');
 };
 
+/**
+ * Exports expenses as CSV with UTF-8 BOM and triggers native iOS Share Sheet
+ */
 export const exportExpensesToCSV = async (
   expenses: Expense[],
   categories: Category[],
   currencySymbol: string,
   isEnglish: boolean = false
-): Promise<void> => {
+): Promise<boolean> => {
   const catMap = new Map(categories.map((c) => [c.id, isEnglish && c.nameEn ? c.nameEn : c.name]));
   const headers = isEnglish
     ? ['Date', 'Item', 'Amount', 'Currency', 'Category', 'Payment Method', 'Payer', 'Notes']
@@ -496,7 +299,7 @@ export const exportExpensesToCSV = async (
   const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
   const fileName = `expenses_report_${new Date().toISOString().split('T')[0]}.csv`;
 
-  await NativeShareService.shareFile(fileName, csvContent, 'text/csv');
+  return await NativeShareService.shareFile(fileName, csvContent, 'text/csv');
 };
 
 export const formatMoney = (amount: number, currency: CurrencyCode, lang: 'ar' | 'en' = 'ar'): string => {

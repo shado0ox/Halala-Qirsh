@@ -52,7 +52,7 @@ export interface BudgetSettings {
   salaryDay: number;
   currency: CurrencyCode;
   soundEnabled: boolean;
-  deviceFrameMode: boolean;
+  themeMode: 'system' | 'light' | 'dark';
   selectedMonth: string; // YYYY-MM
   notificationsEnabled: boolean;
   notificationLeadDays: number;
@@ -60,7 +60,7 @@ export interface BudgetSettings {
   dailyReminderTime: string; // "HH:MM" e.g. "21:00"
   language: 'ar' | 'en';
   isPasscodeEnabled: boolean;
-  passcode: string; // 4-digit PIN
+  biometricsEnabled: boolean;
   lastNotificationCheckDate?: string;
 }
 

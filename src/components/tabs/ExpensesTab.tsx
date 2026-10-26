@@ -136,11 +136,9 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
   };
 
   const handleDelete = (id: string) => {
-    if (confirm('هل أنت متأكد من حذف هذا المصروف؟')) {
-      sound.playDelete(settings.soundEnabled);
-      onDeleteExpense(id);
-      setSelectedExpenseForDetails(null);
-    }
+    sound.playDelete(settings.soundEnabled);
+    onDeleteExpense(id);
+    setSelectedExpenseForDetails(null);
   };
 
   return (

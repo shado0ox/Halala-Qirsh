@@ -2,7 +2,7 @@ import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
   appId: 'com.homeexpenses.budget',
-  appName: 'مصاريف البيت | Home Expenses',
+  appName: 'مصاريف البيت',
   webDir: 'dist',
   plugins: {
     Keyboard: {

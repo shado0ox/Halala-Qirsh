@@ -385,10 +385,8 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
 
                       <button
                         onClick={() => {
-                          if (confirm('حذف هذه الفاتورة الدورية؟')) {
-                            sound.playDelete(settings.soundEnabled);
-                            onDeleteBill(bill.id);
-                          }
+                          sound.playDelete(settings.soundEnabled);
+                          onDeleteBill(bill.id);
                         }}
                         className="p-1 rounded-lg text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 cursor-pointer transition-colors"
                       >
