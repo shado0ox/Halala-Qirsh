@@ -109,7 +109,7 @@ export class SecurityService {
    * Accepts localized cancelTitle.
    */
   static async authenticateBiometric(
-    reason: string = 'Unlock Home Expenses',
+    reason: string = 'Unlock Halala & Qirsh',
     cancelTitle: string = 'Cancel'
   ): Promise<boolean> {
     return withSystemFlow(async () => {

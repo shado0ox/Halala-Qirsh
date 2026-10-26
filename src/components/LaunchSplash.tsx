@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { springs, fades } from '../utils/motion';
 import { HalalaQirshLogo } from './HalalaQirshLogo';
+import { translations } from '../utils/i18n';
 
 interface LaunchSplashProps {
   onFinish: () => void;
@@ -53,8 +54,8 @@ export const LaunchSplash: React.FC<LaunchSplashProps> = ({
             <h1 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
               <span>{isEnglish ? 'Halala & Qirsh' : 'هللة وقرش'}</span>
             </h1>
-            <p className="text-[11px] font-bold text-amber-300/90 mt-0.5 tracking-wider uppercase">
-              {isEnglish ? 'Halala & Qirsh' : 'Halala & Qirsh'}
+            <p className="text-[11px] font-bold text-amber-300/90 mt-0.5 tracking-wider">
+              {translations[isEnglish ? 'en' : 'ar'].splashTagline}
             </p>
           </motion.div>
 
@@ -64,9 +65,7 @@ export const LaunchSplash: React.FC<LaunchSplashProps> = ({
             transition={{ delay: 0.25, ...fades.fast }}
             className="text-xs text-emerald-200/80 mt-2 text-center max-w-xs"
           >
-            {isEnglish
-              ? 'Every Halala & Qirsh Counts · 100% Private & Offline'
-              : 'نحفظ لك كل هللة وقرش · ميزانية مشفرة ومحفوظة محلياً'}
+            {translations[isEnglish ? 'en' : 'ar'].splashSubtitle}
           </motion.p>
         </motion.div>
       )}

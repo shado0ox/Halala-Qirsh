@@ -1,6 +1,6 @@
-# دليل تجهيز ونشر تطبيق "مصاريف البيت" على متجر تطبيقات أبل (Apple App Store)
+# دليل تجهيز ونشر تطبيق "هللة وقرش" على متجر تطبيقات أبل (Apple App Store)
 
-هذا الدليل يقدم لك الخطوات الدقيقة والتفصيلية خطوة بخطوة لبناء وتجهيز تطبيق **"مصاريف البيت" (Home Expenses)** على جهاز الماك وفتحه في برنامج **Xcode** ورفعه إلى **TestFlight** ومتجر **App Store**.
+هذا الدليل يقدم لك الخطوات الدقيقة والتفصيلية خطوة بخطوة لبناء وتجهيز تطبيق **"هللة وقرش" (Halala & Qirsh)** على جهاز الماك وفتحه في برنامج **Xcode** ورفعه إلى **TestFlight** ومتجر **App Store**.
 
 ---
 
@@ -30,7 +30,7 @@
 افتح تطبيق **Terminal** على الماك وانتقل لمجلد المشروع:
 
 ```bash
-cd /مسار_المجلد/iOS-Expense-Budget
+cd /مسار_المجلد/halala-qirsh
 ```
 
 ### أ) تثبيت الاعتماديات النظيفة:
@@ -71,7 +71,7 @@ npx cap sync ios
 
 ```xml
 <key>NSFaceIDUsageDescription</key>
-<string>يستخدم التطبيق بصمة الوجه لفتح قفل بيانات مصاريف البيت وحماية خصوصيتك المالية / Home Expenses uses Face ID to securely unlock your financial data.</string>
+<string>يستخدم التطبيق بصمة الوجه لفتح قفل بيانات هللة وقرش وحماية خصوصيتك المالية / Halala & Qirsh uses Face ID to securely unlock your financial data.</string>
 ```
 
 ---
@@ -90,7 +90,7 @@ npx cap sync ios
    - فعّل خيار **Automatically manage signing**.
    - في خانة **Team**، اختر حساب Apple Developer الخاص بك.
    - تأكد أن **Bundle Identifier** مطابق لما حددته:
-     `com.homeexpenses.budget`
+     `com.shady.halalaqirsh`
 
 3. **اختيار الجهاز التجريبي:**
    - من شريط الأدوات العلوي، اختر إما محاكي (Simulator) مثل **iPhone 16 Pro** أو وصّل جهاز الآيفون الفعلي بالماك.

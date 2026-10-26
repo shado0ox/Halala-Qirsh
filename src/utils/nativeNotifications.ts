@@ -130,7 +130,7 @@ export class NativeNotificationService {
     const hour = parseInt(hourStr, 10) || 21;
     const minute = parseInt(minuteStr, 10) || 0;
 
-    const title = settings.language === 'en' ? 'Daily Expense Reminder' : 'تذكير مصاريف البيت اليومي';
+    const title = settings.language === 'en' ? 'Daily Expense Reminder' : 'تذكير هللة وقرش اليومي';
     const body =
       settings.language === 'en'
         ? 'Did you log your purchases and expenses today? Keep your household budget on track!'
@@ -317,8 +317,8 @@ export class NativeNotificationService {
     const title = settings.language === 'en' ? 'Test Notification: Electricity Bill' : 'تنبيه تجريبي: فاتورة الكهرباء';
     const body =
       settings.language === 'en'
-        ? `This is a test notification for Home Expenses. Bill amount: ${formattedAmount}.`
-        : `هذا إشعار تجريبي لاختبار التنبيهات المحلية لمصاريف البيت. الفاتورة بمبلغ ${formattedAmount} مستحقة.`;
+        ? `This is a test notification for Halala & Qirsh. Bill amount: ${formattedAmount}.`
+        : `هذا إشعار تجريبي لاختبار التنبيهات المحلية لتطبيق هللة وقرش. الفاتورة بمبلغ ${formattedAmount} مستحقة.`;
 
     if (this.isNative()) {
       try {

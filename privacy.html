@@ -3,14 +3,14 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>سياسة الخصوصية | Privacy Policy - مصاريف البيت (Home Expenses)</title>
+  <title>سياسة الخصوصية | Privacy Policy - هللة وقرش (Halala & Qirsh)</title>
   <style>
     :root {
       --bg: #F2F2F7;
       --card: #FFFFFF;
       --text: #1C1C1E;
       --subtext: #636366;
-      --accent: #007AFF;
+      --accent: #059669;
       --border: #E5E5EA;
     }
     @media (prefers-color-scheme: dark) {
@@ -19,7 +19,7 @@
         --card: #1C1C1E;
         --text: #F2F2F7;
         --subtext: #8E8E93;
-        --accent: #0A84FF;
+        --accent: #10B981;
         --border: #2C2C2E;
       }
     }
@@ -96,16 +96,16 @@
   <div class="container">
     <div class="card">
       <span class="badge">تخزين محلي 100% · لا توجد خوادم · لا تتبع</span>
-      <h1>سياسة الخصوصية — تطبيق مصاريف البيت</h1>
+      <h1>سياسة الخصوصية — تطبيق هللة وقرش</h1>
       <p>آخر تحديث: 2026</p>
 
-      <h2>1. المبدأ الأساسي: الخصوصية المطلقة</h2>
-      <p>تطبيق <strong>مصاريف البيت (Home Expenses)</strong> مصمم ليعمل كأداة مالية شخصية وعائلية مستقلة تماماً بدون خوادم، بدون حسابات مستخدمين، وبدون أي نوع من أنواع التتبع أو الإعلانات أو التحليلات.</p>
+      <h2>1. المبدأ الأساسي: الخصوصية المطلقة وعدم جمع البيانات</h2>
+      <p>تطبيق <strong>هللة وقرش (Halala & Qirsh)</strong> مصمم ليعمل كأداة مالية شخصية وعائلية مستقلة تماماً بدون خوادم، بدون حسابات مستخدمين، وبدون أي نوع من أنواع التتبع أو الإعلانات أو حزم التحليلات البرمجية.</p>
 
       <h2>2. تخزين البيانات والعمل دون إنترنت</h2>
       <p>كافة البيانات التي تقوم بإدخالها (المصاريف، الفواتير، أسماء وتصنيفات السلع، الميزانيات، والعملات):</p>
       <ul>
-        <li>تُخزّن محلياً فقط وبشكل كامل على ذاكرة جهاز الآيفون الخاص بك عبر (Apple UserDefaults / Preferences).</li>
+        <li>تُخزّن محلياً فقط وبشكل كامل على ذاكرة جهاز الآيفون الخاص بك عبر التخزين المحلي الآمن (Apple UserDefaults / Capacitor Preferences).</li>
         <li>لا يتم إرسالها إلى أي خادم خارجي أو مزود سحابي، ولا يمكن لأي طرف ثالث أو حتى لمطور التطبيق الوصول إليها.</li>
         <li>التطبيق يعمل بنسبة 100% دون الحاجة إلى أي اتصال بشبكة الإنترنت.</li>
       </ul>
@@ -113,29 +113,29 @@
       <h2>3. القياسات الحيوية وسلسلة المفاتيح (Face ID / Apple Keychain)</h2>
       <p>عند تفعيل رمز الدخول أو بصمة الوجه (Face ID / Touch ID):</p>
       <ul>
-        <li>تتم مصادقة بصمة الوجه كلياً عبر نظام iOS المدمج (LocalAuthentication Framework). التطبيق لا يستلم ولا يخزن أي صورة أو بيانات بيومترية.</li>
-        <li>رمز الدخول يتم حفظه كقيمة مجزأة ومملحة (Salted SHA-256 Hash) داخل سلسلة مفاتيح أبل الآمنة (iOS Keychain Services عبر SecureStorage)، ولا يُحفظ كنص عادي نهائياً.</li>
-        <li>عداد المحاولات الفاشلة وفترات القفل التدريجي تُدار أيضاً داخل سلسلة المفاتيح الآمنة لمنع التخمين العشوائي.</li>
+        <li>تتم مصادقة بصمة الوجه كلياً عبر إطار العمل المدمج لنظام iOS المعتمد (LocalAuthentication Framework). التطبيق لا يستلم ولا يخزن أي صورة أو بيانات بيومترية.</li>
+        <li>رمز الدخول يتم حفظه كقيمة مجزأة ومملحة (Salted SHA-256 Hash) داخل سلسلة مفاتيح أبل المشفرة والمحمية بالعتاد (iOS Keychain Services عبر SecureStorage)، ولا يُحفظ كنص عادي نهائياً.</li>
+        <li>عداد المحاولات الفاشلة وفترات القفل التدريجي تُدار أيضاً داخل سلسلة المفاتيح الآمنة لحماية الجهاز من التخمين المتكرر.</li>
       </ul>
 
       <h2>4. الإشعارات والتنبيهات المحلية</h2>
-      <p>تنبيهات الفواتير والتذكير اليومي تتم جدولتها محلياً على جهازك بواسطة تقويم النظام (Apple Local Notifications)، دون أي اتصال بخوادم Push Notifications خارجية.</p>
+      <p>تنبيهات الفواتير والتذكير اليومي تتم جدولتها محلياً على جهازك حصراً بواسطة تقويم وتنبيهات النظام المدمجة (Apple Local Notifications)، دون أي اتصال بخوادم Push Notifications خارجية.</p>
 
       <h2>5. تصدير ومشاركة البيانات</h2>
       <p>أنت وحدك المالك الوحيد لبياناتك. يتيح لك التطبيق تصدير بياناتك كملف JSON للنسخ الاحتياطي أو ملف CSV لجداول البيانات، ويتم نقلها مباشرة عبر قائمة المشاركة الرسمية بنظام iOS (Share Sheet) وفق اختيارك فقط.</p>
 
       <h2>6. الدعم الفني والتواصل مع المطور</h2>
-      <p>إذا كان لديك أي استفسار أو طلب دعم فني حول التطبيق وسياسة الخصوصية، يمكنك التواصل معنا مباشرة عبر البريد الإلكتروني: <a href="mailto:shady.nasif@gmail.com" style="color:var(--accent); font-weight:bold;">shady.nasif@gmail.com</a>.</p>
+      <p>إذا كان لديك أي استفسار أو طلب دعم فني حول تطبيق هللة وقرش وسياسة الخصوصية، يمكنك التواصل معنا مباشرة عبر البريد الإلكتروني: <a href="mailto:shady.nasif@gmail.com" style="color:var(--accent); font-weight:bold;">shady.nasif@gmail.com</a>.</p>
 
       <div class="divider"></div>
 
       <div class="en-section">
         <span class="badge">100% Local Storage · No Servers · No Tracking</span>
-        <h1>Privacy Policy — Home Expenses</h1>
+        <h1>Privacy Policy — Halala & Qirsh</h1>
         <p>Last updated: 2026</p>
 
         <h2>1. Core Principle: Zero Data Collection</h2>
-        <p><strong>Home Expenses</strong> is built as a private, offline-first personal household finance and budget tracker. There are no user accounts, no backend servers, no analytics SDKs, no tracking pixels, and no third-party advertisements.</p>
+        <p><strong>Halala & Qirsh</strong> is built as a private, offline-first personal household finance and budget tracker. There are no user accounts, no backend servers, no analytics SDKs, no tracking pixels, and no third-party advertisements.</p>
 
         <h2>2. On-Device Local Storage</h2>
         <p>All data you enter into the application (expenses, bills, categories, budget limits, grocery lists, and preferences):</p>
@@ -160,7 +160,7 @@
         <p>You have full ownership of your data. You can back up or export your data at any time via CSV or JSON using the native Apple Share Sheet.</p>
 
         <h2>6. Support & Inquiries</h2>
-        <p>For any questions or support regarding this Privacy Policy and the Home Expenses app, please contact us at: <a href="mailto:shady.nasif@gmail.com" style="color:var(--accent); font-weight:bold;">shady.nasif@gmail.com</a>.</p>
+        <p>For any questions or support regarding this Privacy Policy and the Halala & Qirsh app, please contact us at: <a href="mailto:shady.nasif@gmail.com" style="color:var(--accent); font-weight:bold;">shady.nasif@gmail.com</a>.</p>
       </div>
     </div>
   </div>

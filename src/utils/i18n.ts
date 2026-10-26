@@ -6,6 +6,8 @@ export const translations = {
     appSubtitle: 'Halala & Qirsh · تتبع المصاريف والميزانية - تخزين محلي 100%',
     brandNameEn: 'Halala & Qirsh',
     brandTagline: 'نحفظ لك كل هللة وقرش',
+    splashTagline: 'ميزانيتك على جهازك فقط',
+    splashSubtitle: 'نحفظ لك كل هللة وقرش · ميزانية مشفرة ومحفوظة محلياً',
     tabDashboard: 'الرئيسية',
     tabExpenses: 'المصاريف',
     tabBudgets: 'الميزانية',
@@ -77,7 +79,7 @@ export const translations = {
     overLabel: 'زيادة',
 
     // Expenses
-    expensesLog: 'سجل مصاريف البيت',
+    expensesLog: 'سجل المصاريف',
     expensesHistory: 'سجل نفقات المنزل',
     addExpenseBtn: '+ إضافة مصروف',
     addExpenseAction: 'إضافة مصروف',
@@ -306,6 +308,8 @@ export const translations = {
     appSubtitle: 'Halala & Qirsh · Household Budget & Expense Tracker',
     brandNameEn: 'Halala & Qirsh',
     brandTagline: 'Every Halala & Qirsh counts',
+    splashTagline: 'Your budget, on your device only',
+    splashSubtitle: 'Every Halala & Qirsh counts · 100% Private & Offline',
     tabDashboard: 'Dashboard',
     tabExpenses: 'Expenses',
     tabBudgets: 'Budgets',

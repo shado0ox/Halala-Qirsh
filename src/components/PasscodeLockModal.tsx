@@ -79,7 +79,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
     if (lockoutSeconds > 0 || isVerifying) return;
     setIsVerifying(true);
     nativeHaptics.tap(soundEnabled);
-    const reason = isEnglish ? 'Authenticate to unlock Home Expenses' : 'المصادقة لفتح تطبيق مصاريف البيت';
+    const reason = isEnglish ? 'Authenticate to unlock Halala & Qirsh' : 'المصادقة لفتح تطبيق هللة وقرش';
     const cancelTitle = isEnglish ? 'Cancel' : 'إلغاء';
     const success = await SecurityService.authenticateBiometric(reason, cancelTitle);
     setIsVerifying(false);
@@ -242,7 +242,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
           <p className="text-xs text-white/75 mb-6">
             {errorMessage ||
               (mode === 'unlock'
-                ? isEnglish ? 'Personal expense & budget data' : 'حماية بيانات مصاريف البيت وميزانيتك'
+                ? isEnglish ? 'Personal expense & budget data' : 'حماية بيانات المصاريف وميزانيتك'
                 : isConfirming
                 ? isEnglish ? 'Re-enter your 4 digits' : 'أعد إدخال الرمز المكون من 4 أرقام'
                 : isEnglish ? 'Enter 4 digits to lock app' : 'اختر 4 أرقام لقفل التطبيق')}

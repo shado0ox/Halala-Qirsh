@@ -1,8 +1,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.homeexpenses.budget',
-  appName: 'مصاريف البيت',
+  appId: 'com.shady.halalaqirsh',
+  appName: 'هللة وقرش',
   webDir: 'dist',
   plugins: {
     Keyboard: {

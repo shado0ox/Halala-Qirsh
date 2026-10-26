@@ -23,6 +23,7 @@ import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
 import { useCoinFlight } from '../../context/CoinFlightContext';
+import { translations } from '../../utils/i18n';
 
 interface ExpensesTabProps {
   categories: Category[];
@@ -52,6 +53,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
   const isRTL = settings.language !== 'en';
   const isEn = settings.language === 'en';
   const lang = settings.language || 'ar';
+  const t = translations[lang];
   const isHidden = Boolean(settings.hideAmounts);
 
   const { registerTarget, highlightedExpenseId } = useCoinFlight();
@@ -367,12 +369,10 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
               <Receipt size={26} />
             </motion.div>
             <div className="text-sm font-bold text-[#1C1C1E] dark:text-white">
-              {isEn ? 'No matching expenses' : 'لا توجد مصاريف مطابقة'}
+              {t.noMatchingExpenses}
             </div>
             <p className="text-xs text-[#8E8E93] max-w-xs mx-auto">
-              {isEn
-                ? 'Try modifying your search or filters, or tap + to log a new expense.'
-                : 'جرب تعديل عبارة البحث أو الفلاتر، أو اضغط على + لتسجيل مصروف جديد.'}
+              {t.noMatchingExpensesHint}
             </p>
           </div>
         )}

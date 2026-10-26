@@ -8,9 +8,13 @@
     <path d="M512 216L240 436C228 446 220 460 220 476C220 504 242 524 270 524H300V752C300 774 318 792 340 792H684C706 792 724 774 724 752V524H754C782 524 804 504 804 476C804 460 796 446 784 436L512 216Z" fill="#FFFFFF"/>
     
     <!-- Central Coin Silhouette -->
-    <circle cx="512" cy="580" r="120" fill="#064E3B"/>
-    <circle cx="512" cy="580" r="102" fill="none" stroke="#FFFFFF" stroke-width="12"/>
-    <path d="M512 508V652" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
-    <path d="M464 544C464 526 484 518 512 518C540 518 558 528 558 546C558 578 464 572 464 612C464 632 484 642 512 642C542 642 560 630 560 612" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+    <circle cx="512" cy="595" r="128" fill="#064E3B"/>
+    <circle cx="512" cy="595" r="114" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-dasharray="10 12"/>
+    <circle cx="512" cy="595" r="96" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+    <circle cx="512" cy="595" r="92" fill="#047857"/>
+
+    <!-- Stylized Arabic "هـ" (Halala) Mark -->
+    <circle cx="504" cy="592" r="24" fill="none" stroke="#FFFFFF" stroke-width="12"/>
+    <path d="M552 580 C552 546 526 528 496 528 C462 528 440 556 440 594 C440 632 466 658 506 658 L424 658" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 </svg>

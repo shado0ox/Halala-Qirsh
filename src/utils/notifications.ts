@@ -130,8 +130,8 @@ export const sendTestBillNotification = (
     ? 'Test Reminder: Electricity & AC Bill'
     : 'تنبيه تجريبي: فاتورة الكهرباء والتكييف';
   const body = isEn
-    ? `This is a test notification for household bills. Bill amount: ${sampleAmount} is due.`
-    : `هذا إشعار تجريبي لاختبار التنبيهات المحلية لمصاريف البيت. الفاتورة بمبلغ ${sampleAmount} مستحقة السداد.`;
+    ? `This is a test notification for Halala & Qirsh. Bill amount: ${sampleAmount} is due.`
+    : `هذا إشعار تجريبي لاختبار التنبيهات المحلية لتطبيق هللة وقرش. الفاتورة بمبلغ ${sampleAmount} مستحقة السداد.`;
 
   const dispatched = triggerBrowserNotification(title, body, 'test-notification');
   return {

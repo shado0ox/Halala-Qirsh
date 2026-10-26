@@ -122,31 +122,20 @@ export const HalalaQirshLogo: React.FC<HalalaQirshLogoProps> = ({
           {/* Sunburst Radial Sheen */}
           <circle cx="64" cy="60" r="32" fill="url(#sunburst)" />
 
-          {/* Palm & Crossed Swords Arabesque Mint Emblem */}
-          {/* Palm Fronds */}
+          {/* Stylized Arabic "هـ" (Halala) Minted Emblem */}
+          <circle cx="63" cy="59" r="6" fill="none" stroke="#FEF3C7" strokeWidth="2.5" />
           <path
-            d="M64 42C64 42 61 46 61 50C61 54 64 58 64 58C64 58 67 54 67 50C67 46 64 42 64 42Z"
-            fill="#FDE68A"
+            d="M74 57 C74 50 69 46 63 46 C55 46 51 52 51 60 C51 68 56 73 65 73 L48 73"
+            fill="none"
+            stroke="#FEF3C7"
+            strokeWidth="3"
+            strokeLinecap="round"
+            strokeLinejoin="round"
           />
-          <path d="M64 44C60 45 57 48 56 52" stroke="#FDE68A" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M64 44C68 45 71 48 72 52" stroke="#FDE68A" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M64 48C59 50 58 55 58 58" stroke="#FDE68A" strokeWidth="1.6" strokeLinecap="round" />
-          <path d="M64 48C69 50 70 55 70 58" stroke="#FDE68A" strokeWidth="1.6" strokeLinecap="round" />
-          {/* Palm Trunk */}
-          <path d="M64 54V66" stroke="#FEF3C7" strokeWidth="2.2" strokeLinecap="round" />
-
-          {/* Crossed Swords at Base */}
-          <path d="M55 72L73 62" stroke="#FDE68A" strokeWidth="1.8" strokeLinecap="round" />
-          <path d="M73 72L55 62" stroke="#FDE68A" strokeWidth="1.8" strokeLinecap="round" />
-          {/* Sword Hilts */}
-          <circle cx="54" cy="73" r="1.4" fill="#FEF3C7" />
-          <circle cx="74" cy="73" r="1.4" fill="#FEF3C7" />
-
           {/* Mint Stars */}
-          <polygon
-            points="64,36 65.5,39 69,39.5 66.5,41.5 67,45 64,43 61,45 61.5,41.5 59,39.5 62.5,39"
-            fill="#FEF3C7"
-          />
+          <circle cx="64" cy="38" r="2" fill="#FEF3C7" />
+          <circle cx="54" cy="40" r="1.5" fill="#FDE68A" />
+          <circle cx="74" cy="40" r="1.5" fill="#FDE68A" />
         </g>
       </svg>
     </div>

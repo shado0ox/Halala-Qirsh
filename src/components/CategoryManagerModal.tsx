@@ -336,7 +336,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     <span>
                       {isEn
                         ? `All Expense Categories (${categories.length})`
-                        : `جميع تصنيفات مصاريف البيت (${categories.length})`}
+                        : `جميع تصنيفات المصاريف (${categories.length})`}
                     </span>
                     <span className="text-[11px] text-blue-600 dark:text-blue-400">
                       {isEn ? 'Tap to edit or set limit' : 'انقر للتعديل أو تغيير الميزانية'}
