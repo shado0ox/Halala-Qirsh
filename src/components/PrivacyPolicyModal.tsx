@@ -83,7 +83,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
 
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 text-slate-500 dark:text-slate-400">
                 <Mail size={14} className="text-blue-500" />
-                <span>Support & Contact: <strong className="text-slate-800 dark:text-slate-200">support@example.com</strong></span>
+                <span>Support & Contact: <strong className="text-slate-800 dark:text-slate-200">shady.nasif@gmail.com</strong></span>
               </div>
             </>
           ) : (
@@ -125,7 +125,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
 
               <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 text-slate-500 dark:text-slate-400">
                 <Mail size={14} className="text-blue-500" />
-                <span>الدعم الفني والتواصل: <strong className="text-slate-800 dark:text-slate-200">support@example.com</strong></span>
+                <span>الدعم الفني والتواصل: <strong className="text-slate-800 dark:text-slate-200">shady.nasif@gmail.com</strong></span>
               </div>
             </>
           )}
