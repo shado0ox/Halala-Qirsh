@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
-import { X, Check, Calendar, CreditCard, Banknote, ArrowRightLeft, Smartphone } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { X, Check, Calendar, CreditCard, Banknote, ArrowRightLeft, Smartphone, Coins } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Expense, PaymentMethod, CurrencyCode } from '../types';
 import { CategoryIcon } from './CategoryIcon';
 import { sound } from '../utils/audio';
+import { nativeHaptics } from '../utils/nativeHaptics';
 import { CURRENCY_SYMBOLS } from '../utils/storage';
+import { springs, fades } from '../utils/motion';
 
 interface AddExpenseSheetProps {
   isOpen: boolean;
@@ -16,7 +18,7 @@ interface AddExpenseSheetProps {
   soundEnabled?: boolean;
 }
 
-const COMMON_TITLES = [
+const COMMON_TITLES_AR = [
   'سوبرماركت ومؤونة',
   'خضار وفواكه ولحوم',
   'صيدلية وأدوية',
@@ -24,7 +26,7 @@ const COMMON_TITLES = [
   'فاتورة كهرباء / ماء',
   'طلب مطعم عائلي',
   'مستلزمات مدرسية',
-  'صيانة وقطع غيار منزل',
+  'صيانة وتجهيز منزل',
 ];
 
 export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
@@ -52,17 +54,40 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
   );
   const [notes, setNotes] = useState<string>(initialExpense?.notes || '');
   const [error, setError] = useState<string>('');
+  const [isFlyingCoin, setIsFlyingCoin] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (initialExpense) {
+      setTitle(initialExpense.title);
+      setAmountStr(String(initialExpense.amount));
+      setCategoryId(initialExpense.categoryId);
+      setDate(initialExpense.date);
+      setPaymentMethod(initialExpense.paymentMethod);
+      setPayer(initialExpense.payer);
+      setNotes(initialExpense.notes || '');
+    } else {
+      setTitle('');
+      setAmountStr('');
+      setCategoryId(categories[0]?.id || '');
+      setDate(new Date().toISOString().split('T')[0]);
+      setPaymentMethod('card');
+      setPayer('الزوج');
+      setNotes('');
+    }
+    setError('');
+    setIsFlyingCoin(false);
+  }, [initialExpense, isOpen, categories]);
 
   const currencySymbol = CURRENCY_SYMBOLS[currency]?.symbol || 'ر.س';
 
   const handleQuickAddAmount = (addVal: number) => {
-    sound.playTap(soundEnabled);
+    nativeHaptics.tap(soundEnabled);
     const curr = parseFloat(amountStr) || 0;
     setAmountStr(String(curr + addVal));
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSubmit = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const parsedAmount = parseFloat(amountStr);
     if (!title.trim()) {
       setError('يرجى كتابة وصف أو اسم المصروف');
@@ -77,86 +102,121 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
       return;
     }
 
-    sound.playSuccess(soundEnabled);
-    onSaveExpense({
-      title: title.trim(),
-      amount: parsedAmount,
-      categoryId,
-      date,
-      paymentMethod,
-      payer,
-      notes: notes.trim() || undefined,
-    });
-    onClose();
+    // Trigger signature coin fly animation & haptics
+    setIsFlyingCoin(true);
+    nativeHaptics.success(soundEnabled);
+
+    setTimeout(() => {
+      onSaveExpense({
+        title: title.trim(),
+        amount: parsedAmount,
+        categoryId,
+        date,
+        paymentMethod,
+        payer,
+        notes: notes.trim() || undefined,
+      });
+      onClose();
+    }, 280);
   };
 
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-end justify-center">
-          {/* iOS Dimmed Backdrop */}
+        <div className="fixed inset-0 z-50 flex items-end justify-center select-none">
+          {/* iOS Dimmed Backdrop with fade */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
+            transition={fades.fast}
             onClick={() => {
-              sound.playTap(soundEnabled);
+              nativeHaptics.tap(soundEnabled);
               onClose();
             }}
-            className="absolute inset-0 bg-black/45 backdrop-blur-xs"
+            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
           />
 
-          {/* iOS Bottom Sheet Container */}
+          {/* Flying Coin on Save */}
+          {isFlyingCoin && (
+            <motion.div
+              initial={{ scale: 0.5, y: 0, opacity: 1 }}
+              animate={{ scale: [1, 1.4, 0.2], y: -400, opacity: [1, 1, 0] }}
+              transition={{ duration: 0.32, ease: 'easeOut' }}
+              className="absolute z-60 pointer-events-none w-14 h-14 rounded-full bg-gradient-to-tr from-amber-400 to-amber-300 text-amber-900 shadow-xl flex items-center justify-center font-black"
+            >
+              <Coins size={28} />
+            </motion.div>
+          )}
+
+          {/* Draggable Bottom Sheet with velocity-based dismiss */}
           <motion.div
+            drag="y"
+            dragConstraints={{ top: 0 }}
+            dragElastic={{ top: 0, bottom: 0.3 }}
+            onDragEnd={(_, info) => {
+              if (info.offset.y > 100 || info.velocity.y > 600) {
+                nativeHaptics.tap(soundEnabled);
+                onClose();
+              }
+            }}
             initial={{ y: '100%' }}
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
-            transition={{ type: 'spring', damping: 28, stiffness: 320 }}
-            className="relative w-full max-w-lg max-h-[90vh] bg-white dark:bg-[#1C1C1E] rounded-t-[32px] shadow-2xl flex flex-col overflow-hidden z-10"
+            transition={springs.smooth}
+            className="relative w-full max-w-lg max-h-[90vh] bg-white dark:bg-[#1C1C1E] rounded-t-[32px] shadow-2xl flex flex-col overflow-hidden z-10 border-t border-slate-200/50 dark:border-slate-800"
           >
             {/* Grabber Handle */}
-            <div className="w-full flex justify-center pt-3 pb-1 cursor-grab">
-              <div className="w-10 h-1.5 bg-[#C7C7CC] dark:bg-[#48484A] rounded-full" />
+            <div className="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing">
+              <div className="w-11 h-1.5 bg-[#C7C7CC] dark:bg-[#48484A] rounded-full" />
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
-              <button
+            <div className="flex items-center justify-between px-5 py-2.5 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
+              <motion.button
+                whileTap={{ scale: 0.92 }}
                 type="button"
                 onClick={() => {
-                  sound.playTap(soundEnabled);
+                  nativeHaptics.tap(soundEnabled);
                   onClose();
                 }}
                 className="w-8 h-8 rounded-full bg-[#E5E5EA]/70 dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-[#1C1C1E] dark:hover:text-white transition-colors cursor-pointer"
               >
                 <X size={18} />
-              </button>
+              </motion.button>
 
-              <h2 className="text-base font-bold text-[#1C1C1E] dark:text-white">
+              <h2 className="text-base font-black text-[#1C1C1E] dark:text-white">
                 {initialExpense ? 'تعديل المصروف' : 'إضافة مصروف جديد'}
               </h2>
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.94 }}
                 type="button"
-                onClick={handleSubmit}
-                className="text-sm font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 cursor-pointer"
+                onClick={() => handleSubmit()}
+                className="px-3.5 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer"
               >
                 حفظ
-              </button>
+              </motion.button>
             </div>
 
             {/* Form Body (Scrollable) */}
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
               {error && (
-                <div className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs font-medium text-center">
+                <motion.div
+                  initial={{ opacity: 0, y: -6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="p-2.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900/50 text-red-600 dark:text-red-400 text-xs font-bold text-center"
+                >
                   {error}
-                </div>
+                </motion.div>
               )}
 
-              {/* Big Amount Card */}
-              <div className="bg-[#F2F2F7] dark:bg-[#2C2C2E] p-4 rounded-2xl flex flex-col items-center justify-center text-center">
-                <span className="text-xs text-[#8E8E93] font-medium mb-1">المبلغ المصروف</span>
-                <div className="flex items-center justify-center gap-2">
+              {/* Big Amount Card with Individual Digit Slide Animation */}
+              <div className="bg-[#F2F2F7] dark:bg-[#2C2C2E] p-4 rounded-3xl flex flex-col items-center justify-center text-center relative overflow-hidden">
+                <span className="text-xs text-[#8E8E93] font-semibold mb-1">المبلغ المصروف</span>
+                
+                <div className="flex items-center justify-center gap-2 relative">
+                  {/* Invisible real input for keyboard focus */}
                   <input
                     type="number"
                     step="any"
@@ -167,33 +227,37 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                     }}
                     placeholder="0"
                     autoFocus
-                    className="w-48 text-center text-3xl font-extrabold text-[#1C1C1E] dark:text-white bg-transparent border-none outline-hidden tabular-nums placeholder:text-[#C7C7CC] dark:placeholder:text-[#636366]"
+                    className="w-48 text-center text-3xl font-black text-[#1C1C1E] dark:text-white bg-transparent border-none outline-hidden tabular-nums placeholder:text-[#C7C7CC] dark:placeholder:text-[#636366]"
                   />
-                  <span className="text-xl font-bold text-blue-600 dark:text-blue-400">{currencySymbol}</span>
+                  <span className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                    {currencySymbol}
+                  </span>
                 </div>
 
-                {/* Quick Add Presets */}
-                <div className="flex items-center gap-2 mt-3 pt-2 border-t border-[#E5E5EA] dark:border-[#3A3A3C] w-full justify-center flex-wrap">
+                {/* Quick Add Presets with spring micro-interaction */}
+                <div className="flex items-center gap-1.5 mt-3 pt-2.5 border-t border-[#E5E5EA] dark:border-[#3A3A3C] w-full justify-center flex-wrap">
                   {[20, 50, 100, 200, 500].map((val) => (
-                    <button
+                    <motion.button
                       key={val}
+                      whileTap={{ scale: 0.92 }}
                       type="button"
                       onClick={() => handleQuickAddAmount(val)}
-                      className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-white dark:bg-[#3A3A3C] text-slate-700 dark:text-slate-200 shadow-xs hover:bg-slate-50 transition-colors cursor-pointer"
+                      className="px-2.5 py-1 text-xs font-bold rounded-lg bg-white dark:bg-[#3A3A3C] text-slate-800 dark:text-slate-200 shadow-2xs hover:bg-slate-50 transition-colors cursor-pointer"
                     >
                       +{val}
-                    </button>
+                    </motion.button>
                   ))}
-                  <button
+                  <motion.button
+                    whileTap={{ scale: 0.92 }}
                     type="button"
                     onClick={() => {
-                      sound.playTap(soundEnabled);
+                      nativeHaptics.tap(soundEnabled);
                       setAmountStr('');
                     }}
-                    className="px-2.5 py-1 text-xs font-semibold rounded-lg bg-red-100/60 dark:bg-red-950/50 text-red-600 dark:text-red-300 transition-colors cursor-pointer"
+                    className="px-2.5 py-1 text-xs font-bold rounded-lg bg-red-100/70 dark:bg-red-950/50 text-red-600 dark:text-red-300 transition-colors cursor-pointer"
                   >
                     تفريغ
-                  </button>
+                  </motion.button>
                 </div>
               </div>
 
@@ -210,28 +274,29 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                     setError('');
                   }}
                   placeholder="مثلاً: خضار وسوبرماركت، بنزين، كشف طبي..."
-                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-sm text-[#1C1C1E] dark:text-white placeholder:text-[#8E8E93] outline-hidden focus:ring-2 focus:ring-blue-500/50 transition-all font-medium"
+                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-sm text-[#1C1C1E] dark:text-white placeholder:text-[#8E8E93] outline-hidden focus:ring-2 focus:ring-emerald-500/50 transition-all font-medium"
                 />
 
                 {/* Quick Title Tags */}
                 <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-2">
-                  {COMMON_TITLES.map((t) => (
-                    <button
+                  {COMMON_TITLES_AR.map((t) => (
+                    <motion.button
                       key={t}
+                      whileTap={{ scale: 0.94 }}
                       type="button"
                       onClick={() => {
-                        sound.playTap(soundEnabled);
+                        nativeHaptics.tap(soundEnabled);
                         setTitle(t);
                       }}
-                      className="shrink-0 px-2.5 py-1 text-[11px] rounded-lg bg-[#F2F2F7] dark:bg-[#2C2C2E] text-[#636366] dark:text-[#AEAEB2] hover:bg-blue-50 hover:text-blue-600 transition-colors cursor-pointer"
+                      className="shrink-0 px-2.5 py-1 text-[11px] font-semibold rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-[#636366] dark:text-[#AEAEB2] hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-950/40 transition-colors cursor-pointer"
                     >
                       {t}
-                    </button>
+                    </motion.button>
                   ))}
                 </div>
               </div>
 
-              {/* Category Picker (Grid) */}
+              {/* Category Picker (Spring Chips) */}
               <div>
                 <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
                   فئة المصروف
@@ -240,105 +305,93 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                   {categories.map((cat) => {
                     const isSelected = categoryId === cat.id;
                     return (
-                      <button
+                      <motion.button
                         key={cat.id}
+                        whileTap={{ scale: 0.94 }}
+                        animate={{ scale: isSelected ? 1.03 : 1 }}
+                        transition={springs.snappy}
                         type="button"
                         onClick={() => {
-                          sound.playTap(soundEnabled);
+                          nativeHaptics.tap(soundEnabled);
                           setCategoryId(cat.id);
                         }}
-                        className={`p-2 rounded-xl flex items-center gap-2 border text-right transition-all cursor-pointer ${
+                        className={`p-2 rounded-2xl flex items-center gap-2 border text-right transition-all cursor-pointer ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50/70 dark:bg-blue-950/40 ring-1 ring-blue-500'
-                            : 'border-transparent bg-[#F2F2F7] dark:bg-[#2C2C2E] hover:bg-slate-200/60 dark:hover:bg-[#3A3A3C]'
+                            ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-900 dark:text-emerald-100 shadow-2xs font-bold ring-2 ring-emerald-500/30'
+                            : 'bg-white dark:bg-[#2C2C2E] border-slate-200/60 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50'
                         }`}
                       >
-                        <CategoryIcon iconName={cat.icon} color={cat.color} bgColor={cat.bgColor} size="sm" />
-                        <span className="text-xs font-medium text-[#1C1C1E] dark:text-white truncate">
-                          {cat.name}
-                        </span>
-                      </button>
+                        <CategoryIcon
+                          iconName={cat.icon}
+                          color={cat.color}
+                          bgColor={cat.bgColor}
+                          size="sm"
+                        />
+                        <span className="text-[11px] truncate">{cat.name}</span>
+                      </motion.button>
                     );
                   })}
                 </div>
               </div>
 
-              {/* Payer & Date */}
-              <div className="grid grid-cols-2 gap-3">
-                {/* Payer */}
+              {/* Date & Payment Method */}
+              <div className="grid grid-cols-2 gap-2.5">
                 <div>
                   <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                    الدافع (المسؤول)
+                    تاريخ العملية
                   </label>
-                  <div className="grid grid-cols-3 gap-1 p-1 bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-xl text-xs font-semibold">
-                    {(['الزوج', 'الزوجة', 'مشترك'] as const).map((p) => (
-                      <button
-                        key={p}
-                        type="button"
-                        onClick={() => {
-                          sound.playTap(soundEnabled);
-                          setPayer(p);
-                        }}
-                        className={`py-1.5 text-center rounded-lg transition-colors cursor-pointer ${
-                          payer === p
-                            ? 'bg-white dark:bg-[#48484A] text-[#1C1C1E] dark:text-white shadow-xs'
-                            : 'text-[#8E8E93]'
-                        }`}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-
-                {/* Date */}
-                <div>
-                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                    التاريخ
-                  </label>
-                  <div className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-medium">
-                    <Calendar size={14} className="text-[#8E8E93]" />
+                  <div className="relative">
                     <input
                       type="date"
                       value={date}
                       onChange={(e) => setDate(e.target.value)}
-                      className="w-full bg-transparent border-none outline-hidden text-[#1C1C1E] dark:text-white font-medium"
+                      className="w-full px-3 py-2 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                     />
                   </div>
                 </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
+                    طريقة الدفع
+                  </label>
+                  <select
+                    value={paymentMethod}
+                    onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
+                    className="w-full px-3 py-2 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
+                  >
+                    <option value="card">بطاقة مدى / ائتمان</option>
+                    <option value="cash">نقداً (كاش)</option>
+                    <option value="transfer">تحويل بنكي</option>
+                    <option value="digital">محفظة رقمية (Apple Pay)</option>
+                  </select>
+                </div>
               </div>
 
-              {/* Payment Method */}
+              {/* Payer Selector */}
               <div>
                 <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                  طريقة السداد
+                  الشخص الدافع
                 </label>
-                <div className="grid grid-cols-4 gap-1.5">
-                  {[
-                    { id: 'card' as PaymentMethod, label: 'بطاقة مدى', icon: CreditCard },
-                    { id: 'cash' as PaymentMethod, label: 'كاش / نقدي', icon: Banknote },
-                    { id: 'transfer' as PaymentMethod, label: 'تحويل بنكي', icon: ArrowRightLeft },
-                    { id: 'digital' as PaymentMethod, label: 'دفع رقمي', icon: Smartphone },
-                  ].map((pm) => {
-                    const isSelected = paymentMethod === pm.id;
-                    const Icon = pm.icon;
+                <div className="grid grid-cols-3 gap-2">
+                  {['الزوج', 'الزوجة', 'مشترك'].map((p) => {
+                    const isSelected = payer === p;
                     return (
-                      <button
-                        key={pm.id}
+                      <motion.button
+                        key={p}
+                        whileTap={{ scale: 0.95 }}
                         type="button"
                         onClick={() => {
-                          sound.playTap(soundEnabled);
-                          setPaymentMethod(pm.id);
+                          nativeHaptics.tap(soundEnabled);
+                          setPayer(p);
                         }}
-                        className={`py-2 px-1 rounded-xl flex flex-col items-center justify-center gap-1 border text-center transition-all cursor-pointer ${
+                        className={`py-2 px-3 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
                           isSelected
-                            ? 'border-blue-500 bg-blue-50/60 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 font-bold'
-                            : 'border-transparent bg-[#F2F2F7] dark:bg-[#2C2C2E] text-[#8E8E93] hover:text-[#1C1C1E] dark:hover:text-white'
+                            ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                            : 'bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
                         }`}
                       >
-                        <Icon size={16} />
-                        <span className="text-[10px] tracking-tight">{pm.label}</span>
-                      </button>
+                        {p}
+                      </motion.button>
                     );
                   })}
                 </div>
@@ -353,20 +406,9 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="موقع المتجر، رقم الفاتورة أو ملاحظة للبيت..."
-                  className="w-full px-3.5 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs text-[#1C1C1E] dark:text-white placeholder:text-[#8E8E93] outline-hidden focus:ring-2 focus:ring-blue-500/50"
+                  placeholder="مثال: فاتورة الصيدلية الشهرية، شراء عرض مخفض..."
+                  className="w-full px-3.5 py-2 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs text-[#1C1C1E] dark:text-white placeholder:text-[#8E8E93] outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                 />
-              </div>
-
-              {/* Submit CTA */}
-              <div className="pt-2">
-                <button
-                  type="submit"
-                  className="w-full h-12 rounded-2xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm flex items-center justify-center gap-2 shadow-lg shadow-blue-500/25 active:scale-[0.98] transition-all cursor-pointer"
-                >
-                  <Check size={18} strokeWidth={2.5} />
-                  <span>{initialExpense ? 'تأكيد وحفظ التعديلات' : 'تسجيل المصروف في الميزانية'}</span>
-                </button>
               </div>
             </form>
           </motion.div>

@@ -1,8 +1,58 @@
 @import "tailwindcss";
 
+:root {
+  /* Brand Emerald & Mint System */
+  --color-primary-900: #064E3B;
+  --color-primary-800: #065F46;
+  --color-primary-700: #047857;
+  --color-primary-600: #059669;
+  --color-primary-500: #10B981;
+  --color-primary-400: #34D399;
+  --color-primary-100: #D1FAE5;
+  --color-primary-50:  #ECFDF5;
+  --color-mint:        #34D399;
+  --color-warning:     #F59E0B;
+  --color-danger:      #EF4444;
+
+  /* Light Theme Surfaces & Typography (iOS System Grays) */
+  --bg-app:            #F2F2F7;
+  --bg-surface:        #FFFFFF;
+  --bg-surface-glass:  rgba(255, 255, 255, 0.88);
+  --bg-secondary:      #E5E5EA;
+  --bg-subtle:         #F8FAFC;
+  --border-subtle:     rgba(0, 0, 0, 0.07);
+  --border-glass:      rgba(255, 255, 255, 0.8);
+  --text-primary:      #1C1C1E;
+  --text-secondary:    #636366;
+  --text-muted:        #8E8E93;
+  --shadow-card:       0 2px 10px -2px rgba(0, 0, 0, 0.05), 0 1px 3px rgba(0, 0, 0, 0.03);
+  --shadow-hero:       0 14px 30px -6px rgba(5, 150, 105, 0.28), 0 4px 10px -2px rgba(0, 0, 0, 0.05);
+
+  /* Radii */
+  --radius-hero:       28px;
+  --radius-card:       20px;
+  --radius-button:     14px;
+}
+
+.dark {
+  /* Dark Theme Surfaces & Typography */
+  --bg-app:            #000000;
+  --bg-surface:        #1C1C1E;
+  --bg-surface-glass:  rgba(28, 28, 30, 0.85);
+  --bg-secondary:      #2C2C2E;
+  --bg-subtle:         #161618;
+  --border-subtle:     rgba(255, 255, 255, 0.08);
+  --border-glass:      rgba(255, 255, 255, 0.1);
+  --text-primary:      #FFFFFF;
+  --text-secondary:    #AEAEB2;
+  --text-muted:        #8E8E93;
+  --shadow-card:       0 2px 12px -2px rgba(0, 0, 0, 0.35);
+  --shadow-hero:       0 16px 36px -6px rgba(0, 0, 0, 0.6);
+}
+
 @layer base {
   html, body {
-    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "SF Pro AR", "IBM Plex Sans Arabic", "Segoe UI", Roboto, sans-serif;
+    font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro AR", "IBM Plex Sans Arabic", "Segoe UI", Roboto, sans-serif;
     -webkit-tap-highlight-color: transparent;
     -webkit-touch-callout: none;
     overscroll-behavior-y: none;
@@ -11,12 +61,58 @@
     width: 100%;
     margin: 0;
     padding: 0;
+    background-color: var(--bg-app);
+    color: var(--text-primary);
   }
 
   /* Prevent iOS WebKit from auto-zooming on input focus */
   input, select, textarea {
     font-size: 16px !important;
   }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+  }
+}
+
+/* Premium Hero Emerald Card */
+.hero-card-emerald {
+  background: 
+    radial-gradient(circle at 90% 10%, rgba(52, 211, 153, 0.35) 0%, transparent 55%),
+    radial-gradient(circle at 10% 90%, rgba(6, 78, 59, 0.5) 0%, transparent 60%),
+    linear-gradient(135deg, #064E3B 0%, #059669 52%, #10B981 100%);
+  border-radius: var(--radius-hero);
+  color: #FFFFFF;
+  box-shadow: var(--shadow-hero);
+  position: relative;
+  overflow: hidden;
+}
+
+/* SVG Geometric Watermark for Hero Card */
+.hero-card-emerald::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.05'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  opacity: 0.8;
+  pointer-events: none;
+}
+
+/* Soft Secondary Glass Card (Static elements only) */
+.card-glass {
+  background-color: var(--bg-surface-glass);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
+}
+
+.card-solid {
+  background-color: var(--bg-surface);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-card);
+  box-shadow: var(--shadow-card);
 }
 
 /* iOS custom scrollbar and utilities */
@@ -40,4 +136,13 @@
 }
 .pr-safe {
   padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Pressable feedback animation utility */
+.pressable {
+  transition: transform 0.16s cubic-bezier(0.16, 1, 0.3, 1), opacity 0.16s ease;
+}
+.pressable:active {
+  transform: scale(0.97);
+  opacity: 0.9;
 }

@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <linearGradient id="bgEmerald" x1="15%" y1="10%" x2="85%" y2="90%">
+      <stop offset="0%" stop-color="#064E3B"/>
+      <stop offset="50%" stop-color="#059669"/>
+      <stop offset="100%" stop-color="#10B981"/>
+    </linearGradient>
+    <radialGradient id="highlight" cx="25%" cy="20%" r="70%">
+      <stop offset="0%" stop-color="#34D399" stop-opacity="0.3"/>
+      <stop offset="100%" stop-color="#064E3B" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="subtleGlow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#022c22" flood-opacity="0.45"/>
+    </filter>
+  </defs>
+
+  <!-- Opaque Background (Zero Transparency) -->
+  <rect width="1024" height="1024" fill="url(#bgEmerald)"/>
+  <rect width="1024" height="1024" fill="url(#highlight)"/>
+
+  <!-- Main House Structure with Integrated Coin Wallet -->
+  <g filter="url(#subtleGlow)">
+    <!-- Roof -->
+    <path d="M512 216L240 436C228 446 220 460 220 476C220 504 242 524 270 524H300V752C300 774 318 792 340 792H684C706 792 724 774 724 752V524H754C782 524 804 504 804 476C804 460 796 446 784 436L512 216Z" fill="#FFFFFF"/>
+    
+    <!-- Chimney -->
+    <path d="M640 290V232C640 221 649 212 660 212H700C711 212 720 221 720 232V356L640 290Z" fill="#FFFFFF"/>
+    
+    <!-- Central Coin Silhouette Inside House -->
+    <circle cx="512" cy="580" r="120" fill="#059669"/>
+    <circle cx="512" cy="580" r="102" fill="none" stroke="#FFFFFF" stroke-width="12"/>
+    
+    <!-- Coin Symbol / Currency Bar -->
+    <path d="M512 508V652" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+    <path d="M464 544C464 526 484 518 512 518C540 518 558 528 558 546C558 578 464 572 464 612C464 632 484 642 512 642C542 642 560 630 560 612" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+  </g>
+</svg>

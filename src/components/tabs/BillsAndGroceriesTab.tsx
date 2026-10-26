@@ -16,12 +16,15 @@ import {
   BellRing,
   Sparkles,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import { RecurringBill, GroceryItem, Category, BudgetSettings } from '../../types';
 import { SegmentedControl } from '../SegmentedControl';
 import { CategoryIcon } from '../CategoryIcon';
 import { formatMoney } from '../../utils/storage';
-import { sound } from '../../utils/audio';
+import { nativeHaptics } from '../../utils/nativeHaptics';
 import { NotificationPermissionState } from '../../utils/notifications';
+import { AnimatedCounter } from '../AnimatedCounter';
+import { springs, fades, useMotionConfig } from '../../utils/motion';
 
 interface BillsAndGroceriesTabProps {
   bills: RecurringBill[];
@@ -61,6 +64,9 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
   onUpdateSettings,
 }) => {
   const [activeSubTab, setActiveSubTab] = useState<'bills' | 'groceries'>('bills');
+  const motionConfig = useMotionConfig(settings.animations);
+  const isReduced = motionConfig.isReduced;
+  const isEn = settings.language === 'en';
 
   // Add Bill Modal
   const [showAddBillModal, setShowAddBillModal] = useState<boolean>(false);
@@ -81,6 +87,9 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
 
   const catMap = new Map(categories.map((c) => [c.id, c]));
 
+  // Today's day of month
+  const todayDay = new Date().getDate();
+
   // Bills calculations
   const totalBillsAmount = bills.reduce((sum, b) => sum + b.amount, 0);
   const paidBillsAmount = bills.filter((b) => b.isPaid).reduce((sum, b) => sum + b.amount, 0);
@@ -97,133 +106,149 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
     const amount = parseFloat(billAmount);
     if (!billTitle.trim() || isNaN(amount) || amount <= 0) return;
 
-    sound.playSuccess(settings.soundEnabled);
+    nativeHaptics.success(settings.soundEnabled);
     onAddBill({
       title: billTitle.trim(),
       amount,
       categoryId: billCategoryId,
       dueDay: billDueDay,
       isPaid: false,
-      reminderEnabled: billReminderEnabled,
       notes: billNotes.trim() || undefined,
+      reminderEnabled: billReminderEnabled,
     });
+
     setBillTitle('');
     setBillAmount('');
-    setBillReminderEnabled(true);
+    setBillDueDay(1);
+    setBillNotes('');
     setShowAddBillModal(false);
   };
 
   const handleSaveGrocery = (e: React.FormEvent) => {
     e.preventDefault();
     if (!grocName.trim()) return;
-    const price = parseFloat(grocEstimatedPrice) || 0;
+    const estPrice = parseFloat(grocEstimatedPrice) || 0;
 
-    sound.playSuccess(settings.soundEnabled);
+    nativeHaptics.success(settings.soundEnabled);
     onAddGrocery({
       name: grocName.trim(),
       category: grocCategory,
-      estimatedPrice: price,
+      estimatedPrice: estPrice,
       isBought: false,
       quantity: grocQuantity > 0 ? grocQuantity : 1,
       unit: grocUnit,
     });
+
     setGrocName('');
     setGrocEstimatedPrice('');
+    setGrocQuantity(1);
     setShowAddGroceryModal(false);
   };
 
   const handleConvertBought = () => {
     if (boughtItems.length === 0) return;
-    sound.playSuccess(settings.soundEnabled);
+    nativeHaptics.success(settings.soundEnabled);
     onConvertBoughtToExpense(boughtItems);
   };
 
   return (
-    <div className="flex-1 w-full overflow-y-auto px-4 py-3 space-y-3.5 no-scrollbar">
-      {/* Top Header & Segmented Switcher */}
-      <div className="space-y-2">
+    <div className="flex-1 w-full overflow-y-auto px-4 py-3 space-y-4 no-scrollbar">
+      {/* Top Header & Sub-Tab Switcher */}
+      <div className="space-y-3 pt-1">
         <div className="flex items-center justify-between">
-          <h1 className="text-xl font-extrabold text-[#1C1C1E] dark:text-white tracking-tight">
-            التزامات ومشتريات البيت
-          </h1>
-          <button
+          <div>
+            <h1 className="text-2xl font-black text-[#1C1C1E] dark:text-white tracking-tight">
+              {isEn ? 'Bills & Groceries' : 'الفواتير ونواقص البيت'}
+            </h1>
+            <span className="text-xs text-[#8E8E93] font-medium">
+              {activeSubTab === 'bills'
+                ? isEn ? `${unpaidCount} unpaid bills this month` : `${unpaidCount} فواتير متبقية للاستحقاق`
+                : isEn ? `${unboughtItems.length} items needed` : `${unboughtItems.length} أصناف مطلوبة للقائمة`}
+            </span>
+          </div>
+
+          <motion.button
+            whileTap={{ scale: 0.94 }}
             onClick={() => {
-              sound.playTap(settings.soundEnabled);
+              nativeHaptics.tap(settings.soundEnabled);
               if (activeSubTab === 'bills') {
                 setShowAddBillModal(true);
               } else {
                 setShowAddGroceryModal(true);
               }
             }}
-            className="px-3 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
+            className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
           >
-            {activeSubTab === 'bills' ? '+ فاتورة دورية' : '+ سلعة للقائمة'}
-          </button>
+            {activeSubTab === 'bills'
+              ? (isEn ? '+ Recurring Bill' : '+ فاتورة دورية')
+              : (isEn ? '+ Grocery Item' : '+ سلعة للقائمة')}
+          </motion.button>
         </div>
 
-        {/* iOS Segmented Control */}
+        {/* Segmented Control */}
         <SegmentedControl
           value={activeSubTab}
           onChange={setActiveSubTab}
           soundEnabled={settings.soundEnabled}
           options={[
-            { value: 'bills', label: 'الفواتير والأقساط الشهرية', badge: unpaidCount },
-            { value: 'groceries', label: 'قائمة مشتريات ونواقص البيت', badge: unboughtItems.length },
+            { value: 'bills', label: isEn ? 'Monthly Bills' : 'الفواتير والأقساط الشهرية', badge: unpaidCount },
+            { value: 'groceries', label: isEn ? 'Household Groceries' : 'قائمة مشتريات ونواقص البيت', badge: unboughtItems.length },
           ]}
         />
       </div>
 
       {/* ===================== TAB 1: BILLS ===================== */}
       {activeSubTab === 'bills' && (
-        <div className="space-y-3.5">
+        <div className="space-y-3.5 pb-6">
           {/* Bills Summary Box */}
-          <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-2xs space-y-3">
+          <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#8E8E93]">حالة فواتير هذا الشهر</span>
+              <span className="text-xs font-bold text-[#8E8E93]">
+                {isEn ? 'Monthly Bills Status' : 'حالة فواتير هذا الشهر'}
+              </span>
               <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                {bills.filter((b) => b.isPaid).length} من {bills.length} مسددة
+                {bills.filter((b) => b.isPaid).length} {isEn ? 'of' : 'من'} {bills.length} {isEn ? 'paid' : 'مسددة'}
               </span>
             </div>
 
             <div className="grid grid-cols-2 gap-2 text-center">
               <div className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-900/40">
                 <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-semibold block">
-                  تم سداده
+                  {isEn ? 'Paid' : 'تم سداده'}
                 </span>
-                <span className="text-sm font-extrabold text-emerald-600 dark:text-emerald-400 tabular-nums">
+                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
                   {formatMoney(paidBillsAmount, settings.currency)}
                 </span>
               </div>
 
               <div className="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-900/40">
                 <span className="text-[10px] text-amber-800 dark:text-amber-300 font-semibold block">
-                  المتبقي مستحق السداد
+                  {isEn ? 'Remaining Due' : 'المتبقي مستحق السداد'}
                 </span>
-                <span className="text-sm font-extrabold text-amber-600 dark:text-amber-400 tabular-nums">
+                <span className="text-sm font-black text-amber-600 dark:text-amber-400 tabular-nums">
                   {formatMoney(unpaidBillsAmount, settings.currency)}
                 </span>
               </div>
             </div>
           </div>
 
-          {/* Local Bill Reminders Card (Web Notifications API) */}
-          <div className="bg-white dark:bg-[#1C1C1E] p-3.5 rounded-3xl border border-blue-200/60 dark:border-blue-900/40 shadow-2xs space-y-3">
+          {/* Local Bill Reminders Card */}
+          <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-emerald-200/60 dark:border-emerald-900/40 shadow-2xs space-y-3">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+                <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                   <BellRing size={16} />
                 </div>
                 <div>
                   <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
-                    تنبيهات الفواتير المحلية (Web Notifications)
+                    {isEn ? 'Local Apple Notifications' : 'تنبيهات الفواتير المحلية (Apple)'}
                   </span>
                   <span className="text-[10px] text-[#8E8E93]">
-                    تذكير تلقائي قبل موعد استحقاق فواتير البيت
+                    {isEn ? 'Automatic reminder before bill due date' : 'تذكير محلي قبل موعد الاستحقاق'}
                   </span>
                 </div>
               </div>
 
-              {/* Status Badge */}
               <span
                 className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
                   notificationPermission === 'granted'
@@ -234,34 +259,34 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
                 }`}
               >
                 {notificationPermission === 'granted'
-                  ? 'مفعلة بالمتصفح ✓'
+                  ? (isEn ? 'Active ✓' : 'مفعلة ✓')
                   : notificationPermission === 'denied'
-                  ? 'محظورة بالمتصفح'
-                  : 'تحتاج إذن المتصفح'}
+                  ? (isEn ? 'Denied' : 'محظورة')
+                  : (isEn ? 'Action needed' : 'تحتاج إذن')}
               </span>
             </div>
 
             {/* Reminder Lead Days Selector */}
-            <div className="flex items-center justify-between p-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs">
+            <div className="flex items-center justify-between p-2 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs">
               <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">
-                موعد التنبيه:
+                {isEn ? 'Remind me:' : 'موعد التنبيه:'}
               </span>
               <div className="flex items-center gap-1 font-semibold text-[11px]">
                 {[
-                  { days: 0, label: 'في نفس اليوم' },
-                  { days: 1, label: 'قبل يوم' },
-                  { days: 3, label: 'قبل 3 أيام' },
+                  { days: 0, label: isEn ? 'On Due Day' : 'في نفس اليوم' },
+                  { days: 1, label: isEn ? '1 Day Before' : 'قبل يوم' },
+                  { days: 3, label: isEn ? '3 Days Before' : 'قبل 3 أيام' },
                 ].map((opt) => (
                   <button
                     key={opt.days}
                     type="button"
                     onClick={() => {
-                      sound.playTap(settings.soundEnabled);
+                      nativeHaptics.tap(settings.soundEnabled);
                       onUpdateSettings({ notificationLeadDays: opt.days });
                     }}
-                    className={`px-2 py-1 rounded-md transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
                       settings.notificationLeadDays === opt.days
-                        ? 'bg-blue-600 text-white shadow-2xs font-bold'
+                        ? 'bg-emerald-600 text-white shadow-2xs font-bold'
                         : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
                     }`}
                   >
@@ -271,135 +296,168 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
               </div>
             </div>
 
-            {/* Action Buttons: Request Permission or Test */}
+            {/* Action Buttons */}
             <div className="flex items-center gap-2">
               {notificationPermission !== 'granted' ? (
                 <button
                   type="button"
                   onClick={onRequestNotificationPermission}
-                  className="flex-1 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer transition-colors"
+                  className="flex-1 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
                 >
                   <Bell size={14} />
-                  <span>تفعيل إشعارات المتصفح الآن</span>
+                  <span>{isEn ? 'Enable Local Reminders' : 'تفعيل إشعارات الجهاز الآن'}</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={onSendTestNotification}
-                  className="flex-1 py-2 rounded-xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 hover:bg-blue-100 font-bold text-xs flex items-center justify-center gap-1.5 border border-blue-200/60 dark:border-blue-900/50 cursor-pointer transition-colors"
+                  className="flex-1 py-2 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-200/60 dark:border-emerald-900/50 cursor-pointer"
                 >
                   <Sparkles size={14} />
-                  <span>إرسال إشعار تجريبي لاختبار التنبيه</span>
+                  <span>{isEn ? 'Send Test Reminder' : 'إرسال إشعار تجريبي لاختبار التنبيه'}</span>
                 </button>
               )}
             </div>
           </div>
 
-          {/* Bills List */}
+          {/* Bills List with Path Animation & Urgency Glow */}
           <div className="space-y-2">
             <span className="text-xs font-bold text-[#8E8E93] px-1">
-              جدول الفواتير المستحقة شهرياً
+              {isEn ? 'Monthly Bills Schedule' : 'جدول الفواتير المستحقة شهرياً'}
             </span>
 
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-slate-200/60 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden shadow-2xs">
-              {bills.map((bill) => {
-                const cat = catMap.get(bill.categoryId);
-                const isReminderOn = bill.reminderEnabled !== false;
+              <AnimatePresence initial={false}>
+                {bills.map((bill) => {
+                  const cat = catMap.get(bill.categoryId);
+                  const isReminderOn = bill.reminderEnabled !== false;
+                  const isUrgent = !bill.isPaid && Math.abs(bill.dueDay - todayDay) <= (settings.notificationLeadDays || 1);
 
-                return (
-                  <div
-                    key={bill.id}
-                    className={`p-3.5 flex items-center justify-between transition-colors ${
-                      bill.isPaid
-                        ? 'bg-slate-50/50 dark:bg-slate-900/30 opacity-75'
-                        : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      {/* Checkbox */}
-                      <button
-                        onClick={() => {
-                          sound.playSuccess(settings.soundEnabled);
-                          onToggleBill(bill.id);
-                        }}
-                        className="cursor-pointer text-blue-600 dark:text-blue-400 shrink-0"
-                        title={bill.isPaid ? 'تحديد كغير مسددة' : 'تحديد كمسددة'}
-                      >
-                        {bill.isPaid ? (
-                          <CheckCircle2 size={24} className="text-emerald-500 fill-emerald-100 dark:fill-emerald-950" />
-                        ) : (
-                          <Circle size={24} className="text-slate-300 dark:text-slate-600 hover:text-blue-500" />
-                        )}
-                      </button>
+                  return (
+                    <motion.div
+                      layout
+                      key={bill.id}
+                      initial={{ opacity: 0, y: 8 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, scale: 0.95 }}
+                      transition={springs.smooth}
+                      className={`p-3.5 flex items-center justify-between transition-colors relative ${
+                        bill.isPaid
+                          ? 'bg-slate-50/50 dark:bg-slate-900/25 opacity-70'
+                          : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
+                      }`}
+                    >
+                      {/* Urgency glow if due soon */}
+                      {isUrgent && (
+                        <motion.div
+                          animate={{ opacity: [0.3, 0.8, 0.3] }}
+                          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
+                          className="absolute inset-y-0 right-0 w-1 bg-amber-500 rounded-r-md pointer-events-none"
+                        />
+                      )}
 
-                      <CategoryIcon
-                        iconName={cat?.icon || 'Zap'}
-                        color={cat?.color || '#F59E0B'}
-                        bgColor={cat?.bgColor}
-                        size="md"
-                      />
-
-                      <div>
-                        <div
-                          className={`text-xs font-bold ${
-                            bill.isPaid
-                              ? 'line-through text-[#8E8E93]'
-                              : 'text-[#1C1C1E] dark:text-white'
-                          }`}
+                      <div className="flex items-center gap-3">
+                        {/* Animated Checkmark Path Checkbox */}
+                        <motion.button
+                          whileTap={{ scale: 0.88 }}
+                          onClick={() => {
+                            nativeHaptics.success(settings.soundEnabled);
+                            onToggleBill(bill.id);
+                          }}
+                          className="cursor-pointer text-emerald-600 dark:text-emerald-400 shrink-0"
+                          title={bill.isPaid ? 'تحديد كغير مسددة' : 'تحديد كمسددة'}
                         >
-                          {bill.title}
-                        </div>
-                        <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5 flex-wrap">
-                          <span className="flex items-center gap-0.5">
-                            <Calendar size={11} />
-                            <span>يوم {bill.dueDay} من الشهر</span>
-                          </span>
-                          <span>·</span>
-                          <span>{cat?.name || 'فواتير'}</span>
-                          {bill.notes && <span>· {bill.notes}</span>}
+                          {bill.isPaid ? (
+                            <svg className="w-6 h-6 text-emerald-500" viewBox="0 0 24 24" fill="none">
+                              <circle cx="12" cy="12" r="10" fill="#10B981" />
+                              <motion.path
+                                d="M8 12.5l2.5 2.5 5.5-5.5"
+                                stroke="#FFFFFF"
+                                strokeWidth="2.5"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                                initial={{ pathLength: 0 }}
+                                animate={{ pathLength: 1 }}
+                                transition={springs.bouncy}
+                              />
+                            </svg>
+                          ) : (
+                            <Circle size={24} className="text-slate-300 dark:text-slate-600 hover:text-emerald-500" />
+                          )}
+                        </motion.button>
+
+                        <CategoryIcon
+                          iconName={cat?.icon || 'Zap'}
+                          color={cat?.color || '#F59E0B'}
+                          bgColor={cat?.bgColor}
+                          size="md"
+                        />
+
+                        <div>
+                          <div
+                            className={`text-xs font-bold ${
+                              bill.isPaid
+                                ? 'line-through text-[#8E8E93]'
+                                : 'text-[#1C1C1E] dark:text-white'
+                            }`}
+                          >
+                            {bill.title}
+                          </div>
+                          <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5 flex-wrap">
+                            <span className="flex items-center gap-0.5">
+                              <Calendar size={11} />
+                              <span>{isEn ? `Day ${bill.dueDay} of month` : `يوم ${bill.dueDay} من الشهر`}</span>
+                            </span>
+                            <span>·</span>
+                            <span>{isEn ? (cat?.nameEn || cat?.name || 'Bills') : (cat?.name || 'فواتير')}</span>
+                            {bill.notes && <span>· {bill.notes}</span>}
+                          </div>
                         </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-extrabold text-[#1C1C1E] dark:text-white tabular-nums">
-                        {formatMoney(bill.amount, settings.currency)}
-                      </span>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-[#1C1C1E] dark:text-white tabular-nums">
+                          {formatMoney(bill.amount, settings.currency)}
+                        </span>
 
-                      {/* Reminder Toggle Button */}
-                      <button
-                        type="button"
-                        onClick={() => {
-                          sound.playTap(settings.soundEnabled);
-                          onToggleBillReminder(bill.id);
-                        }}
-                        className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                          isReminderOn
-                            ? 'text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40'
-                            : 'text-slate-300 dark:text-slate-600 hover:text-slate-500'
-                        }`}
-                        title={isReminderOn ? 'التنبيه مفعل لهذه الفاتورة (انقر للتعطيل)' : 'التنبيه معطل (انقر للتفعيل)'}
-                      >
-                        {isReminderOn ? <Bell size={14} /> : <BellOff size={14} />}
-                      </button>
+                        <motion.button
+                          whileTap={{ scale: 0.9 }}
+                          type="button"
+                          onClick={() => {
+                            nativeHaptics.tap(settings.soundEnabled);
+                            onToggleBillReminder(bill.id);
+                          }}
+                          className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
+                            isReminderOn
+                              ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
+                              : 'text-slate-300 dark:text-slate-600 hover:text-slate-500'
+                          }`}
+                          title={isReminderOn ? 'Reminder enabled' : 'Reminder disabled'}
+                        >
+                          {isReminderOn ? <Bell size={14} /> : <BellOff size={14} />}
+                        </motion.button>
 
-                      <button
-                        onClick={() => {
-                          sound.playDelete(settings.soundEnabled);
-                          onDeleteBill(bill.id);
-                        }}
-                        className="p-1 rounded-lg text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 cursor-pointer transition-colors"
-                      >
-                        <Trash2 size={14} />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
+                        <motion.button
+                          whileTap={{ scale: 0.9 }}
+                          onClick={() => {
+                            nativeHaptics.impactLight(settings.soundEnabled);
+                            onDeleteBill(bill.id);
+                          }}
+                          className="p-1 rounded-lg text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 cursor-pointer transition-colors"
+                        >
+                          <Trash2 size={14} />
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  );
+                })}
+              </AnimatePresence>
 
               {bills.length === 0 && (
                 <div className="p-8 text-center text-xs text-[#8E8E93]">
-                  لا توجد فواتير مضافة بعد. اضغط على "+ فاتورة دورية" لإضافة كهرباء، إيجار، أو إنترنت.
+                  {isEn
+                    ? 'No bills added yet. Tap "+ Recurring Bill" to add rent, utilities, or subscriptions.'
+                    : 'لا توجد فواتير مضافة بعد. اضغط على "+ فاتورة دورية" لإضافة كهرباء، إيجار، أو إنترنت.'}
                 </div>
               )}
             </div>
@@ -409,330 +467,404 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
 
       {/* ===================== TAB 2: GROCERIES ===================== */}
       {activeSubTab === 'groceries' && (
-        <div className="space-y-3.5">
+        <div className="space-y-3.5 pb-6">
           {/* Action Banner to Convert to Expense */}
           {boughtItems.length > 0 && (
-            <div className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between">
+            <motion.div
+              layout
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="p-3.5 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between"
+            >
               <div>
                 <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200 block">
-                  تم شراء {boughtItems.length} أصناف بنجاح!
+                  {isEn ? `${boughtItems.length} items purchased!` : `تم شراء ${boughtItems.length} أصناف بنجاح!`}
                 </span>
                 <span className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                  إجمالي التكلفة التقريبية: {formatMoney(totalBoughtEst, settings.currency)}
+                  {isEn ? 'Estimated Total: ' : 'إجمالي التكلفة التقريبية: '}
+                  <AnimatedCounter
+                    value={totalBoughtEst}
+                    formatFn={(v) => formatMoney(v, settings.currency)}
+                    isReduced={isReduced}
+                  />
                 </span>
               </div>
 
-              <button
+              <motion.button
+                whileTap={{ scale: 0.93 }}
                 onClick={handleConvertBought}
-                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1 shadow-xs cursor-pointer transition-all active:scale-95"
+                className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
               >
                 <Receipt size={14} />
-                <span>ترحيل لمصروف فعلي</span>
-              </button>
-            </div>
+                <span>{isEn ? 'Log as Expense' : 'ترحيل لمصروف فعلي'}</span>
+              </motion.button>
+            </motion.div>
           )}
 
           {/* Unbought Groceries */}
           <div className="space-y-2">
             <span className="text-xs font-bold text-[#8E8E93] px-1 flex items-center justify-between">
-              <span>أصناف مطلوب شراؤها ({unboughtItems.length})</span>
-              <span className="text-[11px] text-blue-600 dark:text-blue-400">حدد المربع عند الشراء</span>
+              <span>{isEn ? `Items to buy (${unboughtItems.length})` : `أصناف مطلوب شراؤها (${unboughtItems.length})`}</span>
+              <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                {isEn ? 'Check circle when bought' : 'حدد المربع عند الشراء'}
+              </span>
             </span>
 
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-slate-200/60 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden shadow-2xs">
-              {unboughtItems.map((item) => (
-                <div
-                  key={item.id}
-                  className="p-3 flex items-center justify-between hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <button
-                      onClick={() => {
-                        sound.playTap(settings.soundEnabled);
-                        onToggleGrocery(item.id);
-                      }}
-                      className="cursor-pointer text-slate-300 hover:text-blue-500 shrink-0"
-                    >
-                      <Circle size={22} />
-                    </button>
+              <AnimatePresence initial={false}>
+                {unboughtItems.map((item) => (
+                  <motion.div
+                    layout
+                    key={item.id}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, x: 80 }}
+                    transition={springs.smooth}
+                    className="p-3.5 flex items-center justify-between hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <motion.button
+                        whileTap={{ scale: 0.88 }}
+                        onClick={() => {
+                          nativeHaptics.tap(settings.soundEnabled);
+                          onToggleGrocery(item.id);
+                        }}
+                        className="cursor-pointer text-slate-300 hover:text-emerald-600 shrink-0"
+                      >
+                        <Circle size={22} />
+                      </motion.button>
 
-                    <div>
-                      <div className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-                        {item.name}
-                      </div>
-                      <div className="text-[11px] text-[#8E8E93] flex items-center gap-1">
-                        <span>{item.category}</span>
-                        <span>·</span>
-                        <span>
-                          الكمية: {item.quantity} {item.unit}
-                        </span>
+                      <div>
+                        <div className="text-xs font-bold text-[#1C1C1E] dark:text-white">
+                          {item.name}
+                        </div>
+                        <div className="text-[11px] text-[#8E8E93] flex items-center gap-1">
+                          <span>{item.category}</span>
+                          <span>·</span>
+                          <span>
+                            {isEn ? `Qty: ${item.quantity} ${item.unit}` : `الكمية: ${item.quantity} ${item.unit}`}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
 
-                  <div className="flex items-center gap-2">
-                    {item.estimatedPrice > 0 && (
-                      <span className="text-xs font-bold text-slate-700 dark:text-slate-300 tabular-nums">
-                        ~{formatMoney(item.estimatedPrice * item.quantity, settings.currency)}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {item.estimatedPrice > 0 && (
+                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 tabular-nums">
+                          ~{formatMoney(item.estimatedPrice * item.quantity, settings.currency)}
+                        </span>
+                      )}
 
-                    <button
-                      onClick={() => {
-                        sound.playDelete(settings.soundEnabled);
-                        onDeleteGrocery(item.id);
-                      }}
-                      className="p-1 rounded-lg text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 cursor-pointer"
-                    >
-                      <Trash2 size={13} />
-                    </button>
-                  </div>
-                </div>
-              ))}
+                      <motion.button
+                        whileTap={{ scale: 0.88 }}
+                        onClick={() => {
+                          nativeHaptics.impactLight(settings.soundEnabled);
+                          onDeleteGrocery(item.id);
+                        }}
+                        className="p-1 rounded-lg text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 cursor-pointer"
+                      >
+                        <Trash2 size={13} />
+                      </motion.button>
+                    </div>
+                  </motion.div>
+                ))}
+              </AnimatePresence>
 
               {unboughtItems.length === 0 && (
-                <div className="p-6 text-center text-xs text-[#8E8E93]">
-                  قائمة المشتريات فارغة حالياً! اضغط على "+ سلعة للقائمة" لإضافة ما يحتاجه البيت.
+                <div className="p-7 text-center space-y-2">
+                  <motion.div
+                    animate={isReduced ? {} : { y: [0, -4, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center"
+                  >
+                    <ShoppingBag size={22} />
+                  </motion.div>
+                  <div className="text-xs font-bold text-[#1C1C1E] dark:text-white">
+                    {isEn ? 'All household items are stocked!' : 'تم شراء جميع نواقص البيت!'}
+                  </div>
+                  <p className="text-[11px] text-[#8E8E93] max-w-xs mx-auto">
+                    {isEn ? 'Tap + to add items needed for the home.' : 'اضغط على + لإضافة أي طلبات أو مشتريات ناقصة.'}
+                  </p>
                 </div>
               )}
             </div>
           </div>
 
-          {/* Already Bought Groceries */}
+          {/* Bought Items Group with Strike-through line drawing */}
           {boughtItems.length > 0 && (
             <div className="space-y-2 pt-2">
               <span className="text-xs font-bold text-[#8E8E93] px-1">
-                تم شراؤها في هذه الجولة ({boughtItems.length})
+                {isEn ? `Purchased Items (${boughtItems.length})` : `أصناف تم شراؤها (${boughtItems.length})`}
               </span>
 
-              <div className="bg-white/60 dark:bg-[#1C1C1E]/60 rounded-2xl border border-slate-200/50 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden opacity-80">
-                {boughtItems.map((item) => (
-                  <div
-                    key={item.id}
-                    className="p-2.5 px-3 flex items-center justify-between bg-slate-50/40 dark:bg-slate-900/20"
-                  >
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => {
-                          sound.playTap(settings.soundEnabled);
-                          onToggleGrocery(item.id);
-                        }}
-                        className="cursor-pointer text-emerald-500 shrink-0"
-                      >
-                        <CheckCircle2 size={20} className="fill-emerald-100 dark:fill-emerald-950" />
-                      </button>
+              <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-slate-200/60 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden opacity-75 shadow-2xs">
+                <AnimatePresence initial={false}>
+                  {boughtItems.map((item) => (
+                    <motion.div
+                      layout
+                      key={item.id}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0 }}
+                      className="p-3 flex items-center justify-between"
+                    >
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => {
+                            nativeHaptics.tap(settings.soundEnabled);
+                            onToggleGrocery(item.id);
+                          }}
+                          className="cursor-pointer text-emerald-500 shrink-0"
+                        >
+                          <CheckCircle2 size={22} className="fill-emerald-100 dark:fill-emerald-950" />
+                        </button>
 
-                      <div className="line-through text-xs text-[#8E8E93]">
-                        {item.name} ({item.quantity} {item.unit})
+                        <div>
+                          <div className="text-xs font-bold text-[#8E8E93] line-through relative">
+                            {item.name}
+                          </div>
+                          <span className="text-[10px] text-[#8E8E93]">
+                            {item.quantity} {item.unit}
+                          </span>
+                        </div>
                       </div>
-                    </div>
 
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs text-[#8E8E93] tabular-nums">
-                        {formatMoney(item.estimatedPrice * item.quantity, settings.currency)}
-                      </span>
                       <button
                         onClick={() => {
-                          sound.playDelete(settings.soundEnabled);
+                          nativeHaptics.impactLight(settings.soundEnabled);
                           onDeleteGrocery(item.id);
                         }}
-                        className="p-1 text-slate-300 hover:text-red-500 cursor-pointer"
+                        className="p-1 rounded-lg text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 cursor-pointer"
                       >
                         <Trash2 size={13} />
                       </button>
-                    </div>
-                  </div>
-                ))}
+                    </motion.div>
+                  ))}
+                </AnimatePresence>
               </div>
             </div>
           )}
         </div>
       )}
 
-      {/* ===================== MODAL: ADD BILL ===================== */}
-      {showAddBillModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div onClick={() => setShowAddBillModal(false)} className="absolute inset-0 bg-black/50 backdrop-blur-xs" />
-          <form
-            onSubmit={handleSaveBill}
-            className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-3"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
-              <span className="text-sm font-bold text-[#1C1C1E] dark:text-white">إضافة فاتورة دورية</span>
-              <button
-                type="button"
-                onClick={() => setShowAddBillModal(false)}
-                className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93]"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">اسم الفاتورة</label>
-              <input
-                type="text"
-                value={billTitle}
-                onChange={(e) => setBillTitle(e.target.value)}
-                placeholder="مثلاً: كهرباء البيت، إنترنت، قسط سيارة..."
-                className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-medium text-[#1C1C1E] dark:text-white outline-hidden"
-                autoFocus
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">المبلغ التقريبي</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={billAmount}
-                  onChange={(e) => setBillAmount(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden tabular-nums"
-                  required
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">يوم الاستحقاق</label>
-                <input
-                  type="number"
-                  min="1"
-                  max="31"
-                  value={billDueDay}
-                  onChange={(e) => setBillDueDay(parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden tabular-nums"
-                  required
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">الفئة</label>
-              <select
-                value={billCategoryId}
-                onChange={(e) => setBillCategoryId(e.target.value)}
-                className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-medium text-[#1C1C1E] dark:text-white outline-hidden"
-              >
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Notification Reminder Checkbox */}
-            <div className="p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Bell size={15} className="text-blue-500" />
-                <span className="text-xs font-semibold text-[#1C1C1E] dark:text-white">
-                  تفعيل التنبيه والتذكير المحلي
-                </span>
-              </div>
-              <input
-                type="checkbox"
-                checked={billReminderEnabled}
-                onChange={(e) => setBillReminderEnabled(e.target.checked)}
-                className="w-4 h-4 text-blue-600 rounded-sm cursor-pointer accent-blue-600"
-              />
-            </div>
-
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 cursor-pointer mt-2"
+      {/* Add Bill Modal */}
+      <AnimatePresence>
+        {showAddBillModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddBillModal(false)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ scale: 0.93, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.93, opacity: 0 }}
+              transition={springs.smooth}
+              className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4"
             >
-              <Check size={16} />
-              <span>حفظ الفاتورة</span>
-            </button>
-          </form>
-        </div>
-      )}
-
-      {/* ===================== MODAL: ADD GROCERY ===================== */}
-      {showAddGroceryModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          <div onClick={() => setShowAddGroceryModal(false)} className="absolute inset-0 bg-black/50 backdrop-blur-xs" />
-          <form
-            onSubmit={handleSaveGrocery}
-            className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-3"
-          >
-            <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
-              <span className="text-sm font-bold text-[#1C1C1E] dark:text-white">إضافة سلعة لقائمة البيت</span>
-              <button
-                type="button"
-                onClick={() => setShowAddGroceryModal(false)}
-                className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93]"
-              >
-                <X size={15} />
-              </button>
-            </div>
-
-            <div>
-              <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">اسم السلعة / المنتج</label>
-              <input
-                type="text"
-                value={grocName}
-                onChange={(e) => setGrocName(e.target.value)}
-                placeholder="مثلاً: حليب، بيض، أرز، زيت، مناديل..."
-                className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-medium text-[#1C1C1E] dark:text-white outline-hidden"
-                autoFocus
-                required
-              />
-            </div>
-
-            <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">الكمية</label>
-                <input
-                  type="number"
-                  min="1"
-                  value={grocQuantity}
-                  onChange={(e) => setGrocQuantity(parseInt(e.target.value, 10) || 1)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden tabular-nums"
-                />
-              </div>
-
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">الوحدة</label>
-                <select
-                  value={grocUnit}
-                  onChange={(e) => setGrocUnit(e.target.value)}
-                  className="w-full px-2 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-medium text-[#1C1C1E] dark:text-white outline-hidden"
+              <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
+                <h3 className="text-sm font-black text-[#1C1C1E] dark:text-white">
+                  {isEn ? 'Add Recurring Bill' : 'إضافة فاتورة دورية جديدة'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddBillModal(false)}
+                  className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer"
                 >
-                  <option value="حبة">حبة</option>
-                  <option value="كجم">كجم</option>
-                  <option value="علبة">علبة</option>
-                  <option value="طبق">طبق</option>
-                  <option value="لتر">لتر</option>
-                  <option value="كيس">كيس</option>
-                  <option value="كرتون">كرتون</option>
-                </select>
+                  <X size={15} />
+                </button>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">سعر تقريبي</label>
-                <input
-                  type="number"
-                  step="any"
-                  value={grocEstimatedPrice}
-                  onChange={(e) => setGrocEstimatedPrice(e.target.value)}
-                  placeholder="0"
-                  className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden tabular-nums"
-                />
-              </div>
-            </div>
+              <form onSubmit={handleSaveBill} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
+                    {isEn ? 'Bill Title' : 'اسم أو بيان الفاتورة'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={billTitle}
+                    onChange={(e) => setBillTitle(e.target.value)}
+                    placeholder={isEn ? 'e.g. Electricity, Rent, Fiber' : 'مثال: فاتورة الكهرباء، إيجار البيت، إنترنت ألياف'}
+                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-semibold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
 
-            <button
-              type="submit"
-              className="w-full py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 cursor-pointer mt-2"
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
+                      {isEn ? 'Amount' : 'المبلغ التقديري'}
+                    </label>
+                    <input
+                      type="number"
+                      step="any"
+                      required
+                      value={billAmount}
+                      onChange={(e) => setBillAmount(e.target.value)}
+                      placeholder="0"
+                      className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
+                      {isEn ? 'Due Day (1-31)' : 'يوم الاستحقاق (1-31)'}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      max={31}
+                      required
+                      value={billDueDay}
+                      onChange={(e) => setBillDueDay(parseInt(e.target.value, 10) || 1)}
+                      className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
+                    {isEn ? 'Category' : 'التصنيف'}
+                  </label>
+                  <select
+                    value={billCategoryId}
+                    onChange={(e) => setBillCategoryId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden"
+                  >
+                    {categories.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {isEn ? (c.nameEn || c.name) : c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div className="flex items-center justify-between p-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
+                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    {isEn ? 'Schedule local reminder' : 'جدولة تنبيه محلي'}
+                  </span>
+                  <input
+                    type="checkbox"
+                    checked={billReminderEnabled}
+                    onChange={(e) => setBillReminderEnabled(e.target.checked)}
+                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors"
+                >
+                  {isEn ? 'Save Bill' : 'حفظ الفاتورة'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Grocery Modal */}
+      <AnimatePresence>
+        {showAddGroceryModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowAddGroceryModal(false)}
+              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            />
+            <motion.div
+              initial={{ scale: 0.93, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.93, opacity: 0 }}
+              transition={springs.smooth}
+              className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4"
             >
-              <Check size={16} />
-              <span>إضافة للقائمة</span>
-            </button>
-          </form>
-        </div>
-      )}
+              <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
+                <h3 className="text-sm font-black text-[#1C1C1E] dark:text-white">
+                  {isEn ? 'Add Grocery Item' : 'إضافة سلعة لقائمة البيت'}
+                </h3>
+                <button
+                  type="button"
+                  onClick={() => setShowAddGroceryModal(false)}
+                  className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveGrocery} className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
+                    {isEn ? 'Item Name' : 'اسم السلعة المطلوبة'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={grocName}
+                    onChange={(e) => setGrocName(e.target.value)}
+                    placeholder={isEn ? 'e.g. Milk, Apples, Bread' : 'مثال: حليب، بيض، أرز بسمتي، منظفات'}
+                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-semibold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div>
+                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
+                      {isEn ? 'Quantity' : 'الكمية'}
+                    </label>
+                    <input
+                      type="number"
+                      min={1}
+                      value={grocQuantity}
+                      onChange={(e) => setGrocQuantity(parseInt(e.target.value, 10) || 1)}
+                      className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
+                      {isEn ? 'Unit' : 'الوحدة'}
+                    </label>
+                    <input
+                      type="text"
+                      value={grocUnit}
+                      onChange={(e) => setGrocUnit(e.target.value)}
+                      placeholder={isEn ? 'pcs / kg' : 'حبة / كجم / كرتون'}
+                      className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
+                    {isEn ? 'Est. Price (Optional)' : 'السعر التقريبي للقطعة (اختياري)'}
+                  </label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={grocEstimatedPrice}
+                    onChange={(e) => setGrocEstimatedPrice(e.target.value)}
+                    placeholder="0"
+                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
+                  />
+                </div>
+
+                <button
+                  type="submit"
+                  className="w-full py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors"
+                >
+                  {isEn ? 'Add to List' : 'إضافة للقائمة'}
+                </button>
+              </form>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

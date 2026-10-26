@@ -3,10 +3,11 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
-import { Lock } from 'lucide-react';
+import { Lock, Sparkles, X } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   AppData,
   Category,
@@ -31,21 +32,37 @@ import {
 import { NativeNotificationService } from './utils/nativeNotifications';
 import { SecurityService } from './utils/security';
 import { isSystemFlowActive } from './utils/systemFlow';
+import { fades, useMotionConfig } from './utils/motion';
 
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
-import { CategoryManagerModal } from './components/CategoryManagerModal';
 import { IOSNotificationBanner } from './components/IOSNotificationBanner';
 import { PasscodeLockModal } from './components/PasscodeLockModal';
-import { PrivacyPolicyModal } from './components/PrivacyPolicyModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { Toast } from './components/Toast';
+import { LaunchSplash } from './components/LaunchSplash';
 
 import { DashboardTab } from './components/tabs/DashboardTab';
 import { ExpensesTab } from './components/tabs/ExpensesTab';
 import { BudgetsTab } from './components/tabs/BudgetsTab';
 import { BillsAndGroceriesTab } from './components/tabs/BillsAndGroceriesTab';
-import { AnalyticsSettingsTab } from './components/tabs/AnalyticsSettingsTab';
+
+// Lazy-load heavy modals & settings to reduce initial bundle chunk size
+const AnalyticsSettingsTab = React.lazy(() =>
+  import('./components/tabs/AnalyticsSettingsTab').then((m) => ({ default: m.AnalyticsSettingsTab }))
+);
+const OnboardingModal = React.lazy(() =>
+  import('./components/OnboardingModal').then((m) => ({ default: m.OnboardingModal }))
+);
+const ConfettiBurst = React.lazy(() =>
+  import('./components/ConfettiBurst').then((m) => ({ default: m.ConfettiBurst }))
+);
+const CategoryManagerModal = React.lazy(() =>
+  import('./components/CategoryManagerModal').then((m) => ({ default: m.CategoryManagerModal }))
+);
+const PrivacyPolicyModal = React.lazy(() =>
+  import('./components/PrivacyPolicyModal').then((m) => ({ default: m.PrivacyPolicyModal }))
+);
 
 interface ConfirmState {
   isOpen: boolean;
@@ -56,13 +73,25 @@ interface ConfirmState {
   onConfirm: () => void;
 }
 
+const TAB_ORDER: TabId[] = [
+  'dashboard',
+  'expenses',
+  'budgets',
+  'bills_groceries',
+  'analytics_settings',
+];
+
 export default function App() {
   const [data, setData] = useState<AppData>(() => loadAppData());
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  const [prevTab, setPrevTab] = useState<TabId>('dashboard');
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState<boolean>(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
+  // App launch splash
+  const [isSplashActive, setIsSplashActive] = useState<boolean>(true);
 
   // Synchronously initialize isLocked to prevent financial data flash at startup
   const [isLocked, setIsLocked] = useState<boolean>(() => {
@@ -71,6 +100,10 @@ export default function App() {
   });
   const [passcodeModalMode, setPasscodeModalMode] = useState<'set' | 'change' | null>(null);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
+
+  // Month-end celebration state
+  const [showCelebration, setShowCelebration] = useState<boolean>(false);
+  const [celebrationMessage, setCelebrationMessage] = useState<string>('');
 
   // App Switcher privacy cover state
   const [isAppInactive, setIsAppInactive] = useState<boolean>(false);
@@ -98,6 +131,11 @@ export default function App() {
   const [currentNotification, setCurrentNotification] = useState<InAppNotification | null>(null);
   const shownBannersRef = useRef<Set<string>>(new Set());
 
+  const motionConfig = useMotionConfig(data.settings.animations);
+  const isReduced = motionConfig.isReduced;
+  const isEn = data.settings.language === 'en';
+  const isRTL = data.settings.language !== 'en';
+
   // Load shown banner keys from Preferences on launch
   useEffect(() => {
     getShownBannerKeys().then((keys) => {
@@ -116,8 +154,34 @@ export default function App() {
       } else if (!prefData.settings.isPasscodeEnabled) {
         setIsLocked(false);
       }
+
+      // Check for Month-End Celebration
+      const d = new Date();
+      d.setMonth(d.getMonth() - 1);
+      const prevMonthStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      if (prefData.settings.lastCelebratedMonth !== prevMonthStr) {
+        const prevExpenses = prefData.expenses.filter((e) => e.date.startsWith(prevMonthStr));
+        const prevTotalSpent = prevExpenses.reduce((s, e) => s + e.amount, 0);
+        const budgetLimit =
+          prefData.settings.budgetMode === 'custom_total'
+            ? prefData.settings.totalMonthlyBudget
+            : prefData.categories.reduce((s, c) => s + c.monthlyLimit, 0);
+
+        if (prevExpenses.length > 0 && prevTotalSpent <= budgetLimit) {
+          setShowCelebration(true);
+          setCelebrationMessage(
+            isEn
+              ? `Congratulations! You stayed under budget last month and saved successfully.`
+              : `تهانينا! لقد أنهيت الشهر الماضي بنجاح تحت حد الميزانية المحددة.`
+          );
+          setData((curr) => ({
+            ...curr,
+            settings: { ...curr.settings, lastCelebratedMonth: prevMonthStr },
+          }));
+        }
+      }
     });
-  }, []);
+  }, [isEn]);
 
   // Sync document RTL/LTR and language attribute
   useEffect(() => {
@@ -133,7 +197,7 @@ export default function App() {
     saveAppData(data);
   }, [data]);
 
-  // Live dark mode handling (system listener or user preference)
+  // Live dark mode handling
   useEffect(() => {
     const applyTheme = (dark: boolean) => {
       setIsDarkMode(dark);
@@ -146,7 +210,6 @@ export default function App() {
           document.body.style.backgroundColor = '#F2F2F7';
         }
       }
-      // Adapt native iOS status bar text color
       try {
         StatusBar.setStyle({
           style: dark ? Style.Dark : Style.Light,
@@ -168,15 +231,10 @@ export default function App() {
     }
   }, [data.settings.themeMode]);
 
-  // Evaluate bill notifications safely: shown at most once per bill per day.
-  // Does NOT depend on currentNotification to prevent redisplay loop on dismissal.
+  // Bill notification check
   const runBillNotificationCheck = useCallback(async () => {
     if (!data.settings.notificationsEnabled) return;
-
-    // Trigger native scheduling for upcoming cycles
     const reminders = await NativeNotificationService.scheduleBillReminders(data.bills, data.settings);
-
-    // Pick first reminder that has not been shown today
     const unshown = reminders.filter((r) => !shownBannersRef.current.has(r.id));
     if (unshown.length > 0) {
       const notifToShow = unshown[0];
@@ -186,12 +244,11 @@ export default function App() {
     }
   }, [data.bills, data.settings]);
 
-  // Run bill notification check only when bills or notification settings change (No timers)
   useEffect(() => {
     runBillNotificationCheck();
   }, [runBillNotificationCheck]);
 
-  // App state changes: handle app switcher privacy cover, auto-lock timeout, and foreground check
+  // App state changes
   useEffect(() => {
     const listenerPromise = CapApp.addListener('appStateChange', (state) => {
       if (!state.isActive) {
@@ -208,13 +265,10 @@ export default function App() {
 
         const timeout = data.settings.autoLockTimeout ?? 30;
 
-        // Only lock if NOT in the middle of a system UI flow (Face ID, Share sheet, file picker)
-        // and elapsed time meets the configured autoLockTimeout
         if (!isFlowActive && data.settings.isPasscodeEnabled && elapsedSecs >= timeout) {
           setIsLocked(true);
         }
 
-        // Re-check bills upon foreground return
         runBillNotificationCheck();
       }
     });
@@ -224,19 +278,16 @@ export default function App() {
     };
   }, [data.settings.isPasscodeEnabled, data.settings.autoLockTimeout, runBillNotificationCheck]);
 
-  // Update notification permission state on mount
   useEffect(() => {
     NativeNotificationService.checkPermissions().then((status) => {
       setNotificationPermission(status === 'granted' ? 'granted' : status === 'denied' ? 'denied' : 'default');
     });
   }, []);
 
-  // Schedule daily expense reminder whenever settings change
   useEffect(() => {
     NativeNotificationService.scheduleDailyReminder(data.settings);
   }, [data.settings.dailyReminderEnabled, data.settings.dailyReminderTime, data.settings.language]);
 
-  // Request native Notification permission
   const handleRequestNotificationPermission = async () => {
     nativeHaptics.tap(data.settings.soundEnabled);
     const granted = await NativeNotificationService.requestPermissions();
@@ -249,7 +300,6 @@ export default function App() {
     }
   };
 
-  // Send a test notification
   const handleSendTestNotification = async () => {
     nativeHaptics.success(data.settings.soundEnabled);
     const res = await NativeNotificationService.sendTest(data.settings);
@@ -261,7 +311,6 @@ export default function App() {
     });
   };
 
-  // Update specific settings
   const handleUpdateSettings = (newSettings: Partial<BudgetSettings>) => {
     setData((prev) => ({
       ...prev,
@@ -272,9 +321,7 @@ export default function App() {
     }));
   };
 
-  // Add or Edit Expense
   const handleSaveExpense = (expenseData: Omit<Expense, 'id' | 'createdAt'>) => {
-    nativeHaptics.success(data.settings.soundEnabled);
     if (editingExpense) {
       setData((prev) => ({
         ...prev,
@@ -322,7 +369,6 @@ export default function App() {
     });
   };
 
-  // Categories
   const handleSaveCategory = (catToSave: Category) => {
     nativeHaptics.success(data.settings.soundEnabled);
     setData((prev) => {
@@ -372,7 +418,6 @@ export default function App() {
     }));
   };
 
-  // Bills
   const handleToggleBill = (billId: string) => {
     nativeHaptics.success(data.settings.soundEnabled);
     setData((prev) => {
@@ -426,7 +471,6 @@ export default function App() {
     });
   };
 
-  // Groceries
   const handleToggleGrocery = (itemId: string) => {
     nativeHaptics.tap(data.settings.soundEnabled);
     setData((prev) => ({
@@ -479,11 +523,10 @@ export default function App() {
       groceries: prev.groceries.filter((g) => !g.isBought),
     }));
 
-    setActiveTab('expenses');
+    handleTabChange('expenses');
     showToast(data.settings.language === 'en' ? 'Groceries recorded as expense' : 'تم ترحيل المشتريات كمصروف');
   };
 
-  // Data management
   const handleImportData = (imported: AppData) => {
     setData(imported);
     showToast(data.settings.language === 'en' ? 'Backup restored successfully' : 'تمت استعادة البيانات بنجاح');
@@ -512,7 +555,6 @@ export default function App() {
     });
   };
 
-  // Passcode modal success handlers
   const handlePasscodeSuccess = () => {
     if (isLocked) {
       setIsLocked(false);
@@ -538,18 +580,53 @@ export default function App() {
     });
   };
 
-  const isEn = data.settings.language === 'en';
+  // Tab navigation with direction-aware transitions
+  const handleTabChange = (nextTab: TabId) => {
+    setPrevTab(activeTab);
+    setActiveTab(nextTab);
+  };
+
+  const prevIdx = TAB_ORDER.indexOf(prevTab);
+  const nextIdx = TAB_ORDER.indexOf(activeTab);
+  const isMovingForward = nextIdx >= prevIdx;
+  const slideX = isRTL ? (isMovingForward ? -20 : 20) : (isMovingForward ? 20 : -20);
+
   const unpaidBillsCount = data.bills.filter((b) => !b.isPaid).length;
 
   return (
     <div className="h-[100dvh] w-full flex flex-col bg-[#F2F2F7] dark:bg-black text-[#1C1C1E] dark:text-white pt-safe pb-safe overflow-hidden select-none relative">
-      {/* Privacy Cover for iOS App Switcher Multitasking Snapshot */}
+      {/* Short Branded Launch Splash */}
+      {isSplashActive && (
+        <LaunchSplash
+          onFinish={() => setIsSplashActive(false)}
+          isReduced={isReduced}
+          isEnglish={isEn}
+        />
+      )}
+
+      {/* DEV-Only FPS / Render Debug Indicator (stripped automatically in production builds) */}
+      {import.meta.env.DEV && (
+        <div className="fixed top-2 left-2 z-100 bg-black/80 text-emerald-400 font-mono text-[9px] px-2 py-0.5 rounded-full border border-emerald-500/30 pointer-events-none select-none">
+          DEV · 60 FPS
+        </div>
+      )}
+
+      {/* Lightweight Month-End Celebration Confetti Burst */}
+      <Suspense fallback={null}>
+        <ConfettiBurst
+          active={showCelebration}
+          onComplete={() => setShowCelebration(false)}
+          isReduced={isReduced}
+        />
+      </Suspense>
+
+      {/* App Switcher Multitasking Privacy Cover */}
       {isAppInactive && (
         <div className="fixed inset-0 z-100 bg-[#F2F2F7] dark:bg-black flex flex-col items-center justify-center p-6 select-none">
-          <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl mb-3">
+          <div className="w-16 h-16 rounded-3xl bg-emerald-600 flex items-center justify-center text-white shadow-xl mb-3">
             <Lock size={32} />
           </div>
-          <p className="text-base font-bold text-slate-800 dark:text-white">
+          <p className="text-base font-black text-slate-800 dark:text-white">
             {isEn ? 'Home Expenses' : 'مصاريف البيت'}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
@@ -558,7 +635,7 @@ export default function App() {
         </div>
       )}
 
-      {/* If locked, render ONLY the lock screen over a plain background (zero content flash) */}
+      {/* If locked, render ONLY the lock screen over a plain background */}
       {isLocked ? (
         <div className="flex-1 w-full flex items-center justify-center">
           <PasscodeLockModal
@@ -578,9 +655,30 @@ export default function App() {
             onDismiss={() => setCurrentNotification(null)}
             onAction={() => {
               setCurrentNotification(null);
-              setActiveTab('bills_groceries');
+              handleTabChange('bills_groceries');
             }}
           />
+
+          {/* Month-End Congratulatory Banner Card */}
+          {showCelebration && (
+            <motion.div
+              initial={{ y: -50, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: -50, opacity: 0 }}
+              className="mx-4 mt-2 p-3.5 rounded-2xl bg-gradient-to-r from-emerald-600 to-emerald-500 text-white shadow-lg flex items-center justify-between gap-3 z-40 relative"
+            >
+              <div className="flex items-center gap-2.5">
+                <Sparkles size={18} className="text-emerald-200 shrink-0" />
+                <span className="text-xs font-bold leading-snug">{celebrationMessage}</span>
+              </div>
+              <button
+                onClick={() => setShowCelebration(false)}
+                className="p-1 rounded-full bg-white/20 hover:bg-white/30 text-white cursor-pointer"
+              >
+                <X size={14} />
+              </button>
+            </motion.div>
+          )}
 
           {/* App-wide Toast Notification */}
           <Toast
@@ -589,7 +687,7 @@ export default function App() {
             onClose={() => setToastMessage(null)}
           />
 
-          {/* App-wide Native-styled Confirmation Modal */}
+          {/* App-wide Native Confirmation Modal */}
           <ConfirmModal
             isOpen={confirmDialog.isOpen}
             title={confirmDialog.title}
@@ -601,97 +699,112 @@ export default function App() {
             isEnglish={isEn}
           />
 
-          {/* Active Tab View */}
-          <main className="flex-1 w-full flex flex-col overflow-hidden">
-            {activeTab === 'dashboard' && (
-              <DashboardTab
-                categories={data.categories}
-                expenses={data.expenses}
-                bills={data.bills}
-                settings={data.settings}
-                onOpenAddExpense={() => {
-                  setEditingExpense(null);
-                  setIsAddExpenseOpen(true);
-                }}
-                onNavigateToTab={(tab: TabId) => setActiveTab(tab)}
-                onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
-              />
-            )}
+          {/* Active Tab View with Direction-Aware Page Transitions */}
+          <main className="flex-1 w-full flex flex-col overflow-hidden relative">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={activeTab}
+                initial={isReduced ? { opacity: 0 } : { opacity: 0, x: slideX }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={isReduced ? { opacity: 0 } : { opacity: 0, x: -slideX }}
+                transition={fades.fast}
+                className="flex-1 w-full flex flex-col overflow-hidden"
+              >
+                {activeTab === 'dashboard' && (
+                  <DashboardTab
+                    categories={data.categories}
+                    expenses={data.expenses}
+                    bills={data.bills}
+                    settings={data.settings}
+                    onOpenAddExpense={() => {
+                      setEditingExpense(null);
+                      setIsAddExpenseOpen(true);
+                    }}
+                    onNavigateToTab={handleTabChange}
+                    onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
+                    onUpdateSettings={handleUpdateSettings}
+                  />
+                )}
 
-            {activeTab === 'expenses' && (
-              <ExpensesTab
-                categories={data.categories}
-                expenses={data.expenses}
-                settings={data.settings}
-                onEditExpense={handleEditExpense}
-                onDeleteExpense={handleDeleteExpense}
-                onOpenAddExpense={() => {
-                  setEditingExpense(null);
-                  setIsAddExpenseOpen(true);
-                }}
-              />
-            )}
+                {activeTab === 'expenses' && (
+                  <ExpensesTab
+                    categories={data.categories}
+                    expenses={data.expenses}
+                    settings={data.settings}
+                    onEditExpense={handleEditExpense}
+                    onDeleteExpense={handleDeleteExpense}
+                    onOpenAddExpense={() => {
+                      setEditingExpense(null);
+                      setIsAddExpenseOpen(true);
+                    }}
+                  />
+                )}
 
-            {activeTab === 'budgets' && (
-              <BudgetsTab
-                categories={data.categories}
-                expenses={data.expenses}
-                settings={data.settings}
-                onUpdateSettings={handleUpdateSettings}
-                onUpdateCategoryLimit={handleUpdateCategoryLimit}
-                onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
-              />
-            )}
+                {activeTab === 'budgets' && (
+                  <BudgetsTab
+                    categories={data.categories}
+                    expenses={data.expenses}
+                    settings={data.settings}
+                    onUpdateSettings={handleUpdateSettings}
+                    onUpdateCategoryLimit={handleUpdateCategoryLimit}
+                    onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
+                  />
+                )}
 
-            {activeTab === 'bills_groceries' && (
-              <BillsAndGroceriesTab
-                bills={data.bills}
-                groceries={data.groceries}
-                categories={data.categories}
-                settings={data.settings}
-                onToggleBill={handleToggleBill}
-                onAddBill={handleAddBill}
-                onDeleteBill={handleDeleteBill}
-                onToggleBillReminder={handleToggleBillReminder}
-                onToggleGrocery={handleToggleGrocery}
-                onAddGrocery={handleAddGrocery}
-                onDeleteGrocery={handleDeleteGrocery}
-                onConvertBoughtToExpense={handleConvertBoughtToExpense}
-                onRequestNotificationPermission={handleRequestNotificationPermission}
-                onSendTestNotification={handleSendTestNotification}
-                notificationPermission={notificationPermission}
-                onUpdateSettings={handleUpdateSettings}
-              />
-            )}
+                {activeTab === 'bills_groceries' && (
+                  <BillsAndGroceriesTab
+                    bills={data.bills}
+                    groceries={data.groceries}
+                    categories={data.categories}
+                    settings={data.settings}
+                    onToggleBill={handleToggleBill}
+                    onAddBill={handleAddBill}
+                    onDeleteBill={handleDeleteBill}
+                    onToggleBillReminder={handleToggleBillReminder}
+                    onToggleGrocery={handleToggleGrocery}
+                    onAddGrocery={handleAddGrocery}
+                    onDeleteGrocery={handleDeleteGrocery}
+                    onConvertBoughtToExpense={handleConvertBoughtToExpense}
+                    onRequestNotificationPermission={handleRequestNotificationPermission}
+                    onSendTestNotification={handleSendTestNotification}
+                    notificationPermission={notificationPermission}
+                    onUpdateSettings={handleUpdateSettings}
+                  />
+                )}
 
-            {activeTab === 'analytics_settings' && (
-              <AnalyticsSettingsTab
-                categories={data.categories}
-                expenses={data.expenses}
-                settings={data.settings}
-                fullData={data}
-                onUpdateSettings={handleUpdateSettings}
-                onImportData={handleImportData}
-                onClearAllData={handleClearAllData}
-                onRequestNotificationPermission={handleRequestNotificationPermission}
-                onSendTestNotification={handleSendTestNotification}
-                notificationPermission={notificationPermission}
-                onOpenPasscodeModal={(mode) => setPasscodeModalMode(mode)}
-                onDisablePasscode={handleDisablePasscode}
-                onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
-                onShowToast={showToast}
-              />
-            )}
+                {activeTab === 'analytics_settings' && (
+                  <Suspense fallback={<div className="flex-1 w-full bg-transparent" />}>
+                    <AnalyticsSettingsTab
+                      categories={data.categories}
+                      expenses={data.expenses}
+                      settings={data.settings}
+                      fullData={data}
+                      onUpdateSettings={handleUpdateSettings}
+                      onImportData={handleImportData}
+                      onClearAllData={handleClearAllData}
+                      onRequestNotificationPermission={handleRequestNotificationPermission}
+                      onSendTestNotification={handleSendTestNotification}
+                      notificationPermission={notificationPermission}
+                      onOpenPasscodeModal={(mode) => setPasscodeModalMode(mode)}
+                      onDisablePasscode={handleDisablePasscode}
+                      onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
+                      onShowToast={showToast}
+                    />
+                  </Suspense>
+                )}
+              </motion.div>
+            </AnimatePresence>
           </main>
 
-          {/* iOS Native TabBar with Safe Area Padding */}
+          {/* iOS Native TabBar with Shared Layout Pill */}
           <TabBar
             activeTab={activeTab}
-            onChangeTab={setActiveTab}
+            onChangeTab={handleTabChange}
             onOpenAddExpense={() => {
               setEditingExpense(null);
               setIsAddExpenseOpen(true);
             }}
+            isAddExpenseOpen={isAddExpenseOpen}
             unpaidBillsCount={unpaidBillsCount}
             soundEnabled={data.settings.soundEnabled}
             language={data.settings.language}
@@ -711,17 +824,21 @@ export default function App() {
             soundEnabled={data.settings.soundEnabled}
           />
 
-          {/* Category Manager Modal */}
-          <CategoryManagerModal
-            isOpen={isCategoryManagerOpen}
-            onClose={() => setIsCategoryManagerOpen(false)}
-            categories={data.categories}
-            currency={data.settings.currency}
-            onSaveCategory={handleSaveCategory}
-            onDeleteCategory={handleDeleteCategory}
-            soundEnabled={data.settings.soundEnabled}
-            onShowToast={showToast}
-          />
+          {/* Lazy-Loaded Category Manager Modal */}
+          <Suspense fallback={null}>
+            {isCategoryManagerOpen && (
+              <CategoryManagerModal
+                isOpen={isCategoryManagerOpen}
+                onClose={() => setIsCategoryManagerOpen(false)}
+                categories={data.categories}
+                currency={data.settings.currency}
+                onSaveCategory={handleSaveCategory}
+                onDeleteCategory={handleDeleteCategory}
+                soundEnabled={data.settings.soundEnabled}
+                onShowToast={showToast}
+              />
+            )}
+          </Suspense>
 
           {/* Passcode Set / Change Modal */}
           {passcodeModalMode && (
@@ -736,13 +853,29 @@ export default function App() {
             />
           )}
 
-          {/* Privacy Policy Modal */}
-          <PrivacyPolicyModal
-            isOpen={isPrivacyPolicyOpen}
-            onClose={() => setIsPrivacyPolicyOpen(false)}
-            isEnglish={isEn}
-            soundEnabled={data.settings.soundEnabled}
-          />
+          {/* Lazy-Loaded Privacy Policy Modal */}
+          <Suspense fallback={null}>
+            {isPrivacyPolicyOpen && (
+              <PrivacyPolicyModal
+                isOpen={isPrivacyPolicyOpen}
+                onClose={() => setIsPrivacyPolicyOpen(false)}
+                isEnglish={isEn}
+                soundEnabled={data.settings.soundEnabled}
+              />
+            )}
+          </Suspense>
+
+          {/* Lazy-Loaded Onboarding Flow (first launch only) */}
+          <Suspense fallback={null}>
+            {data.settings.hasCompletedOnboarding === false && (
+              <OnboardingModal
+                isOpen={data.settings.hasCompletedOnboarding === false}
+                onComplete={(updated) => handleUpdateSettings({ ...updated, hasCompletedOnboarding: true })}
+                soundEnabled={data.settings.soundEnabled}
+                currentLanguage={data.settings.language}
+              />
+            )}
+          </Suspense>
         </>
       )}
     </div>

@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion } from 'motion/react';
-import { Lock, Delete, ScanFace, Fingerprint, AlertCircle } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Lock, Delete, ScanFace, Fingerprint, AlertCircle, CheckCircle2 } from 'lucide-react';
 import { nativeHaptics } from '../utils/nativeHaptics';
 import { SecurityService, BiometryStatus } from '../utils/security';
+import { springs, fades } from '../utils/motion';
 
 interface PasscodeLockModalProps {
   isOpen: boolean;
@@ -30,6 +31,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
   const [biometry, setBiometry] = useState<BiometryStatus>({ isAvailable: false, biometryType: 'none' });
   const [lockoutSeconds, setLockoutSeconds] = useState<number>(0);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
+  const [isUnlockedSuccess, setIsUnlockedSuccess] = useState<boolean>(false);
 
   // Tracks if the automatic biometric prompt has already run for this presentation
   const hasAutoPromptedRef = useRef<boolean>(false);
@@ -42,6 +44,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
       setFirstEnteredPin('');
       setIsConfirming(false);
       setErrorMessage('');
+      setIsUnlockedSuccess(false);
     }
   }, [isOpen]);
 
@@ -82,9 +85,12 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
     setIsVerifying(false);
 
     if (success) {
+      setIsUnlockedSuccess(true);
       nativeHaptics.success(soundEnabled);
-      setEnteredPin('');
-      onSuccess();
+      setTimeout(() => {
+        setEnteredPin('');
+        onSuccess();
+      }, 350);
     }
   }, [lockoutSeconds, isVerifying, soundEnabled, isEnglish, onSuccess]);
 
@@ -102,79 +108,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
     }
   }, [isOpen, mode, biometry.isAvailable, lockoutSeconds, handleRealBiometricAuth]);
 
-  if (!isOpen) return null;
-
-  const triggerError = (msg: string) => {
-    nativeHaptics.error(soundEnabled);
-    setErrorShake(true);
-    setErrorMessage(msg);
-    setTimeout(() => {
-      setEnteredPin('');
-      setErrorShake(false);
-    }, 500);
-  };
-
-  const handleKeyPress = async (digit: string) => {
-    if (lockoutSeconds > 0 || isVerifying || enteredPin.length >= 4) return;
-    nativeHaptics.tap(soundEnabled);
-    const newPin = enteredPin + digit;
-    setEnteredPin(newPin);
-    setErrorMessage('');
-
-    if (newPin.length === 4) {
-      setIsVerifying(true);
-      if (mode === 'unlock') {
-        const isMatch = await SecurityService.verifyPasscode(newPin);
-        setIsVerifying(false);
-        if (isMatch) {
-          nativeHaptics.success(soundEnabled);
-          setEnteredPin('');
-          onSuccess();
-        } else {
-          const remainingSecs = await SecurityService.getLockoutRemainingSeconds();
-          if (remainingSecs > 0) {
-            setLockoutSeconds(remainingSecs);
-            triggerError(
-              isEnglish
-                ? `Too many failed attempts. Locked for ${remainingSecs}s`
-                : `محاولات خاطئة متكررة. تم القفل لمدة ${remainingSecs} ثانية`
-            );
-          } else {
-            triggerError(isEnglish ? 'Incorrect Passcode' : 'رمز الدخول غير صحيح');
-          }
-        }
-      } else if (mode === 'set' || mode === 'change') {
-        setIsVerifying(false);
-        if (!isConfirming) {
-          nativeHaptics.tap(soundEnabled);
-          setFirstEnteredPin(newPin);
-          setEnteredPin('');
-          setIsConfirming(true);
-        } else {
-          if (newPin === firstEnteredPin) {
-            await SecurityService.setPasscode(newPin);
-            nativeHaptics.success(soundEnabled);
-            onSuccess(newPin);
-            setEnteredPin('');
-            setFirstEnteredPin('');
-            setIsConfirming(false);
-          } else {
-            triggerError(isEnglish ? 'Passcodes do not match' : 'الرمزان غير متطابقين، أعد المحاولة');
-            setIsConfirming(false);
-            setFirstEnteredPin('');
-          }
-        }
-      }
-    }
-  };
-
-  const handleDelete = () => {
-    if (lockoutSeconds > 0 || isVerifying) return;
-    nativeHaptics.tap(soundEnabled);
-    setEnteredPin((prev) => prev.slice(0, -1));
-    setErrorMessage('');
-  };
-
+  // Keypad numbers with iOS subtitles
   const keypadNumbers = [
     { num: '1', letters: '' },
     { num: '2', letters: 'ABC' },
@@ -187,17 +121,107 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
     { num: '9', letters: 'WXYZ' },
   ];
 
+  const triggerError = (msg: string) => {
+    nativeHaptics.error(soundEnabled);
+    setErrorShake(true);
+    setErrorMessage(msg);
+    setTimeout(() => {
+      setErrorShake(false);
+      setEnteredPin('');
+    }, 500);
+  };
+
+  const handleKeyPress = async (digit: string) => {
+    if (lockoutSeconds > 0 || enteredPin.length >= 4) return;
+    nativeHaptics.tap(soundEnabled);
+    const nextPin = enteredPin + digit;
+    setEnteredPin(nextPin);
+
+    if (nextPin.length === 4) {
+      if (mode === 'unlock') {
+        const isMatch = await SecurityService.verifyPasscode(nextPin);
+        if (isMatch) {
+          setIsUnlockedSuccess(true);
+          nativeHaptics.success(soundEnabled);
+          setTimeout(() => {
+            setEnteredPin('');
+            onSuccess();
+          }, 350);
+        } else {
+          const lockout = await SecurityService.getLockoutRemainingSeconds();
+          if (lockout > 0) {
+            setLockoutSeconds(lockout);
+            triggerError(
+              isEnglish
+                ? `Too many attempts. Locked for ${lockout}s`
+                : `محاولات خاطئة كثيرة. مقفل لمدة ${lockout} ثانية`
+            );
+          } else {
+            triggerError(
+              isEnglish
+                ? 'Incorrect passcode'
+                : 'رمز الدخول غير صحيح'
+            );
+          }
+        }
+      } else if (mode === 'set' || mode === 'change') {
+        if (!isConfirming) {
+          setFirstEnteredPin(nextPin);
+          setEnteredPin('');
+          setIsConfirming(true);
+          setErrorMessage('');
+        } else {
+          if (nextPin === firstEnteredPin) {
+            await SecurityService.setPasscode(nextPin);
+            setIsUnlockedSuccess(true);
+            nativeHaptics.success(soundEnabled);
+            setTimeout(() => {
+              setEnteredPin('');
+              setFirstEnteredPin('');
+              setIsConfirming(false);
+              onSuccess(nextPin);
+            }, 350);
+          } else {
+            triggerError(isEnglish ? 'Passcodes do not match' : 'الرمز غير متطابق. أعد المحاولة');
+            setIsConfirming(false);
+            setFirstEnteredPin('');
+          }
+        }
+      }
+    }
+  };
+
+  const handleDelete = () => {
+    if (enteredPin.length > 0) {
+      nativeHaptics.tap(soundEnabled);
+      setEnteredPin((prev) => prev.slice(0, -1));
+      setErrorMessage('');
+    }
+  };
+
+  if (!isOpen) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/85 backdrop-blur-2xl">
-      <div className="w-full max-w-xs flex flex-col items-center text-center">
-        {/* Top Lock Icon */}
-        <div className="w-14 h-14 rounded-full bg-white/10 flex items-center justify-center text-white mb-4 shadow-lg border border-white/20">
-          <Lock size={26} strokeWidth={2.2} />
-        </div>
+    <div className="fixed inset-0 z-50 flex items-center justify-center select-none bg-gradient-to-b from-[#064E3B] via-[#047857] to-black text-white px-4">
+      <div className="w-full max-w-sm flex flex-col items-center">
+        {/* Animated App Icon or Success Morph */}
+        <motion.div
+          animate={isUnlockedSuccess ? { scale: [1, 1.25, 1], rotate: [0, 10, 0] } : { scale: 1 }}
+          transition={{ duration: 0.35, ease: 'easeOut' }}
+          className={`w-16 h-16 rounded-3xl flex items-center justify-center shadow-xl mb-4 transition-colors duration-300 ${
+            isUnlockedSuccess
+              ? 'bg-emerald-400 text-emerald-950'
+              : 'bg-white/20 text-white backdrop-blur-md border border-white/20'
+          }`}
+        >
+          {isUnlockedSuccess ? <CheckCircle2 size={34} /> : <Lock size={30} />}
+        </motion.div>
 
         {/* Title */}
-        <h2 className="text-lg font-bold text-white mb-1">
-          {mode === 'unlock'
+        <h2 className="text-xl font-black mb-1">
+          {isUnlockedSuccess
+            ? isEnglish ? 'Unlocked!' : 'تم التحقق بنجاح!'
+            : mode === 'unlock'
             ? isEnglish ? 'Enter Passcode' : 'أدخل رمز الدخول'
             : isConfirming
             ? isEnglish ? 'Confirm Passcode' : 'تأكيد الرمز السري'
@@ -215,7 +239,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
             </span>
           </div>
         ) : (
-          <p className="text-xs text-white/70 mb-6">
+          <p className="text-xs text-white/75 mb-6">
             {errorMessage ||
               (mode === 'unlock'
                 ? isEnglish ? 'Personal expense & budget data' : 'حماية بيانات مصاريف البيت وميزانيتك'
@@ -225,21 +249,28 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
           </p>
         )}
 
-        {/* 4 Pin Dots */}
+        {/* 4 Pin Dots with Spring Fill & Shake */}
         <motion.div
-          animate={errorShake ? { x: [-12, 12, -8, 8, -4, 4, 0] } : {}}
-          transition={{ duration: 0.4 }}
+          animate={errorShake ? { x: [-14, 14, -10, 10, -5, 5, 0] } : {}}
+          transition={{ duration: 0.42 }}
           className="flex items-center gap-4 mb-8"
         >
           {[0, 1, 2, 3].map((idx) => {
             const isFilled = enteredPin.length > idx;
             return (
-              <div
+              <motion.div
                 key={idx}
-                className={`w-4 h-4 rounded-full transition-all duration-200 border-2 ${
-                  isFilled
-                    ? 'bg-white border-white scale-110 shadow-sm'
-                    : 'bg-transparent border-white/50'
+                animate={{
+                  scale: isFilled ? 1.18 : 1,
+                  backgroundColor: isUnlockedSuccess
+                    ? '#34D399'
+                    : isFilled
+                    ? '#FFFFFF'
+                    : 'transparent',
+                }}
+                transition={springs.bouncy}
+                className={`w-4 h-4 rounded-full border-2 ${
+                  isFilled ? 'border-white shadow-md' : 'border-white/40'
                 }`}
               />
             );
@@ -247,63 +278,67 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
         </motion.div>
 
         {/* Keypad */}
-        <div className="grid grid-cols-3 gap-4 w-full px-2 mb-4">
+        <div className="grid grid-cols-3 gap-3.5 w-full px-2 mb-4">
           {keypadNumbers.map(({ num, letters }) => (
-            <button
+            <motion.button
               key={num}
+              whileTap={{ scale: 0.9 }}
               type="button"
-              disabled={lockoutSeconds > 0}
+              disabled={lockoutSeconds > 0 || isUnlockedSuccess}
               onClick={() => handleKeyPress(num)}
-              className="w-18 h-18 mx-auto rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 disabled:opacity-30 disabled:pointer-events-none text-white flex flex-col items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md border border-white/10"
+              className="w-18 h-18 mx-auto rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 disabled:opacity-30 disabled:pointer-events-none text-white flex flex-col items-center justify-center transition-colors cursor-pointer backdrop-blur-md border border-white/10 shadow-xs"
             >
-              <span className="text-2xl font-semibold leading-none">{num}</span>
+              <span className="text-2xl font-bold leading-none">{num}</span>
               {letters && <span className="text-[9px] tracking-widest text-white/60 mt-0.5">{letters}</span>}
-            </button>
+            </motion.button>
           ))}
 
-          {/* Bottom Left: Real Biometric Trigger (only if available) */}
+          {/* Bottom Left: Real Biometric Trigger */}
           <div className="flex items-center justify-center">
             {mode === 'unlock' && biometry.isAvailable && lockoutSeconds === 0 ? (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.88 }}
                 type="button"
                 onClick={handleRealBiometricAuth}
-                className="w-18 h-18 rounded-full flex flex-col items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer active:scale-90"
+                className="w-18 h-18 rounded-full flex flex-col items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer"
                 title={biometry.biometryType === 'touchId' ? 'Touch ID' : 'Face ID'}
               >
                 {biometry.biometryType === 'touchId' ? <Fingerprint size={28} /> : <ScanFace size={28} />}
-                <span className="text-[10px] mt-1 font-medium">
+                <span className="text-[10px] mt-1 font-bold">
                   {biometry.biometryType === 'touchId' ? 'Touch ID' : 'Face ID'}
                 </span>
-              </button>
+              </motion.button>
             ) : null}
           </div>
 
           {/* Zero Button */}
-          <button
+          <motion.button
+            whileTap={{ scale: 0.9 }}
             type="button"
-            disabled={lockoutSeconds > 0}
+            disabled={lockoutSeconds > 0 || isUnlockedSuccess}
             onClick={() => handleKeyPress('0')}
-            className="w-18 h-18 mx-auto rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 disabled:opacity-30 disabled:pointer-events-none text-white flex flex-col items-center justify-center transition-all active:scale-95 cursor-pointer backdrop-blur-md border border-white/10"
+            className="w-18 h-18 mx-auto rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 disabled:opacity-30 disabled:pointer-events-none text-white flex flex-col items-center justify-center transition-colors cursor-pointer backdrop-blur-md border border-white/10 shadow-xs"
           >
-            <span className="text-2xl font-semibold leading-none">0</span>
-          </button>
+            <span className="text-2xl font-bold leading-none">0</span>
+          </motion.button>
 
           {/* Bottom Right: Delete or Cancel */}
           <div className="flex items-center justify-center">
             {enteredPin.length > 0 ? (
-              <button
+              <motion.button
+                whileTap={{ scale: 0.88 }}
                 type="button"
-                disabled={lockoutSeconds > 0}
+                disabled={lockoutSeconds > 0 || isUnlockedSuccess}
                 onClick={handleDelete}
-                className="w-18 h-18 rounded-full flex items-center justify-center text-white/80 hover:text-white active:scale-90 transition-all cursor-pointer"
+                className="w-18 h-18 rounded-full flex items-center justify-center text-white/80 hover:text-white transition-colors cursor-pointer"
               >
                 <Delete size={24} />
-              </button>
+              </motion.button>
             ) : onCancel ? (
               <button
                 type="button"
                 onClick={onCancel}
-                className="text-xs font-semibold text-white/70 hover:text-white cursor-pointer"
+                className="text-xs font-bold text-white/80 hover:text-white cursor-pointer px-3 py-2"
               >
                 {isEnglish ? 'Cancel' : 'إلغاء'}
               </button>

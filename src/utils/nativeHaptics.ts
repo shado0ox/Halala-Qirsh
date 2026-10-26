@@ -18,6 +18,10 @@ class NativeHapticsController {
     sound.playTap(soundEnabled);
   }
 
+  async impactLight(soundEnabled: boolean = true) {
+    return this.tap(soundEnabled);
+  }
+
   // Medium impact for button confirmations, toggles
   async medium(soundEnabled: boolean = true) {
     if (this.isCapacitor()) {
@@ -28,6 +32,10 @@ class NativeHapticsController {
       }
     }
     sound.playTap(soundEnabled);
+  }
+
+  async impactMedium(soundEnabled: boolean = true) {
+    return this.medium(soundEnabled);
   }
 
   // Success notification for saving an expense or paying a bill

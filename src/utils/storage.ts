@@ -132,6 +132,9 @@ export const getDefaultAppData = (): AppData => ({
     isPasscodeEnabled: false,
     biometricsEnabled: false,
     autoLockTimeout: 30, // 30 seconds default
+    animations: 'full',
+    hideAmounts: false,
+    hasCompletedOnboarding: false,
   },
 });
 

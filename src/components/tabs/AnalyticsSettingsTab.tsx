@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import {
   PieChart,
   Download,
@@ -18,7 +18,11 @@ import {
   Moon,
   Sun,
   Smartphone,
+  Eye,
+  Activity,
+  Layers,
 } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
 import {
   Category,
   Expense,
@@ -38,6 +42,7 @@ import { nativeHaptics } from '../../utils/nativeHaptics';
 import { NotificationPermissionState } from '../../utils/notifications';
 import { translations } from '../../utils/i18n';
 import { startSystemFlow, endSystemFlow } from '../../utils/systemFlow';
+import { springs, fades, useMotionConfig } from '../../utils/motion';
 
 interface AnalyticsSettingsTabProps {
   categories: Category[];
@@ -73,6 +78,8 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   onShowToast,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const motionConfig = useMotionConfig(settings.animations);
+  const isReduced = motionConfig.isReduced;
   const lang = settings.language || 'ar';
   const t = translations[lang];
   const isEn = lang === 'en';
@@ -94,6 +101,27 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
     }))
     .filter((c) => c.spent > 0)
     .sort((a, b) => b.spent - a.spent);
+
+  // Active touched slice in Donut Chart
+  const [activeSliceId, setActiveSliceId] = useState<string | null>(null);
+
+  // Donut SVG Math
+  const donutRadius = 60;
+  const donutCircumference = 2 * Math.PI * donutRadius;
+
+  let accumulatedLength = 0;
+  const donutSlices = sortedCategoriesBySpend.map((cat) => {
+    const ratio = totalSpent > 0 ? cat.spent / totalSpent : 0;
+    const strokeDasharray = `${ratio * donutCircumference} ${donutCircumference}`;
+    const strokeDashoffset = -accumulatedLength;
+    accumulatedLength += ratio * donutCircumference;
+    return {
+      cat,
+      ratio,
+      strokeDasharray,
+      strokeDashoffset,
+    };
+  });
 
   // Payer breakdown
   const payerMap = new Map<string, number>();
@@ -118,6 +146,11 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   const handleThemeModeChange = (mode: 'system' | 'light' | 'dark') => {
     nativeHaptics.tap(settings.soundEnabled);
     onUpdateSettings({ themeMode: mode });
+  };
+
+  const handleAnimationModeChange = (mode: 'full' | 'reduced' | 'off') => {
+    nativeHaptics.tap(settings.soundEnabled);
+    onUpdateSettings({ animations: mode });
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -148,78 +181,138 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   };
 
   return (
-    <div className="flex-1 w-full overflow-y-auto px-4 py-3 space-y-4 no-scrollbar">
+    <div className="flex-1 w-full overflow-y-auto px-4 py-3 space-y-4 no-scrollbar pb-8">
       {/* Title */}
-      <div>
-        <h1 className="text-xl font-extrabold text-[#1C1C1E] dark:text-white tracking-tight">
+      <div className="pt-1">
+        <h1 className="text-2xl font-black text-[#1C1C1E] dark:text-white tracking-tight">
           {t.reportsSettings}
         </h1>
         <p className="text-xs text-[#8E8E93]">{t.reportsSubtitle}</p>
       </div>
 
-      {/* SECTION 1: VISUAL ANALYTICS */}
-      <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-2xs space-y-3">
+      {/* SECTION 1: VISUAL ANALYTICS & ANIMATED DONUT */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-4">
         <div className="flex items-center justify-between">
           <span className="text-xs font-bold text-[#8E8E93] flex items-center gap-1.5">
-            <PieChart size={14} className="text-blue-500" />
+            <PieChart size={15} className="text-emerald-500" />
             <span>{t.spendByCategory}</span>
           </span>
-          <span className="text-xs font-bold text-[#1C1C1E] dark:text-white tabular-nums">
+          <span className="text-xs font-black text-[#1C1C1E] dark:text-white tabular-nums">
             {formatMoney(totalSpent, settings.currency, lang)}
           </span>
         </div>
 
-        {/* Categories Bars */}
-        <div className="space-y-2 pt-1">
-          {sortedCategoriesBySpend.map((cat) => {
-            const pct = totalSpent > 0 ? Math.round((cat.spent / totalSpent) * 100) : 0;
-            return (
-              <div key={cat.id} className="space-y-1">
-                <div className="flex items-center justify-between text-xs">
-                  <div className="flex items-center gap-2">
-                    <CategoryIcon
-                      iconName={cat.icon}
-                      color={cat.color}
-                      bgColor={cat.bgColor}
-                      size="sm"
+        {/* Animated Interactive SVG Donut */}
+        {sortedCategoriesBySpend.length > 0 && (
+          <div className="flex flex-col sm:flex-row items-center justify-center gap-5 pt-1">
+            <div className="relative w-36 h-36 shrink-0 flex items-center justify-center">
+              <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 160 160">
+                <circle
+                  cx="80"
+                  cy="80"
+                  r={donutRadius}
+                  stroke="rgba(0, 0, 0, 0.05)"
+                  className="dark:stroke-white/5"
+                  strokeWidth="16"
+                  fill="transparent"
+                />
+                {donutSlices.map((slice, idx) => {
+                  const isSelected = activeSliceId === slice.cat.id;
+                  return (
+                    <motion.circle
+                      key={slice.cat.id}
+                      cx="80"
+                      cy="80"
+                      r={donutRadius}
+                      stroke={slice.cat.color}
+                      strokeWidth={isSelected ? 20 : 16}
+                      strokeDasharray={slice.strokeDasharray}
+                      strokeDashoffset={slice.strokeDashoffset}
+                      initial={isReduced ? {} : { opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      transition={{ duration: 0.4, delay: idx * 0.05 }}
+                      fill="transparent"
+                      className="cursor-pointer transition-all duration-200"
+                      onClick={() => {
+                        nativeHaptics.tap(settings.soundEnabled);
+                        setActiveSliceId(isSelected ? null : slice.cat.id);
+                      }}
                     />
-                    <span className="font-semibold text-[#1C1C1E] dark:text-white">
-                      {isEn && cat.nameEn ? cat.nameEn : cat.name}
-                    </span>
-                  </div>
-                  <div className="flex items-center gap-2 tabular-nums">
-                    <span className="font-bold text-[#1C1C1E] dark:text-white">
-                      {formatMoney(cat.spent, settings.currency, lang)}
-                    </span>
-                    <span className="text-[10px] text-[#8E8E93] w-7 text-left">
-                      {pct}%
-                    </span>
-                  </div>
-                </div>
+                  );
+                })}
+              </svg>
 
-                {/* Progress bar */}
-                <div className="w-full h-1.5 bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all duration-300"
-                    style={{ width: `${pct}%`, backgroundColor: cat.color }}
-                  />
-                </div>
+              <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-2">
+                {activeSliceId ? (
+                  <>
+                    <span className="text-[10px] font-bold text-[#8E8E93] truncate max-w-24">
+                      {isEn ? (categories.find(c => c.id === activeSliceId)?.nameEn || '') : (categories.find(c => c.id === activeSliceId)?.name || '')}
+                    </span>
+                    <span className="text-sm font-black text-[#1C1C1E] dark:text-white tabular-nums">
+                      {Math.round(((catSpendMap.get(activeSliceId) || 0) / totalSpent) * 100)}%
+                    </span>
+                  </>
+                ) : (
+                  <>
+                    <span className="text-sm font-black text-[#1C1C1E] dark:text-white tabular-nums">
+                      {sortedCategoriesBySpend.length}
+                    </span>
+                    <span className="text-[9px] font-bold text-[#8E8E93] uppercase tracking-wider">
+                      {isEn ? 'Categories' : 'تصنيفات'}
+                    </span>
+                  </>
+                )}
               </div>
-            );
-          })}
-
-          {sortedCategoriesBySpend.length === 0 && (
-            <div className="py-6 text-center text-xs text-[#8E8E93]">
-              {isEn ? 'No expenses recorded for this month yet.' : 'لا توجد مصاريف مسجلة لهذا الشهر بعد.'}
             </div>
-          )}
-        </div>
+
+            {/* Top Categories Mini Chips */}
+            <div className="flex-1 w-full space-y-2">
+              {sortedCategoriesBySpend.slice(0, 4).map((cat) => {
+                const pct = totalSpent > 0 ? Math.round((cat.spent / totalSpent) * 100) : 0;
+                const isSelected = activeSliceId === cat.id;
+                return (
+                  <div
+                    key={cat.id}
+                    onClick={() => {
+                      nativeHaptics.tap(settings.soundEnabled);
+                      setActiveSliceId(isSelected ? null : cat.id);
+                    }}
+                    className={`p-2 rounded-xl flex items-center justify-between text-xs cursor-pointer transition-colors ${
+                      isSelected
+                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800'
+                        : 'bg-[#F2F2F7] dark:bg-[#2C2C2E]'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2">
+                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
+                      <span className="font-semibold text-slate-800 dark:text-slate-200">
+                        {isEn && cat.nameEn ? cat.nameEn : cat.name}
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-1.5 tabular-nums">
+                      <span className="font-bold text-slate-700 dark:text-slate-300">
+                        {formatMoney(cat.spent, settings.currency, lang)}
+                      </span>
+                      <span className="text-[10px] text-[#8E8E93]">({pct}%)</span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {sortedCategoriesBySpend.length === 0 && (
+          <div className="py-6 text-center text-xs text-[#8E8E93]">
+            {isEn ? 'No expenses recorded for this month yet.' : 'لا توجد مصاريف مسجلة لهذا الشهر بعد.'}
+          </div>
+        )}
 
         {/* Family Payer Breakdown */}
         {monthlyExpenses.length > 0 && (
           <div className="pt-3 border-t border-[#E5E5EA] dark:border-[#2C2C2E] space-y-2">
             <span className="text-[11px] font-bold text-[#8E8E93] flex items-center gap-1">
-              <Users size={12} />
+              <Users size={13} />
               <span>{t.familyPaymentShare}</span>
             </span>
             <div className="grid grid-cols-3 gap-2 text-center text-xs">
@@ -229,12 +322,12 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
                 const payerLabel = isEn ? (p === 'الزوج' ? t.husband : p === 'الزوجة' ? t.wife : t.joint) : p;
 
                 return (
-                  <div key={p} className="p-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
-                    <span className="text-[10px] text-[#8E8E93] block font-medium">{payerLabel}</span>
-                    <span className="font-bold text-[#1C1C1E] dark:text-white tabular-nums block">
+                  <div key={p} className="p-2.5 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
+                    <span className="text-[10px] text-[#8E8E93] block font-semibold">{payerLabel}</span>
+                    <span className="font-bold text-[#1C1C1E] dark:text-white tabular-nums block mt-0.5">
                       {formatMoney(amount, settings.currency, lang)}
                     </span>
-                    <span className="text-[10px] text-blue-600 dark:text-blue-400 font-semibold tabular-nums">
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold tabular-nums">
                       {pct}%
                     </span>
                   </div>
@@ -245,83 +338,95 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         )}
       </div>
 
-      {/* SECTION 2: NATIVE SECURITY & APP PREFERENCES */}
-      <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-2xs space-y-3.5">
+      {/* SECTION 2: APPEARANCE & ANIMATIONS */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-4">
         <span className="text-xs font-bold text-[#8E8E93] block">
-          {isEn ? 'System & Native App Preferences' : 'تفضيلات التطبيق والأمان'}
+          {isEn ? 'Appearance & Motion' : 'المظهر والحركات التفاعلية'}
         </span>
 
-        {/* Appearance / Dark Mode */}
-        <div className="p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-[#1C1C1E] dark:text-white flex items-center gap-1.5">
-              <Moon size={15} className="text-blue-500" />
-              <span>{isEn ? 'Appearance' : 'مظهر التطبيق'}</span>
-            </span>
-          </div>
-
-          <div className="grid grid-cols-3 gap-1 bg-white dark:bg-[#1C1C1E] p-1 rounded-xl border border-slate-200 dark:border-slate-700">
-            <button
-              type="button"
-              onClick={() => handleThemeModeChange('system')}
-              className={`py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all ${
-                settings.themeMode === 'system'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              <Smartphone size={13} />
-              <span>{isEn ? 'Auto' : 'تلقائي'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleThemeModeChange('light')}
-              className={`py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all ${
-                settings.themeMode === 'light'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              <Sun size={13} />
-              <span>{isEn ? 'Light' : 'فاتح'}</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => handleThemeModeChange('dark')}
-              className={`py-1.5 rounded-lg text-xs font-bold flex items-center justify-center gap-1 cursor-pointer transition-all ${
-                settings.themeMode === 'dark'
-                  ? 'bg-blue-600 text-white shadow-2xs'
-                  : 'text-slate-600 dark:text-slate-300'
-              }`}
-            >
-              <Moon size={13} />
-              <span>{isEn ? 'Dark' : 'داكن'}</span>
-            </button>
+        {/* Theme Segmented Switch */}
+        <div className="flex items-center justify-between text-xs">
+          <span className="font-bold text-[#1C1C1E] dark:text-white">
+            {isEn ? 'Theme' : 'سمة المظهر'}
+          </span>
+          <div className="flex items-center gap-1 bg-[#F2F2F7] dark:bg-[#2C2C2E] p-1 rounded-2xl">
+            {[
+              { id: 'system', label: isEn ? 'System' : 'تلقائي' },
+              { id: 'light', label: isEn ? 'Light' : 'فاتح' },
+              { id: 'dark', label: isEn ? 'Dark' : 'داكن' },
+            ].map((th) => {
+              const isActive = settings.themeMode === th.id;
+              return (
+                <button
+                  key={th.id}
+                  onClick={() => handleThemeModeChange(th.id as any)}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {th.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
-        {/* Language Switcher */}
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
-          <div className="flex items-center gap-2">
-            <Globe size={16} className="text-blue-500" />
-            <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-              {t.languageSwitcher}
+        {/* Motion / Animation Preset Setting */}
+        <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E5E5EA] dark:border-[#2C2C2E]">
+          <div>
+            <span className="font-bold text-[#1C1C1E] dark:text-white block">
+              {isEn ? 'Animations' : 'المؤثرات الحركية'}
+            </span>
+            <span className="text-[10px] text-[#8E8E93]">
+              {isEn ? 'Controls springs & transitions' : 'التحكم في سلاسة وسرعة الحركات'}
             </span>
           </div>
 
-          <div className="flex items-center gap-1 bg-white dark:bg-[#1C1C1E] p-1 rounded-lg border border-slate-200 dark:border-slate-700">
+          <div className="flex items-center gap-1 bg-[#F2F2F7] dark:bg-[#2C2C2E] p-1 rounded-2xl">
+            {[
+              { id: 'full', label: isEn ? 'Full' : 'كاملة' },
+              { id: 'reduced', label: isEn ? 'Reduced' : 'مخففة' },
+              { id: 'off', label: isEn ? 'Off' : 'إيقاف' },
+            ].map((anim) => {
+              const currentAnim = settings.animations || 'full';
+              const isActive = currentAnim === anim.id;
+              return (
+                <button
+                  key={anim.id}
+                  onClick={() => handleAnimationModeChange(anim.id as any)}
+                  className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-emerald-600 text-white shadow-2xs'
+                      : 'text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {anim.label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Language Selection */}
+        <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E5E5EA] dark:border-[#2C2C2E]">
+          <span className="font-bold text-[#1C1C1E] dark:text-white">
+            {isEn ? 'Language' : 'لغة الواجهة'}
+          </span>
+          <div className="flex items-center gap-1 bg-[#F2F2F7] dark:bg-[#2C2C2E] p-1 rounded-2xl">
             <button
               onClick={() => handleLanguageToggle('ar')}
-              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer ${
-                lang === 'ar' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300'
+              className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all cursor-pointer ${
+                lang === 'ar' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               العربية
             </button>
             <button
               onClick={() => handleLanguageToggle('en')}
-              className={`px-2.5 py-1 text-xs font-bold rounded-md transition-colors cursor-pointer ${
-                lang === 'en' ? 'bg-blue-600 text-white shadow-xs' : 'text-slate-600 dark:text-slate-300'
+              className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all cursor-pointer ${
+                lang === 'en' ? 'bg-emerald-600 text-white shadow-2xs' : 'text-slate-600 dark:text-slate-300'
               }`}
             >
               English
@@ -329,377 +434,200 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           </div>
         </div>
 
-        {/* Passcode Lock (Face ID / PIN) */}
-        <div className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Lock size={16} className="text-purple-500" />
-              <div>
-                <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
-                  {t.passcodeLockTitle}
-                </span>
-                <span className="text-[10px] text-[#8E8E93]">{t.passcodeLockSubtitle}</span>
-              </div>
-            </div>
-
-            <span
-              className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                settings.isPasscodeEnabled
-                  ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                  : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
-              }`}
-            >
-              {settings.isPasscodeEnabled ? (isEn ? 'Enabled' : 'مفعل') : (isEn ? 'Disabled' : 'معطل')}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 pt-1 border-t border-[#E5E5EA] dark:border-[#3A3A3C]">
-            {!settings.isPasscodeEnabled ? (
-              <button
-                type="button"
-                onClick={() => {
-                  nativeHaptics.tap(settings.soundEnabled);
-                  onOpenPasscodeModal('set');
-                }}
-                className="flex-1 py-1.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
-              >
-                <Lock size={13} />
-                <span>{t.setPasscode}</span>
-              </button>
-            ) : (
-              <>
-                <button
-                  type="button"
-                  onClick={() => {
-                    nativeHaptics.tap(settings.soundEnabled);
-                    onOpenPasscodeModal('change');
-                  }}
-                  className="flex-1 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] text-purple-600 dark:text-purple-400 font-bold text-xs flex items-center justify-center gap-1 border border-purple-200 dark:border-purple-800 cursor-pointer"
-                >
-                  <span>{t.changePasscode}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    nativeHaptics.warning(settings.soundEnabled);
-                    onDisablePasscode();
-                  }}
-                  className="px-3 py-1.5 rounded-xl bg-red-100 dark:bg-red-950/50 text-red-600 dark:text-red-400 font-bold text-xs cursor-pointer"
-                >
-                  <span>{t.disablePasscode}</span>
-                </button>
-              </>
-            )}
-          </div>
-
-          {settings.isPasscodeEnabled && (
-            <div className="pt-2 border-t border-[#E5E5EA] dark:border-[#3A3A3C] flex items-center justify-between text-xs">
-              <span className="text-[#8E8E93] text-[11px] font-semibold">
-                {isEn ? 'Lock App After:' : 'إعادة القفل بعد:'}
-              </span>
-              <select
-                value={settings.autoLockTimeout ?? 30}
-                onChange={(e) => {
-                  nativeHaptics.tap(settings.soundEnabled);
-                  onUpdateSettings({ autoLockTimeout: parseInt(e.target.value, 10) });
-                }}
-                className="px-2 py-1 bg-white dark:bg-[#1C1C1E] border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100"
-              >
-                <option value={0}>{isEn ? 'Immediately' : 'فوراً'}</option>
-                <option value={30}>{isEn ? '30 seconds' : '30 ثانية'}</option>
-                <option value={60}>{isEn ? '1 minute' : 'دقيقة واحدة'}</option>
-                <option value={300}>{isEn ? '5 minutes' : '5 دقائق'}</option>
-              </select>
-            </div>
-          )}
-        </div>
-
-        {/* Daily Expense Logging Reminder */}
-        <div className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Clock size={16} className="text-amber-500" />
-              <div>
-                <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
-                  {t.dailyReminderTitle}
-                </span>
-                <span className="text-[10px] text-[#8E8E93]">{t.dailyReminderSubtitle}</span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                nativeHaptics.tap(settings.soundEnabled);
-                onUpdateSettings({ dailyReminderEnabled: !settings.dailyReminderEnabled });
-              }}
-              className={`w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer shrink-0 ${
-                settings.dailyReminderEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
-              }`}
-            >
-              <div
-                className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
-                  settings.dailyReminderEnabled ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-
-          {settings.dailyReminderEnabled && (
-            <div className="flex items-center justify-between pt-1 border-t border-[#E5E5EA] dark:border-[#3A3A3C] text-xs">
-              <span className="text-[#8E8E93]">{isEn ? 'Reminder Time:' : 'وقت التذكير المسائي:'}</span>
-              <input
-                type="time"
-                value={settings.dailyReminderTime || '21:00'}
-                onChange={(e) => onUpdateSettings({ dailyReminderTime: e.target.value })}
-                className="px-2 py-1 bg-white dark:bg-[#1C1C1E] border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold tabular-nums"
-              />
-            </div>
-          )}
-        </div>
-
-        {/* Currency Switcher */}
-        <div>
-          <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-            {t.appCurrency} ({CURRENCY_SYMBOLS[settings.currency]?.[isEn ? 'nameEn' : 'name']})
-          </label>
-          <div className="grid grid-cols-4 gap-1.5">
-            {(Object.keys(CURRENCY_SYMBOLS) as CurrencyCode[]).map((c) => {
-              const isSelected = settings.currency === c;
-              return (
-                <button
-                  key={c}
-                  onClick={() => handleCurrencyChange(c)}
-                  className={`py-1.5 px-1 rounded-xl text-xs font-bold border transition-all cursor-pointer text-center ${
-                    isSelected
-                      ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 shadow-2xs'
-                      : 'border-slate-200/60 dark:border-slate-800 bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-300'
-                  }`}
-                >
-                  <div className="text-sm font-extrabold">{CURRENCY_SYMBOLS[c].symbol}</div>
-                  <div className="text-[10px] opacity-75">{c}</div>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
-        {/* Salary Day */}
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
-          <div className="flex items-center gap-2">
-            <Calendar size={16} className="text-blue-500" />
-            <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-              {t.salaryDay}
-            </span>
-          </div>
-          <div className="flex items-center gap-1">
-            <input
-              type="number"
-              min="1"
-              max="31"
-              value={settings.salaryDay}
-              onChange={(e) =>
-                onUpdateSettings({ salaryDay: parseInt(e.target.value, 10) || 27 })
-              }
-              className="w-12 text-center text-xs font-bold px-1 py-1 rounded-lg bg-white dark:bg-[#1C1C1E] border border-slate-300 dark:border-slate-700 tabular-nums"
-            />
-            <span className="text-xs text-[#8E8E93]">{isEn ? 'of month' : 'من الشهر'}</span>
-          </div>
-        </div>
-
-        {/* Sound & Haptics toggle */}
-        <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
-          <div className="flex items-center gap-2">
-            <Volume2 size={16} className="text-blue-500" />
-            <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-              {t.soundHaptics}
-            </span>
-          </div>
-          <button
-            onClick={() => {
-              nativeHaptics.tap(!settings.soundEnabled);
-              onUpdateSettings({ soundEnabled: !settings.soundEnabled });
-            }}
-            className={`w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer ${
-              settings.soundEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
-            }`}
+        {/* Currency Code Selection */}
+        <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E5E5EA] dark:border-[#2C2C2E]">
+          <span className="font-bold text-[#1C1C1E] dark:text-white">
+            {isEn ? 'Currency' : 'العملة الأساسية'}
+          </span>
+          <select
+            value={settings.currency}
+            onChange={(e) => handleCurrencyChange(e.target.value as CurrencyCode)}
+            className="px-3 py-1.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] border-none font-bold text-slate-800 dark:text-white outline-hidden cursor-pointer"
           >
-            <div
-              className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
-                settings.soundEnabled ? 'translate-x-5' : 'translate-x-0'
-              }`}
-            />
-          </button>
-        </div>
-
-        {/* Local Notifications for Bills */}
-        <div className="pt-2 border-t border-[#E5E5EA] dark:border-[#2C2C2E] space-y-2.5">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <BellRing size={16} className="text-blue-500" />
-              <div>
-                <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
-                  {t.localNotifications}
-                </span>
-                <span className="text-[10px] text-[#8E8E93]">
-                  {isEn ? 'Local on-device alerts before due dates' : 'إشعار محلي لتذكيرك قبل حلول موعد الاستحقاق'}
-                </span>
-              </div>
-            </div>
-
-            <button
-              onClick={() => {
-                nativeHaptics.tap(settings.soundEnabled);
-                onUpdateSettings({ notificationsEnabled: !settings.notificationsEnabled });
-              }}
-              className={`w-11 h-6 rounded-full transition-colors p-0.5 cursor-pointer shrink-0 ${
-                settings.notificationsEnabled ? 'bg-emerald-500' : 'bg-slate-300 dark:bg-slate-700'
-              }`}
-            >
-              <div
-                className={`w-5 h-5 rounded-full bg-white shadow-xs transition-transform ${
-                  settings.notificationsEnabled ? 'translate-x-5' : 'translate-x-0'
-                }`}
-              />
-            </button>
-          </div>
-
-          {settings.notificationsEnabled && (
-            <div className="space-y-2 bg-[#F2F2F7] dark:bg-[#2C2C2E] p-2.5 rounded-2xl text-xs">
-              <div className="flex items-center justify-between">
-                <span className="text-[#8E8E93] text-[11px] font-semibold">
-                  {isEn ? 'Notification Permission:' : 'حالة إذن المتصفح / الجهاز:'}
-                </span>
-                <span
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                    notificationPermission === 'granted'
-                      ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                      : notificationPermission === 'denied'
-                      ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
-                      : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                  }`}
-                >
-                  {notificationPermission === 'granted'
-                    ? isEn ? 'Granted ✓' : 'مسموح ومفعل ✓'
-                    : notificationPermission === 'denied'
-                    ? isEn ? 'Denied in Settings' : 'محظور من الإعدادات'
-                    : isEn ? 'Needs Permission' : 'يتطلب الموافقة'}
-                </span>
-              </div>
-
-              <div className="pt-1 flex items-center gap-2">
-                {notificationPermission !== 'granted' ? (
-                  <button
-                    type="button"
-                    onClick={onRequestNotificationPermission}
-                    className="flex-1 py-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1 cursor-pointer"
-                  >
-                    <span>{isEn ? 'Request Notification Permission' : 'طلب إذن الإشعارات'}</span>
-                  </button>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={onSendTestNotification}
-                    className="flex-1 py-1.5 rounded-xl bg-white dark:bg-[#1C1C1E] text-blue-600 dark:text-blue-400 font-bold text-xs flex items-center justify-center gap-1 border border-slate-200 dark:border-slate-700 cursor-pointer hover:bg-slate-50"
-                  >
-                    <Sparkles size={13} />
-                    <span>{isEn ? 'Send Test Notification' : 'إرسال إشعار تجريبي الآن'}</span>
-                  </button>
-                )}
-              </div>
-            </div>
-          )}
+            {Object.entries(CURRENCY_SYMBOLS).map(([code, meta]) => (
+              <option key={code} value={code}>
+                {code} ({meta.symbol})
+              </option>
+            ))}
+          </select>
         </div>
       </div>
 
-      {/* SECTION 3: BACKUP, EXPORT & LOCAL STORAGE */}
-      <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-slate-200/60 dark:border-slate-800 shadow-2xs space-y-3">
-        <div className="flex items-center gap-2">
-          <ShieldCheck size={16} className="text-emerald-500" />
-          <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-            {t.backupAndStorage}
-          </span>
+      {/* SECTION 3: KEYCHAIN SECURITY & PASSCODE */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-3.5">
+        <span className="text-xs font-bold text-[#8E8E93] block">
+          {isEn ? 'Apple Keychain & Security' : 'أمان سلسلة مفاتيح أبل (iOS Keychain)'}
+        </span>
+
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-xl bg-blue-50 dark:bg-blue-950/50 text-blue-600 dark:text-blue-400 flex items-center justify-center">
+              <Lock size={16} />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
+                {isEn ? 'Passcode & Biometrics' : 'رمز الدخول وقفل التطبيق'}
+              </span>
+              <span className="text-[10px] text-[#8E8E93]">
+                {settings.isPasscodeEnabled
+                  ? (isEn ? 'Secured with hardware Keychain' : 'مفعل ومشفر بسلسلة مفاتيح iOS')
+                  : (isEn ? 'Passcode protection disabled' : 'القفل غير مفعل')}
+              </span>
+            </div>
+          </div>
+
+          {settings.isPasscodeEnabled ? (
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => onOpenPasscodeModal('change')}
+                className="px-2.5 py-1 text-xs font-bold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/40 rounded-xl cursor-pointer"
+              >
+                {isEn ? 'Change' : 'تغيير'}
+              </button>
+              <button
+                onClick={onDisablePasscode}
+                className="px-2.5 py-1 text-xs font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/40 rounded-xl cursor-pointer"
+              >
+                {isEn ? 'Disable' : 'إلغاء'}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => onOpenPasscodeModal('set')}
+              className="px-3.5 py-1.5 text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl shadow-xs cursor-pointer"
+            >
+              {isEn ? 'Set Passcode' : 'تعيين رمز'}
+            </button>
+          )}
         </div>
-        <p className="text-[11px] text-[#8E8E93] leading-relaxed">
-          {t.storageEngineNotice}
-        </p>
 
-        {/* Native Sharing & Export Grid */}
-        <div className="grid grid-cols-2 gap-2">
-          {/* Export JSON */}
-          <button
-            onClick={() => {
-              nativeHaptics.success(settings.soundEnabled);
-              exportDataAsJSON(fullData);
-            }}
-            className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 border border-blue-200/60 dark:border-blue-900/50 flex flex-col items-center justify-center gap-1.5 hover:bg-blue-100 transition-colors cursor-pointer text-xs font-bold"
-          >
-            <Download size={18} />
-            <span>{t.downloadJSONBackup}</span>
-          </button>
+        {/* Auto-Lock Timeout Selector */}
+        {settings.isPasscodeEnabled && (
+          <div className="flex items-center justify-between p-2.5 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs">
+            <div className="flex items-center gap-1.5 text-slate-700 dark:text-slate-300">
+              <Clock size={13} className="text-blue-500" />
+              <span className="font-semibold text-[11px]">
+                {isEn ? 'Lock after:' : 'القفل التلقائي بعد:'}
+              </span>
+            </div>
+            <div className="flex items-center gap-1 font-semibold text-[11px]">
+              {[
+                { sec: 0, label: isEn ? 'Immediately' : 'فوراً' },
+                { sec: 30, label: isEn ? '30s' : '30 ثانية' },
+                { sec: 60, label: isEn ? '1m' : 'دقيقة' },
+                { sec: 300, label: isEn ? '5m' : '5 دقائق' },
+              ].map((opt) => (
+                <button
+                  key={opt.sec}
+                  type="button"
+                  onClick={() => {
+                    nativeHaptics.tap(settings.soundEnabled);
+                    onUpdateSettings({ autoLockTimeout: opt.sec });
+                  }}
+                  className={`px-2 py-1 rounded-lg transition-all cursor-pointer ${
+                    (settings.autoLockTimeout ?? 30) === opt.sec
+                      ? 'bg-blue-600 text-white font-bold'
+                      : 'text-slate-600 dark:text-slate-300'
+                  }`}
+                >
+                  {opt.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
 
-          {/* Import JSON */}
-          <button
-            onClick={() => {
+      {/* SECTION 4: DATA EXPORT & SHARE SHEET */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-3">
+        <span className="text-xs font-bold text-[#8E8E93] block">
+          {isEn ? 'Backup & Apple Share Sheet' : 'النسخ الاحتياطي ومشاركة البيانات'}
+        </span>
+
+        <div className="grid grid-cols-2 gap-2.5">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={async () => {
               nativeHaptics.tap(settings.soundEnabled);
               startSystemFlow();
-              fileInputRef.current?.click();
+              try {
+                await exportDataAsJSON(fullData);
+              } finally {
+                setTimeout(endSystemFlow, 1000);
+              }
             }}
-            className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-800 dark:text-slate-100 border border-slate-200/60 dark:border-slate-800 flex flex-col items-center justify-center gap-1.5 hover:bg-slate-200/60 transition-colors cursor-pointer text-xs font-bold"
+            className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-800 dark:text-slate-100 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
           >
-            <Upload size={18} />
-            <span>{t.restoreJSONBackup}</span>
-          </button>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".json"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
+            <Download size={15} className="text-emerald-500" />
+            <span>{isEn ? 'Export JSON Backup' : 'تصدير نسخة JSON'}</span>
+          </motion.button>
 
-          {/* Export & Share CSV through Native iOS Share Sheet */}
-          <button
-            onClick={() => {
-              nativeHaptics.success(settings.soundEnabled);
-              exportExpensesToCSV(
-                expenses,
-                categories,
-                CURRENCY_SYMBOLS[settings.currency]?.symbol || 'ر.س',
-                isEn
-              );
-            }}
-            className="col-span-2 p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-400 border border-emerald-200/50 dark:border-emerald-900/40 flex items-center justify-center gap-2 hover:bg-emerald-100 transition-colors cursor-pointer text-xs font-bold"
-          >
-            <Share2 size={16} />
-            <span>{t.exportShareCSV}</span>
-          </button>
-
-          {/* Privacy Policy Trigger */}
-          <button
-            onClick={() => {
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            onClick={async () => {
               nativeHaptics.tap(settings.soundEnabled);
-              onOpenPrivacyPolicy();
+              startSystemFlow();
+              try {
+                await exportExpensesToCSV(fullData.expenses, fullData.categories, settings.currency);
+              } finally {
+                setTimeout(endSystemFlow, 1000);
+              }
             }}
-            className="col-span-2 p-2.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 flex items-center justify-center gap-2 hover:bg-slate-50 transition-colors cursor-pointer text-xs font-semibold"
+            className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-800 dark:text-slate-100 flex items-center justify-center gap-2 text-xs font-bold cursor-pointer"
           >
             <FileText size={15} className="text-blue-500" />
-            <span>{t.privacyPolicy}</span>
-          </button>
+            <span>{isEn ? 'Export CSV Sheet' : 'تصدير جدول CSV'}</span>
+          </motion.button>
         </div>
 
-        {/* Clear All Data */}
-        <div className="pt-2 border-t border-[#E5E5EA] dark:border-[#2C2C2E] flex items-center justify-end">
-          <button
-            onClick={() => {
-              nativeHaptics.warning(settings.soundEnabled);
-              onClearAllData();
-            }}
-            className="text-xs font-semibold text-red-500 hover:text-red-700 flex items-center gap-1 cursor-pointer py-1 px-2 rounded-lg hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors"
-          >
-            <Trash2 size={13} />
-            <span>{t.clearAllData}</span>
-          </button>
-        </div>
+        {/* Import JSON Backup */}
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".json,application/json"
+          onChange={handleFileUpload}
+          className="hidden"
+        />
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            nativeHaptics.tap(settings.soundEnabled);
+            startSystemFlow();
+            fileInputRef.current?.click();
+          }}
+          className="w-full py-2.5 rounded-2xl border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs flex items-center justify-center gap-2 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+        >
+          <Upload size={14} className="text-emerald-500" />
+          <span>{isEn ? 'Restore from JSON Backup' : 'استعادة البيانات من ملف JSON'}</span>
+        </motion.button>
+      </div>
+
+      {/* SECTION 5: PRIVACY & SYSTEM RESET */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-3">
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            nativeHaptics.tap(settings.soundEnabled);
+            onOpenPrivacyPolicy();
+          }}
+          className="w-full py-2.5 rounded-2xl bg-emerald-50/80 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+        >
+          <ShieldCheck size={16} />
+          <span>{isEn ? 'Privacy Policy & Zero Data Collection' : 'سياسة الخصوصية وأمان البيانات'}</span>
+        </motion.button>
+
+        <motion.button
+          whileTap={{ scale: 0.95 }}
+          onClick={() => {
+            nativeHaptics.tap(settings.soundEnabled);
+            onClearAllData();
+          }}
+          className="w-full py-2.5 rounded-2xl bg-red-50 dark:bg-red-950/30 text-red-600 dark:text-red-400 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:bg-red-100 dark:hover:bg-red-950/50 transition-colors"
+        >
+          <Trash2 size={15} />
+          <span>{isEn ? 'Erase All Data' : 'مسح كافة البيانات من الجهاز'}</span>
+        </motion.button>
       </div>
     </div>
   );
