@@ -3,9 +3,10 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
+import { Lock } from 'lucide-react';
 import {
   AppData,
   Category,
@@ -19,7 +20,8 @@ import {
   loadAppData,
   loadAppDataFromPreferences,
   saveAppData,
-  getDefaultAppData,
+  getShownBannerKeys,
+  markBannerKeyShown,
 } from './utils/storage';
 import { nativeHaptics } from './utils/nativeHaptics';
 import {
@@ -28,6 +30,7 @@ import {
 } from './utils/notifications';
 import { NativeNotificationService } from './utils/nativeNotifications';
 import { SecurityService } from './utils/security';
+import { isSystemFlowActive } from './utils/systemFlow';
 
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
@@ -61,10 +64,17 @@ export default function App() {
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
 
-  // Native Passcode Lock & Privacy Modal state
-  const [isLocked, setIsLocked] = useState<boolean>(false);
+  // Synchronously initialize isLocked to prevent financial data flash at startup
+  const [isLocked, setIsLocked] = useState<boolean>(() => {
+    const initial = loadAppData();
+    return Boolean(initial?.settings?.isPasscodeEnabled);
+  });
   const [passcodeModalMode, setPasscodeModalMode] = useState<'set' | 'change' | null>(null);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
+
+  // App Switcher privacy cover state
+  const [isAppInactive, setIsAppInactive] = useState<boolean>(false);
+  const backgroundTimestampRef = useRef<number>(0);
 
   // App-wide Alert & Toast Dialogs
   const [confirmDialog, setConfirmDialog] = useState<ConfirmState>({
@@ -86,15 +96,25 @@ export default function App() {
     () => getNotificationPermission()
   );
   const [currentNotification, setCurrentNotification] = useState<InAppNotification | null>(null);
+  const shownBannersRef = useRef<Set<string>>(new Set());
 
-  // Hydrate from Capacitor Preferences with plain-text passcode migration
+  // Load shown banner keys from Preferences on launch
+  useEffect(() => {
+    getShownBannerKeys().then((keys) => {
+      shownBannersRef.current = new Set(keys);
+    });
+  }, []);
+
+  // Hydrate from Capacitor Preferences with Keychain migration
   useEffect(() => {
     loadAppDataFromPreferences().then(async (prefData) => {
       setData(prefData);
-      // Check if secure passcode exists
+      await SecurityService.migrateIfNeeded();
       const hasPass = await SecurityService.hasPasscode();
       if (prefData.settings.isPasscodeEnabled && hasPass) {
         setIsLocked(true);
+      } else if (!prefData.settings.isPasscodeEnabled) {
+        setIsLocked(false);
       }
     });
   }, []);
@@ -148,20 +168,61 @@ export default function App() {
     }
   }, [data.settings.themeMode]);
 
-  // Lock the app again when it returns from background (Guideline 4.2 native security)
+  // Evaluate bill notifications safely: shown at most once per bill per day.
+  // Does NOT depend on currentNotification to prevent redisplay loop on dismissal.
+  const runBillNotificationCheck = useCallback(async () => {
+    if (!data.settings.notificationsEnabled) return;
+
+    // Trigger native scheduling for upcoming cycles
+    const reminders = await NativeNotificationService.scheduleBillReminders(data.bills, data.settings);
+
+    // Pick first reminder that has not been shown today
+    const unshown = reminders.filter((r) => !shownBannersRef.current.has(r.id));
+    if (unshown.length > 0) {
+      const notifToShow = unshown[0];
+      shownBannersRef.current.add(notifToShow.id);
+      await markBannerKeyShown(notifToShow.id);
+      setCurrentNotification((prev) => (prev ? prev : notifToShow));
+    }
+  }, [data.bills, data.settings]);
+
+  // Run bill notification check only when bills or notification settings change (No timers)
+  useEffect(() => {
+    runBillNotificationCheck();
+  }, [runBillNotificationCheck]);
+
+  // App state changes: handle app switcher privacy cover, auto-lock timeout, and foreground check
   useEffect(() => {
     const listenerPromise = CapApp.addListener('appStateChange', (state) => {
-      if (state.isActive) {
-        if (data.settings.isPasscodeEnabled) {
+      if (!state.isActive) {
+        backgroundTimestampRef.current = Date.now();
+        setIsAppInactive(true);
+      } else {
+        setIsAppInactive(false);
+
+        const isFlowActive = isSystemFlowActive();
+        const elapsedSecs = backgroundTimestampRef.current > 0
+          ? (Date.now() - backgroundTimestampRef.current) / 1000
+          : 0;
+        backgroundTimestampRef.current = 0;
+
+        const timeout = data.settings.autoLockTimeout ?? 30;
+
+        // Only lock if NOT in the middle of a system UI flow (Face ID, Share sheet, file picker)
+        // and elapsed time meets the configured autoLockTimeout
+        if (!isFlowActive && data.settings.isPasscodeEnabled && elapsedSecs >= timeout) {
           setIsLocked(true);
         }
+
+        // Re-check bills upon foreground return
+        runBillNotificationCheck();
       }
     });
 
     return () => {
       listenerPromise.then((handle) => handle.remove()).catch(() => {});
     };
-  }, [data.settings.isPasscodeEnabled]);
+  }, [data.settings.isPasscodeEnabled, data.settings.autoLockTimeout, runBillNotificationCheck]);
 
   // Update notification permission state on mount
   useEffect(() => {
@@ -174,19 +235,6 @@ export default function App() {
   useEffect(() => {
     NativeNotificationService.scheduleDailyReminder(data.settings);
   }, [data.settings.dailyReminderEnabled, data.settings.dailyReminderTime, data.settings.language]);
-
-  // Evaluate bill notifications once on data change
-  const runBillNotificationCheck = useCallback(async () => {
-    if (!data.settings.notificationsEnabled) return;
-    const reminders = await NativeNotificationService.scheduleBillReminders(data.bills, data.settings);
-    if (reminders.length > 0 && !currentNotification) {
-      setCurrentNotification(reminders[0]);
-    }
-  }, [data.bills, data.settings, currentNotification]);
-
-  useEffect(() => {
-    runBillNotificationCheck();
-  }, [runBillNotificationCheck]);
 
   // Request native Notification permission
   const handleRequestNotificationPermission = async () => {
@@ -494,188 +542,209 @@ export default function App() {
   const unpaidBillsCount = data.bills.filter((b) => !b.isPaid).length;
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col bg-[#F2F2F7] dark:bg-black text-[#1C1C1E] dark:text-white pt-safe pb-safe overflow-hidden select-none">
-      {/* iOS Dropdown Notification Banner */}
-      <IOSNotificationBanner
-        notification={currentNotification}
-        onDismiss={() => setCurrentNotification(null)}
-        onAction={() => {
-          setCurrentNotification(null);
-          setActiveTab('bills_groceries');
-        }}
-      />
-
-      {/* App-wide Toast Notification */}
-      <Toast
-        message={toastMessage}
-        type={toastType}
-        onClose={() => setToastMessage(null)}
-      />
-
-      {/* App-wide Native-styled Confirmation Modal */}
-      <ConfirmModal
-        isOpen={confirmDialog.isOpen}
-        title={confirmDialog.title}
-        message={confirmDialog.message}
-        confirmText={confirmDialog.confirmText}
-        isDestructive={confirmDialog.isDestructive}
-        onConfirm={confirmDialog.onConfirm}
-        onCancel={() => setConfirmDialog((c) => ({ ...c, isOpen: false }))}
-        isEnglish={isEn}
-      />
-
-      {/* Active Tab View */}
-      <main className="flex-1 w-full flex flex-col overflow-hidden">
-        {activeTab === 'dashboard' && (
-          <DashboardTab
-            categories={data.categories}
-            expenses={data.expenses}
-            bills={data.bills}
-            settings={data.settings}
-            onOpenAddExpense={() => {
-              setEditingExpense(null);
-              setIsAddExpenseOpen(true);
-            }}
-            onNavigateToTab={(tab: TabId) => setActiveTab(tab)}
-            onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
-          />
-        )}
-
-        {activeTab === 'expenses' && (
-          <ExpensesTab
-            categories={data.categories}
-            expenses={data.expenses}
-            settings={data.settings}
-            onEditExpense={handleEditExpense}
-            onDeleteExpense={handleDeleteExpense}
-            onOpenAddExpense={() => {
-              setEditingExpense(null);
-              setIsAddExpenseOpen(true);
-            }}
-          />
-        )}
-
-        {activeTab === 'budgets' && (
-          <BudgetsTab
-            categories={data.categories}
-            expenses={data.expenses}
-            settings={data.settings}
-            onUpdateSettings={handleUpdateSettings}
-            onUpdateCategoryLimit={handleUpdateCategoryLimit}
-            onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
-          />
-        )}
-
-        {activeTab === 'bills_groceries' && (
-          <BillsAndGroceriesTab
-            bills={data.bills}
-            groceries={data.groceries}
-            categories={data.categories}
-            settings={data.settings}
-            onToggleBill={handleToggleBill}
-            onAddBill={handleAddBill}
-            onDeleteBill={handleDeleteBill}
-            onToggleBillReminder={handleToggleBillReminder}
-            onToggleGrocery={handleToggleGrocery}
-            onAddGrocery={handleAddGrocery}
-            onDeleteGrocery={handleDeleteGrocery}
-            onConvertBoughtToExpense={handleConvertBoughtToExpense}
-            onRequestNotificationPermission={handleRequestNotificationPermission}
-            onSendTestNotification={handleSendTestNotification}
-            notificationPermission={notificationPermission}
-            onUpdateSettings={handleUpdateSettings}
-          />
-        )}
-
-        {activeTab === 'analytics_settings' && (
-          <AnalyticsSettingsTab
-            categories={data.categories}
-            expenses={data.expenses}
-            settings={data.settings}
-            fullData={data}
-            onUpdateSettings={handleUpdateSettings}
-            onImportData={handleImportData}
-            onClearAllData={handleClearAllData}
-            onRequestNotificationPermission={handleRequestNotificationPermission}
-            onSendTestNotification={handleSendTestNotification}
-            notificationPermission={notificationPermission}
-            onOpenPasscodeModal={(mode) => setPasscodeModalMode(mode)}
-            onDisablePasscode={handleDisablePasscode}
-            onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
-            onShowToast={showToast}
-          />
-        )}
-      </main>
-
-      {/* iOS Native TabBar with Safe Area Padding */}
-      <TabBar
-        activeTab={activeTab}
-        onChangeTab={setActiveTab}
-        onOpenAddExpense={() => {
-          setEditingExpense(null);
-          setIsAddExpenseOpen(true);
-        }}
-        unpaidBillsCount={unpaidBillsCount}
-        soundEnabled={data.settings.soundEnabled}
-        language={data.settings.language}
-      />
-
-      {/* Bottom Sheet for Adding/Editing Expense */}
-      <AddExpenseSheet
-        isOpen={isAddExpenseOpen}
-        onClose={() => {
-          setIsAddExpenseOpen(false);
-          setEditingExpense(null);
-        }}
-        categories={data.categories}
-        currency={data.settings.currency}
-        onSaveExpense={handleSaveExpense}
-        initialExpense={editingExpense}
-        soundEnabled={data.settings.soundEnabled}
-      />
-
-      {/* Category Manager Modal */}
-      <CategoryManagerModal
-        isOpen={isCategoryManagerOpen}
-        onClose={() => setIsCategoryManagerOpen(false)}
-        categories={data.categories}
-        currency={data.settings.currency}
-        onSaveCategory={handleSaveCategory}
-        onDeleteCategory={handleDeleteCategory}
-        soundEnabled={data.settings.soundEnabled}
-        onShowToast={showToast}
-      />
-
-      {/* Passcode Unlock Screen (shown if app is locked) */}
-      <PasscodeLockModal
-        isOpen={isLocked}
-        mode="unlock"
-        onSuccess={() => setIsLocked(false)}
-        isDark={isDarkMode}
-        soundEnabled={data.settings.soundEnabled}
-        isEnglish={isEn}
-      />
-
-      {/* Passcode Set / Change Modal */}
-      {passcodeModalMode && (
-        <PasscodeLockModal
-          isOpen={true}
-          mode={passcodeModalMode}
-          onSuccess={handlePasscodeSuccess}
-          onCancel={() => setPasscodeModalMode(null)}
-          isDark={isDarkMode}
-          soundEnabled={data.settings.soundEnabled}
-          isEnglish={isEn}
-        />
+    <div className="h-[100dvh] w-full flex flex-col bg-[#F2F2F7] dark:bg-black text-[#1C1C1E] dark:text-white pt-safe pb-safe overflow-hidden select-none relative">
+      {/* Privacy Cover for iOS App Switcher Multitasking Snapshot */}
+      {isAppInactive && (
+        <div className="fixed inset-0 z-100 bg-[#F2F2F7] dark:bg-black flex flex-col items-center justify-center p-6 select-none">
+          <div className="w-16 h-16 rounded-2xl bg-blue-600 flex items-center justify-center text-white shadow-xl mb-3">
+            <Lock size={32} />
+          </div>
+          <p className="text-base font-bold text-slate-800 dark:text-white">
+            {isEn ? 'Home Expenses' : 'مصاريف البيت'}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+            {isEn ? 'Secured Offline Tracker' : 'تطبيق الميزانية المشفر محلياً'}
+          </p>
+        </div>
       )}
 
-      {/* Privacy Policy Modal */}
-      <PrivacyPolicyModal
-        isOpen={isPrivacyPolicyOpen}
-        onClose={() => setIsPrivacyPolicyOpen(false)}
-        isEnglish={isEn}
-        soundEnabled={data.settings.soundEnabled}
-      />
+      {/* If locked, render ONLY the lock screen over a plain background (zero content flash) */}
+      {isLocked ? (
+        <div className="flex-1 w-full flex items-center justify-center">
+          <PasscodeLockModal
+            isOpen={true}
+            mode="unlock"
+            onSuccess={() => setIsLocked(false)}
+            isDark={isDarkMode}
+            soundEnabled={data.settings.soundEnabled}
+            isEnglish={isEn}
+          />
+        </div>
+      ) : (
+        <>
+          {/* iOS Dropdown Notification Banner */}
+          <IOSNotificationBanner
+            notification={currentNotification}
+            onDismiss={() => setCurrentNotification(null)}
+            onAction={() => {
+              setCurrentNotification(null);
+              setActiveTab('bills_groceries');
+            }}
+          />
+
+          {/* App-wide Toast Notification */}
+          <Toast
+            message={toastMessage}
+            type={toastType}
+            onClose={() => setToastMessage(null)}
+          />
+
+          {/* App-wide Native-styled Confirmation Modal */}
+          <ConfirmModal
+            isOpen={confirmDialog.isOpen}
+            title={confirmDialog.title}
+            message={confirmDialog.message}
+            confirmText={confirmDialog.confirmText}
+            isDestructive={confirmDialog.isDestructive}
+            onConfirm={confirmDialog.onConfirm}
+            onCancel={() => setConfirmDialog((c) => ({ ...c, isOpen: false }))}
+            isEnglish={isEn}
+          />
+
+          {/* Active Tab View */}
+          <main className="flex-1 w-full flex flex-col overflow-hidden">
+            {activeTab === 'dashboard' && (
+              <DashboardTab
+                categories={data.categories}
+                expenses={data.expenses}
+                bills={data.bills}
+                settings={data.settings}
+                onOpenAddExpense={() => {
+                  setEditingExpense(null);
+                  setIsAddExpenseOpen(true);
+                }}
+                onNavigateToTab={(tab: TabId) => setActiveTab(tab)}
+                onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
+              />
+            )}
+
+            {activeTab === 'expenses' && (
+              <ExpensesTab
+                categories={data.categories}
+                expenses={data.expenses}
+                settings={data.settings}
+                onEditExpense={handleEditExpense}
+                onDeleteExpense={handleDeleteExpense}
+                onOpenAddExpense={() => {
+                  setEditingExpense(null);
+                  setIsAddExpenseOpen(true);
+                }}
+              />
+            )}
+
+            {activeTab === 'budgets' && (
+              <BudgetsTab
+                categories={data.categories}
+                expenses={data.expenses}
+                settings={data.settings}
+                onUpdateSettings={handleUpdateSettings}
+                onUpdateCategoryLimit={handleUpdateCategoryLimit}
+                onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
+              />
+            )}
+
+            {activeTab === 'bills_groceries' && (
+              <BillsAndGroceriesTab
+                bills={data.bills}
+                groceries={data.groceries}
+                categories={data.categories}
+                settings={data.settings}
+                onToggleBill={handleToggleBill}
+                onAddBill={handleAddBill}
+                onDeleteBill={handleDeleteBill}
+                onToggleBillReminder={handleToggleBillReminder}
+                onToggleGrocery={handleToggleGrocery}
+                onAddGrocery={handleAddGrocery}
+                onDeleteGrocery={handleDeleteGrocery}
+                onConvertBoughtToExpense={handleConvertBoughtToExpense}
+                onRequestNotificationPermission={handleRequestNotificationPermission}
+                onSendTestNotification={handleSendTestNotification}
+                notificationPermission={notificationPermission}
+                onUpdateSettings={handleUpdateSettings}
+              />
+            )}
+
+            {activeTab === 'analytics_settings' && (
+              <AnalyticsSettingsTab
+                categories={data.categories}
+                expenses={data.expenses}
+                settings={data.settings}
+                fullData={data}
+                onUpdateSettings={handleUpdateSettings}
+                onImportData={handleImportData}
+                onClearAllData={handleClearAllData}
+                onRequestNotificationPermission={handleRequestNotificationPermission}
+                onSendTestNotification={handleSendTestNotification}
+                notificationPermission={notificationPermission}
+                onOpenPasscodeModal={(mode) => setPasscodeModalMode(mode)}
+                onDisablePasscode={handleDisablePasscode}
+                onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
+                onShowToast={showToast}
+              />
+            )}
+          </main>
+
+          {/* iOS Native TabBar with Safe Area Padding */}
+          <TabBar
+            activeTab={activeTab}
+            onChangeTab={setActiveTab}
+            onOpenAddExpense={() => {
+              setEditingExpense(null);
+              setIsAddExpenseOpen(true);
+            }}
+            unpaidBillsCount={unpaidBillsCount}
+            soundEnabled={data.settings.soundEnabled}
+            language={data.settings.language}
+          />
+
+          {/* Bottom Sheet for Adding/Editing Expense */}
+          <AddExpenseSheet
+            isOpen={isAddExpenseOpen}
+            onClose={() => {
+              setIsAddExpenseOpen(false);
+              setEditingExpense(null);
+            }}
+            categories={data.categories}
+            currency={data.settings.currency}
+            onSaveExpense={handleSaveExpense}
+            initialExpense={editingExpense}
+            soundEnabled={data.settings.soundEnabled}
+          />
+
+          {/* Category Manager Modal */}
+          <CategoryManagerModal
+            isOpen={isCategoryManagerOpen}
+            onClose={() => setIsCategoryManagerOpen(false)}
+            categories={data.categories}
+            currency={data.settings.currency}
+            onSaveCategory={handleSaveCategory}
+            onDeleteCategory={handleDeleteCategory}
+            soundEnabled={data.settings.soundEnabled}
+            onShowToast={showToast}
+          />
+
+          {/* Passcode Set / Change Modal */}
+          {passcodeModalMode && (
+            <PasscodeLockModal
+              isOpen={true}
+              mode={passcodeModalMode}
+              onSuccess={handlePasscodeSuccess}
+              onCancel={() => setPasscodeModalMode(null)}
+              isDark={isDarkMode}
+              soundEnabled={data.settings.soundEnabled}
+              isEnglish={isEn}
+            />
+          )}
+
+          {/* Privacy Policy Modal */}
+          <PrivacyPolicyModal
+            isOpen={isPrivacyPolicyOpen}
+            onClose={() => setIsPrivacyPolicyOpen(false)}
+            isEnglish={isEn}
+            soundEnabled={data.settings.soundEnabled}
+          />
+        </>
+      )}
     </div>
   );
 }

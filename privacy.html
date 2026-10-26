@@ -100,7 +100,7 @@
       <p>آخر تحديث: 2026</p>
 
       <h2>1. المبدأ الأساسي: الخصوصية المطلقة</h2>
-      <p>تطبيق <strong>مصاريف البيت (Home Expenses)</strong> مصمم ليعمل كأداة مالية شخصية وعائلية مستقلة تماماً بدون خوادم، بدون حسابات مستخدمين، وبدون أي نوع من أنواع التتبع أو الإعلانات.</p>
+      <p>تطبيق <strong>مصاريف البيت (Home Expenses)</strong> مصمم ليعمل كأداة مالية شخصية وعائلية مستقلة تماماً بدون خوادم، بدون حسابات مستخدمين، وبدون أي نوع من أنواع التتبع أو الإعلانات أو التحليلات.</p>
 
       <h2>2. تخزين البيانات والعمل دون إنترنت</h2>
       <p>كافة البيانات التي تقوم بإدخالها (المصاريف، الفواتير، أسماء وتصنيفات السلع، الميزانيات، والعملات):</p>
@@ -110,11 +110,12 @@
         <li>التطبيق يعمل بنسبة 100% دون الحاجة إلى أي اتصال بشبكة الإنترنت.</li>
       </ul>
 
-      <h2>3. القياسات الحيوية ورمز الدخول (Face ID / Passcode)</h2>
+      <h2>3. القياسات الحيوية وسلسلة المفاتيح (Face ID / Apple Keychain)</h2>
       <p>عند تفعيل رمز الدخول أو بصمة الوجه (Face ID / Touch ID):</p>
       <ul>
         <li>تتم مصادقة بصمة الوجه كلياً عبر نظام iOS المدمج (LocalAuthentication Framework). التطبيق لا يستلم ولا يخزن أي صورة أو بيانات بيومترية.</li>
-        <li>رمز الدخول يتم تشفيره وحفظه بصيغة مشفرة غير قابلة للاسترجاع (Salted SHA-256 Hash).</li>
+        <li>رمز الدخول يتم حفظه كقيمة مجزأة ومملحة (Salted SHA-256 Hash) داخل سلسلة مفاتيح أبل الآمنة (iOS Keychain Services عبر SecureStorage)، ولا يُحفظ كنص عادي نهائياً.</li>
+        <li>عداد المحاولات الفاشلة وفترات القفل التدريجي تُدار أيضاً داخل سلسلة المفاتيح الآمنة لمنع التخمين العشوائي.</li>
       </ul>
 
       <h2>4. الإشعارات والتنبيهات المحلية</h2>
@@ -123,8 +124,8 @@
       <h2>5. تصدير ومشاركة البيانات</h2>
       <p>أنت وحدك المالك الوحيد لبياناتك. يتيح لك التطبيق تصدير بياناتك كملف JSON للنسخ الاحتياطي أو ملف CSV لجداول البيانات، ويتم نقلها مباشرة عبر قائمة المشاركة الرسمية بنظام iOS (Share Sheet) وفق اختيارك فقط.</p>
 
-      <h2>6. التواصل مع المطور</h2>
-      <p>إذا كان لديك أي استفسار حول سياسة الخصوصية، يمكنك التواصل عبر المستودع الرسمي للتطبيق.</p>
+      <h2>6. الدعم الفني والتواصل مع المطور</h2>
+      <p>إذا كان لديك أي استفسار أو طلب دعم فني حول التطبيق وسياسة الخصوصية، يمكنك التواصل معنا مباشرة عبر البريد الإلكتروني: <a href="mailto:support@example.com" style="color:var(--accent); font-weight:bold;">support@example.com</a>.</p>
 
       <div class="divider"></div>
 
@@ -134,7 +135,7 @@
         <p>Last updated: 2026</p>
 
         <h2>1. Core Principle: Zero Data Collection</h2>
-        <p><strong>Home Expenses</strong> is built as a private, offline-first personal household finance and budget tracker. There are no user accounts, no analytics SDKs, no tracking pixels, and no third-party advertisements.</p>
+        <p><strong>Home Expenses</strong> is built as a private, offline-first personal household finance and budget tracker. There are no user accounts, no backend servers, no analytics SDKs, no tracking pixels, and no third-party advertisements.</p>
 
         <h2>2. On-Device Local Storage</h2>
         <p>All data you enter into the application (expenses, bills, categories, budget limits, grocery lists, and preferences):</p>
@@ -144,11 +145,12 @@
           <li>Functions 100% offline without requiring cellular data or Wi-Fi.</li>
         </ul>
 
-        <h2>3. Biometrics & Passcode Security (Face ID / Touch ID)</h2>
+        <h2>3. Biometrics & Keychain Security (Face ID / Apple Keychain)</h2>
         <p>When you enable passcode or biometric protection:</p>
         <ul>
-          <li>Face ID / Touch ID authentication is handled directly by Apple's secure iOS LocalAuthentication framework. The app never accesses your biometric data.</li>
-          <li>Passcodes are protected on-device using cryptographic salted SHA-256 hashing.</li>
+          <li>Face ID / Touch ID authentication is handled directly by Apple's secure iOS LocalAuthentication framework. The app never accesses or stores your biometric data.</li>
+          <li>Passcodes are protected using cryptographic salted SHA-256 hashes stored directly in the hardware-backed iOS Keychain (Apple Keychain Services via SecureStorage). Raw PINs are never stored.</li>
+          <li>Failed attempt counters and escalating lockout timers are secured within Keychain to prevent brute-force attacks.</li>
         </ul>
 
         <h2>4. Local On-Device Notifications</h2>
@@ -156,6 +158,9 @@
 
         <h2>5. Data Export & Ownership</h2>
         <p>You have full ownership of your data. You can back up or export your data at any time via CSV or JSON using the native Apple Share Sheet.</p>
+
+        <h2>6. Support & Inquiries</h2>
+        <p>For any questions or support regarding this Privacy Policy and the Home Expenses app, please contact us at: <a href="mailto:support@example.com" style="color:var(--accent); font-weight:bold;">support@example.com</a>.</p>
       </div>
     </div>
   </div>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { X, ShieldCheck, CheckCircle2, Lock, Smartphone } from 'lucide-react';
+import { X, ShieldCheck, CheckCircle2, Lock, Smartphone, Mail } from 'lucide-react';
 import { nativeHaptics } from '../utils/nativeHaptics';
 
 interface PrivacyPolicyModalProps {
@@ -47,8 +47,8 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
           {isEnglish ? (
             <>
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300">
-                <span className="font-bold block mb-1">100% Offline & On-Device Storage</span>
-                Home Expenses is designed with complete privacy at its core. We do not operate any backend servers, analytics, or tracking services.
+                <span className="font-bold block mb-1">100% Offline & Zero Data Collection</span>
+                Home Expenses is designed with complete privacy at its core. We do not operate any backend servers, accounts, analytics SDKs, or tracking services.
               </div>
 
               <div>
@@ -57,35 +57,40 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
                   1. Zero Data Collection
                 </h3>
                 <p>
-                  We do not collect, transmit, share, or sell any personal or financial information. All expense records, category amounts, grocery lists, and budget limits are stored locally on your device via secure Apple Capacitor Preferences (iOS NSUserDefaults).
+                  We do not collect, transmit, share, or sell any personal or financial information. All expense records, category limits, grocery lists, and budget limits are stored locally on your device via secure Apple Preferences (iOS UserDefaults).
                 </p>
               </div>
 
               <div>
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1.5 flex items-center gap-1.5">
                   <Lock size={16} className="text-blue-500" />
-                  2. Local Permissions Usage
+                  2. Biometrics & Apple Keychain Security
                 </h3>
                 <p>
-                  <strong>Notifications:</strong> Used strictly to schedule local, on-device alerts for your upcoming bills and daily reminders. No remote push notifications or external servers are involved.
+                  Face ID / Touch ID verification runs entirely through Apple's LocalAuthentication framework. Your passcode is hashed with a cryptographic salt (SHA-256) and saved directly into the secure hardware iOS Keychain (Apple Keychain Services). Failed attempt counters and escalating lockout rules are also secured inside the Keychain.
                 </p>
               </div>
 
               <div>
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1.5 flex items-center gap-1.5">
                   <Smartphone size={16} className="text-purple-500" />
-                  3. Data Ownership & Backup
+                  3. Local On-Device Notifications
                 </h3>
                 <p>
-                  You have full ownership of your data. You can export a full JSON backup or an Excel CSV report anytime, or erase all data permanently with a single tap.
+                  Notifications are scheduled strictly on your device via the Apple Local Notification framework for upcoming bills and daily reminders. No remote notification server is used.
                 </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                <Mail size={14} className="text-blue-500" />
+                <span>Support & Contact: <strong className="text-slate-800 dark:text-slate-200">support@example.com</strong></span>
               </div>
             </>
           ) : (
             <>
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300">
                 <span className="font-bold block mb-1">خصوصية تامة وتخزين محلي 100% على جهازك</span>
-                تطبيق «مصاريف البيت» صُمم بمبدأ حماية الخصوصية المطلقة. لا نستخدم أي خوادم خارجية، ولا نتتبع أي نشاط أو نجمع أي بيانات شخصية أو مالية.
+                تطبيق «مصاريف البيت» صُمم بمبدأ حماية الخصوصية المطلقة. لا نستخدم أي خوادم خارجية، ولا نتتبع أي نشاط أو نجمع أي بيانات شخصية أو مالية أو تحليلات.
               </div>
 
               <div>
@@ -94,28 +99,33 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
                   1. عدم جمع أي بيانات نهائياً
                 </h3>
                 <p>
-                  لا يتم جمع أو تخزين أو بيع أي بيانات متعلقة بدخلك أو مصاريفك أو فواتيرك. جميع البيانات تُحفظ محلياً داخل نظام جهازك عبر التخزين الآمن Capacitor Preferences (iOS NSUserDefaults) ولا تغادر هاتفك.
+                  لا يتم جمع أو تخزين أو بيع أي بيانات متعلقة بدخلك أو مصاريفك أو فواتيرك. جميع البيانات تُحفظ محلياً داخل نظام جهازك عبر التخزين الآمن Capacitor Preferences (iOS UserDefaults) ولا تغادر هاتفك.
                 </p>
               </div>
 
               <div>
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1.5 flex items-center gap-1.5">
                   <Lock size={16} className="text-blue-500" />
-                  2. صلاحيات التنبيهات المحلية
+                  2. بصمة الوجه وسلسلة مفاتيح أبل (iOS Keychain)
                 </h3>
                 <p>
-                  صلاحية الإشعارات تُستخدم حصراً لجدولة التنبيهات والتذكيرات المحلية على هاتفك مباشرة لمواعيد الفواتير الدورية والتذكير اليومي، دون أي اتصال بخوادم خارجية.
+                  مصادقة Face ID / Touch ID تتم بالكامل عبر إطار العمل المدمج لنظام iOS. رمز الدخول السري يُحفظ كقيمة مجزأة ومملحة (Salted SHA-256 Hash) داخل سلسلة مفاتيح أبل المشفرة (iOS Keychain Services). كما تُدار محاولات الدخول الخاطئة وفترات القفل التدريجي بداخلها.
                 </p>
               </div>
 
               <div>
                 <h3 className="font-bold text-sm text-slate-900 dark:text-white mb-1.5 flex items-center gap-1.5">
                   <Smartphone size={16} className="text-purple-500" />
-                  3. ملكية البيانات والنسخ الاحتياطي
+                  3. التنبيهات المحلية دون خوادم
                 </h3>
                 <p>
-                  أنت المالك الوحيد لبياناتك. يمكنك في أي وقت تصدير نسخة احتياطية كاملة بصيغة JSON أو تقرير Excel CSV عبر قائمة المشاركة في نظام iOS، أو حذف كافة البيانات بنقرة واحدة.
+                  صلاحية الإشعارات تُستخدم حصراً لجدولة التنبيهات والتذكيرات المحلية على هاتفك مباشرة لمواعيد الفواتير الدورية والتذكير اليومي، دون أي اتصال بخوادم خارجية.
                 </p>
+              </div>
+
+              <div className="pt-2 border-t border-slate-200 dark:border-slate-800 flex items-center gap-2 text-slate-500 dark:text-slate-400">
+                <Mail size={14} className="text-blue-500" />
+                <span>الدعم الفني والتواصل: <strong className="text-slate-800 dark:text-slate-200">support@example.com</strong></span>
               </div>
             </>
           )}

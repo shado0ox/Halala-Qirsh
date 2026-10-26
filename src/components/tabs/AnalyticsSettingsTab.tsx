@@ -37,6 +37,7 @@ import {
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { NotificationPermissionState } from '../../utils/notifications';
 import { translations } from '../../utils/i18n';
+import { startSystemFlow, endSystemFlow } from '../../utils/systemFlow';
 
 interface AnalyticsSettingsTabProps {
   categories: Category[];
@@ -120,26 +121,30 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+    try {
+      const file = e.target.files?.[0];
+      if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      try {
-        const parsed = JSON.parse(event.target?.result as string);
-        if (validateBackupData(parsed)) {
-          nativeHaptics.success(settings.soundEnabled);
-          onImportData(parsed);
-          onShowToast?.(isEn ? 'Backup restored successfully' : 'تم استعادة النسخة الاحتياطية بنجاح', 'success');
-        } else {
-          onShowToast?.(isEn ? 'Invalid backup file format' : 'ملف النسخة الاحتياطية غير صالح', 'error');
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        try {
+          const parsed = JSON.parse(event.target?.result as string);
+          if (validateBackupData(parsed)) {
+            nativeHaptics.success(settings.soundEnabled);
+            onImportData(parsed);
+            onShowToast?.(isEn ? 'Backup restored successfully' : 'تم استعادة النسخة الاحتياطية بنجاح', 'success');
+          } else {
+            onShowToast?.(isEn ? 'Invalid backup file format' : 'ملف النسخة الاحتياطية غير صالح', 'error');
+          }
+        } catch {
+          onShowToast?.(isEn ? 'Error reading backup file' : 'حدث خطأ أثناء قراءة الملف', 'error');
         }
-      } catch {
-        onShowToast?.(isEn ? 'Error reading backup file' : 'حدث خطأ أثناء قراءة الملف', 'error');
-      }
-    };
-    reader.readAsText(file);
-    e.target.value = '';
+      };
+      reader.readAsText(file);
+      e.target.value = '';
+    } finally {
+      endSystemFlow();
+    }
   };
 
   return (
@@ -386,6 +391,27 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
               </>
             )}
           </div>
+
+          {settings.isPasscodeEnabled && (
+            <div className="pt-2 border-t border-[#E5E5EA] dark:border-[#3A3A3C] flex items-center justify-between text-xs">
+              <span className="text-[#8E8E93] text-[11px] font-semibold">
+                {isEn ? 'Lock App After:' : 'إعادة القفل بعد:'}
+              </span>
+              <select
+                value={settings.autoLockTimeout ?? 30}
+                onChange={(e) => {
+                  nativeHaptics.tap(settings.soundEnabled);
+                  onUpdateSettings({ autoLockTimeout: parseInt(e.target.value, 10) });
+                }}
+                className="px-2 py-1 bg-white dark:bg-[#1C1C1E] border border-slate-300 dark:border-slate-700 rounded-lg text-xs font-bold text-slate-800 dark:text-slate-100"
+              >
+                <option value={0}>{isEn ? 'Immediately' : 'فوراً'}</option>
+                <option value={30}>{isEn ? '30 seconds' : '30 ثانية'}</option>
+                <option value={60}>{isEn ? '1 minute' : 'دقيقة واحدة'}</option>
+                <option value={300}>{isEn ? '5 minutes' : '5 دقائق'}</option>
+              </select>
+            </div>
+          )}
         </div>
 
         {/* Daily Expense Logging Reminder */}
@@ -615,6 +641,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           <button
             onClick={() => {
               nativeHaptics.tap(settings.soundEnabled);
+              startSystemFlow();
               fileInputRef.current?.click();
             }}
             className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-800 dark:text-slate-100 border border-slate-200/60 dark:border-slate-800 flex flex-col items-center justify-center gap-1.5 hover:bg-slate-200/60 transition-colors cursor-pointer text-xs font-bold"

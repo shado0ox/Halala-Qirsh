@@ -61,6 +61,7 @@ export interface BudgetSettings {
   language: 'ar' | 'en';
   isPasscodeEnabled: boolean;
   biometricsEnabled: boolean;
+  autoLockTimeout?: number; // 0 (Immediately), 30 (30s default), 60 (1m), 300 (5m)
   lastNotificationCheckDate?: string;
 }
 

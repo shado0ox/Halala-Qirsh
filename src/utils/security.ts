@@ -1,10 +1,12 @@
 import { BiometricAuth } from '@aparajita/capacitor-biometric-auth';
+import { SecureStoragePlugin } from 'capacitor-secure-storage-plugin';
 import { Preferences } from '@capacitor/preferences';
+import { withSystemFlow } from './systemFlow';
 
-const SECURE_PASSCODE_KEY = 'home_expenses_passcode_hash';
-const SECURE_SALT_KEY = 'home_expenses_passcode_salt';
-const LOCKOUT_KEY = 'home_expenses_lockout_until';
-const FAILED_ATTEMPTS_KEY = 'home_expenses_failed_attempts';
+const SECURE_PASSCODE_KEY = 'auth_passcode_hash';
+const SECURE_SALT_KEY = 'auth_passcode_salt';
+const LOCKOUT_KEY = 'auth_lockout_until';
+const FAILED_ATTEMPTS_KEY = 'auth_failed_attempts';
 
 export interface BiometryStatus {
   isAvailable: boolean;
@@ -12,11 +14,78 @@ export interface BiometryStatus {
 }
 
 export class SecurityService {
-  private static isNative(): boolean {
-    return (
-      typeof window !== 'undefined' &&
-      !!(window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor?.isNativePlatform?.()
-    );
+  /**
+   * Helper to retrieve a key from iOS Keychain (SecureStoragePlugin)
+   * with fallback to Preferences if not found or in development mode.
+   */
+  private static async getSecure(key: string): Promise<string | null> {
+    try {
+      const res = await SecureStoragePlugin.get({ key });
+      return res?.value ?? null;
+    } catch {
+      try {
+        const { value } = await Preferences.get({ key });
+        return value ?? null;
+      } catch {
+        return null;
+      }
+    }
+  }
+
+  /**
+   * Helper to set a key securely in iOS Keychain with fallback to Preferences.
+   */
+  private static async setSecure(key: string, value: string): Promise<void> {
+    try {
+      await SecureStoragePlugin.set({ key, value });
+    } catch {
+      try {
+        await Preferences.set({ key, value });
+      } catch {
+        // ignore
+      }
+    }
+  }
+
+  /**
+   * Helper to remove a key securely from Keychain and Preferences.
+   */
+  private static async removeSecure(key: string): Promise<void> {
+    try {
+      await SecureStoragePlugin.remove({ key });
+    } catch {
+      // ignore
+    }
+    try {
+      await Preferences.remove({ key });
+    } catch {
+      // ignore
+    }
+  }
+
+  /**
+   * Automatic migration of any credentials previously stored in plain Preferences
+   * into the native iOS Keychain.
+   */
+  static async migrateIfNeeded(): Promise<void> {
+    try {
+      const legacyKeys = [
+        'home_expenses_passcode_hash',
+        'home_expenses_passcode_salt',
+        'home_expenses_failed_attempts',
+        'home_expenses_lockout_until',
+      ];
+      for (const oldKey of legacyKeys) {
+        const { value } = await Preferences.get({ key: oldKey });
+        if (value) {
+          const newKey = oldKey.replace('home_expenses_', 'auth_');
+          await this.setSecure(newKey, value);
+          await Preferences.remove({ key: oldKey });
+        }
+      }
+    } catch (e) {
+      console.warn('Keychain migration warning:', e);
+    }
   }
 
   /**
@@ -35,21 +104,28 @@ export class SecurityService {
   }
 
   /**
-   * Prompt real native Face ID / Touch ID authentication
+   * Prompt real native Face ID / Touch ID authentication.
+   * Tracks system flow so the app does not lock upon dismissal of system UI.
+   * Accepts localized cancelTitle.
    */
-  static async authenticateBiometric(reason: string = 'Unlock Home Expenses'): Promise<boolean> {
-    try {
-      await BiometricAuth.authenticate({
-        reason,
-        cancelTitle: 'Cancel',
-        allowDeviceCredential: true,
-      });
-      this.resetFailedAttempts();
-      return true;
-    } catch (err) {
-      console.warn('Biometric authentication cancelled or failed:', err);
-      return false;
-    }
+  static async authenticateBiometric(
+    reason: string = 'Unlock Home Expenses',
+    cancelTitle: string = 'Cancel'
+  ): Promise<boolean> {
+    return withSystemFlow(async () => {
+      try {
+        await BiometricAuth.authenticate({
+          reason,
+          cancelTitle,
+          allowDeviceCredential: true,
+        });
+        await this.resetFailedAttempts();
+        return true;
+      } catch (err) {
+        console.warn('Biometric authentication cancelled or failed:', err);
+        return false;
+      }
+    });
   }
 
   /**
@@ -66,39 +142,40 @@ export class SecurityService {
    */
   private static async hashPin(pin: string, salt: string): Promise<string> {
     const encoder = new TextEncoder();
-    const data = encoder.encode(salt + pin + 'home_expenses_secure_app');
+    const data = encoder.encode(salt + pin + 'home_expenses_secure_app_v2');
     const hashBuffer = await crypto.subtle.digest('SHA-256', data);
     const hashArray = Array.from(new Uint8Array(hashBuffer));
     return hashArray.map((b) => b.toString(16).padStart(2, '0')).join('');
   }
 
   /**
-   * Save a new 4-digit passcode securely (salted SHA-256)
+   * Save a new 4-digit passcode securely in Keychain (salted SHA-256)
    */
   static async setPasscode(pin: string): Promise<void> {
     const salt = this.generateSalt();
     const hash = await this.hashPin(pin, salt);
 
-    await Preferences.set({ key: SECURE_SALT_KEY, value: salt });
-    await Preferences.set({ key: SECURE_PASSCODE_KEY, value: hash });
+    await this.setSecure(SECURE_SALT_KEY, salt);
+    await this.setSecure(SECURE_PASSCODE_KEY, hash);
     await this.resetFailedAttempts();
   }
 
   /**
-   * Remove stored passcode
+   * Remove stored passcode from Keychain
    */
   static async removePasscode(): Promise<void> {
-    await Preferences.remove({ key: SECURE_PASSCODE_KEY });
-    await Preferences.remove({ key: SECURE_SALT_KEY });
+    await this.removeSecure(SECURE_PASSCODE_KEY);
+    await this.removeSecure(SECURE_SALT_KEY);
     await this.resetFailedAttempts();
   }
 
   /**
-   * Verify an entered PIN against stored salted hash
+   * Verify an entered PIN against stored salted hash in Keychain
    */
   static async verifyPasscode(enteredPin: string): Promise<boolean> {
-    const { value: storedHash } = await Preferences.get({ key: SECURE_PASSCODE_KEY });
-    const { value: salt } = await Preferences.get({ key: SECURE_SALT_KEY });
+    await this.migrateIfNeeded();
+    const storedHash = await this.getSecure(SECURE_PASSCODE_KEY);
+    const salt = await this.getSecure(SECURE_SALT_KEY);
 
     if (!storedHash || !salt) {
       return false;
@@ -120,35 +197,46 @@ export class SecurityService {
    * Check if app is locked out due to >= 5 failed attempts
    */
   static async getLockoutRemainingSeconds(): Promise<number> {
-    const { value: lockoutUntil } = await Preferences.get({ key: LOCKOUT_KEY });
+    await this.migrateIfNeeded();
+    const lockoutUntil = await this.getSecure(LOCKOUT_KEY);
     if (!lockoutUntil) return 0;
 
     const remaining = Math.ceil((parseInt(lockoutUntil, 10) - Date.now()) / 1000);
     if (remaining <= 0) {
-      await Preferences.remove({ key: LOCKOUT_KEY });
+      await this.removeSecure(LOCKOUT_KEY);
       return 0;
     }
     return remaining;
   }
 
+  /**
+   * Escalating lockout:
+   * 5 failed attempts: 30 seconds
+   * 6 failed attempts: 60 seconds (1 minute)
+   * 7 failed attempts: 300 seconds (5 minutes)
+   * 8+ failed attempts: 900 seconds (15 minutes)
+   */
   static async recordFailedAttempt(): Promise<number> {
-    const { value } = await Preferences.get({ key: FAILED_ATTEMPTS_KEY });
+    const value = await this.getSecure(FAILED_ATTEMPTS_KEY);
     const attempts = (parseInt(value || '0', 10) || 0) + 1;
-    await Preferences.set({ key: FAILED_ATTEMPTS_KEY, value: String(attempts) });
+    await this.setSecure(FAILED_ATTEMPTS_KEY, String(attempts));
 
     if (attempts >= 5) {
-      // 30 seconds lockout for 5 attempts, doubling after that
-      const lockoutSeconds = attempts === 5 ? 30 : 60;
+      let lockoutSeconds = 30; // 5 attempts = 30s
+      if (attempts === 6) lockoutSeconds = 60; // 6 attempts = 1m
+      else if (attempts === 7) lockoutSeconds = 300; // 7 attempts = 5m
+      else if (attempts >= 8) lockoutSeconds = 900; // 8+ attempts = 15m
+
       const lockoutUntil = Date.now() + lockoutSeconds * 1000;
-      await Preferences.set({ key: LOCKOUT_KEY, value: String(lockoutUntil) });
+      await this.setSecure(LOCKOUT_KEY, String(lockoutUntil));
     }
 
     return attempts;
   }
 
   static async resetFailedAttempts(): Promise<void> {
-    await Preferences.remove({ key: FAILED_ATTEMPTS_KEY });
-    await Preferences.remove({ key: LOCKOUT_KEY });
+    await this.removeSecure(FAILED_ATTEMPTS_KEY);
+    await this.removeSecure(LOCKOUT_KEY);
   }
 
   /**
@@ -156,13 +244,14 @@ export class SecurityService {
    */
   static async migratePlainPasscode(rawPin: string): Promise<void> {
     if (rawPin && rawPin.length === 4) {
-      console.log('Migrating plain-text passcode to salted secure hash...');
+      console.log('Migrating plain-text passcode to salted Keychain hash...');
       await this.setPasscode(rawPin);
     }
   }
 
   static async hasPasscode(): Promise<boolean> {
-    const { value } = await Preferences.get({ key: SECURE_PASSCODE_KEY });
-    return Boolean(value);
+    await this.migrateIfNeeded();
+    const hash = await this.getSecure(SECURE_PASSCODE_KEY);
+    return Boolean(hash);
   }
 }

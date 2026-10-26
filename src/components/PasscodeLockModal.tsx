@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { motion } from 'motion/react';
 import { Lock, Delete, ScanFace, Fingerprint, AlertCircle } from 'lucide-react';
 import { nativeHaptics } from '../utils/nativeHaptics';
@@ -30,6 +30,20 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
   const [biometry, setBiometry] = useState<BiometryStatus>({ isAvailable: false, biometryType: 'none' });
   const [lockoutSeconds, setLockoutSeconds] = useState<number>(0);
   const [isVerifying, setIsVerifying] = useState<boolean>(false);
+
+  // Tracks if the automatic biometric prompt has already run for this presentation
+  const hasAutoPromptedRef = useRef<boolean>(false);
+
+  // Reset auto-prompt flag whenever modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      hasAutoPromptedRef.current = false;
+      setEnteredPin('');
+      setFirstEnteredPin('');
+      setIsConfirming(false);
+      setErrorMessage('');
+    }
+  }, [isOpen]);
 
   // Check biometric availability and existing lockout on modal mount
   useEffect(() => {
@@ -63,7 +77,8 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
     setIsVerifying(true);
     nativeHaptics.tap(soundEnabled);
     const reason = isEnglish ? 'Authenticate to unlock Home Expenses' : 'المصادقة لفتح تطبيق مصاريف البيت';
-    const success = await SecurityService.authenticateBiometric(reason);
+    const cancelTitle = isEnglish ? 'Cancel' : 'إلغاء';
+    const success = await SecurityService.authenticateBiometric(reason, cancelTitle);
     setIsVerifying(false);
 
     if (success) {
@@ -73,9 +88,16 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
     }
   }, [lockoutSeconds, isVerifying, soundEnabled, isEnglish, onSuccess]);
 
-  // Auto-prompt biometric once when unlock screen opens if available
+  // Auto-prompt biometric ONCE per time the lock screen appears
   useEffect(() => {
-    if (isOpen && mode === 'unlock' && biometry.isAvailable && lockoutSeconds === 0) {
+    if (
+      isOpen &&
+      mode === 'unlock' &&
+      biometry.isAvailable &&
+      lockoutSeconds === 0 &&
+      !hasAutoPromptedRef.current
+    ) {
+      hasAutoPromptedRef.current = true;
       handleRealBiometricAuth();
     }
   }, [isOpen, mode, biometry.isAvailable, lockoutSeconds, handleRealBiometricAuth]);

@@ -2,6 +2,48 @@ import { LocalNotifications } from '@capacitor/local-notifications';
 import { RecurringBill, BudgetSettings, InAppNotification } from '../types';
 import { formatMoney } from './storage';
 import { triggerBrowserNotification, isNotificationSupported } from './notifications';
+import { withSystemFlow } from './systemFlow';
+
+/**
+ * Clamps a day-of-month to the actual number of days in the specified year and month.
+ * Handles leap years for February (29 days) and 30-day months.
+ * monthIndex is 0-indexed (0 = Jan, 1 = Feb, etc.)
+ */
+export function clampDayToMonth(year: number, monthIndex: number, day: number): number {
+  const daysInMonth = new Date(year, monthIndex + 1, 0).getDate();
+  return Math.min(Math.max(1, Math.floor(day)), daysInMonth);
+}
+
+/**
+ * Computes upcoming future bill trigger dates for the candidate month and next months.
+ * Guarantees `count` upcoming future triggers (default 3 cycles).
+ */
+export function computeUpcomingBillTriggers(
+  dueDay: number,
+  leadDays: number,
+  now: Date = new Date(),
+  count: number = 3
+): { dueDate: Date; triggerDate: Date; clampedDay: number }[] {
+  const results: { dueDate: Date; triggerDate: Date; clampedDay: number }[] = [];
+  let monthOffset = 0;
+
+  while (results.length < count && monthOffset < 12) {
+    const candidateMonthDate = new Date(now.getFullYear(), now.getMonth() + monthOffset, 1);
+    const y = candidateMonthDate.getFullYear();
+    const m = candidateMonthDate.getMonth();
+    const clamped = clampDayToMonth(y, m, dueDay);
+
+    const dueDate = new Date(y, m, clamped, 9, 0, 0);
+    const triggerDate = new Date(dueDate.getTime() - Math.max(0, leadDays) * 86400000);
+
+    if (triggerDate.getTime() > now.getTime()) {
+      results.push({ dueDate, triggerDate, clampedDay: clamped });
+    }
+    monthOffset++;
+  }
+
+  return results;
+}
 
 export class NativeNotificationService {
   private static isNative(): boolean {
@@ -12,36 +54,42 @@ export class NativeNotificationService {
   }
 
   /**
-   * Deterministic 32-bit positive integer ID for local notifications
+   * Deterministic ID for bill notifications.
+   * IDs reside in range 100,000 to 790,000 to prevent collisions with:
+   * - 88888 (test notification)
+   * - 99999 (daily reminder)
    */
-  static getDeterministicId(prefix: string, key: string): number {
+  static getDeterministicId(billId: string, cycleIndex: number = 0): number {
     let hash = 0;
-    const str = `${prefix}_${key}`;
+    const str = `bill_${billId}`;
     for (let i = 0; i < str.length; i++) {
       hash = (hash << 5) - hash + str.charCodeAt(i);
       hash |= 0;
     }
-    return Math.abs(hash % 900000) + 10000;
+    const base = 100000 + (Math.abs(hash) % 680000);
+    return base + (cycleIndex % 10) * 10;
   }
 
   static async requestPermissions(): Promise<boolean> {
-    if (this.isNative()) {
-      try {
-        const result = await LocalNotifications.requestPermissions();
-        return result.display === 'granted';
-      } catch (e) {
-        console.error('Capacitor LocalNotifications permission error:', e);
-        return false;
+    return withSystemFlow(async () => {
+      if (this.isNative()) {
+        try {
+          const result = await LocalNotifications.requestPermissions();
+          return result.display === 'granted';
+        } catch (e) {
+          console.error('Capacitor LocalNotifications permission error:', e);
+          return false;
+        }
+      } else if (isNotificationSupported()) {
+        try {
+          const res = await Notification.requestPermission();
+          return res === 'granted';
+        } catch {
+          return false;
+        }
       }
-    } else if (isNotificationSupported()) {
-      try {
-        const res = await Notification.requestPermission();
-        return res === 'granted';
-      } catch {
-        return false;
-      }
-    }
-    return false;
+      return false;
+    });
   }
 
   static async checkPermissions(): Promise<'granted' | 'denied' | 'prompt'> {
@@ -114,30 +162,33 @@ export class NativeNotificationService {
   }
 
   /**
-   * Cancels a scheduled notification for a specific recurring bill (e.g. when paid or deleted)
+   * Cancels scheduled notifications for a specific recurring bill across all cycle offsets
    */
   static async cancelBillNotification(billId: string): Promise<void> {
     if (this.isNative()) {
       try {
-        const notifId = this.getDeterministicId('bill', billId);
-        await LocalNotifications.cancel({ notifications: [{ id: notifId }] });
+        const idsToCancel = [0, 1, 2].map((idx) => ({
+          id: this.getDeterministicId(billId, idx),
+        }));
+        await LocalNotifications.cancel({ notifications: idsToCancel });
       } catch (err) {
-        console.warn('Failed to cancel bill notification:', err);
+        console.warn('Failed to cancel bill notifications:', err);
       }
     }
   }
 
   /**
-   * Schedule bill notifications deterministically at 9:00 AM on due day minus lead days.
-   * Also returns active in-app notifications for due bills.
+   * Evaluates due bills and returns in-app banner notifications with clamped dates
    */
-  static async scheduleBillReminders(
+  static evaluateInAppReminders(
     bills: RecurringBill[],
-    settings: BudgetSettings
-  ): Promise<InAppNotification[]> {
+    settings: BudgetSettings,
+    now: Date = new Date()
+  ): InAppNotification[] {
     if (!settings.notificationsEnabled) return [];
 
-    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth();
     const currentDay = now.getDate();
     const leadDays = settings.notificationLeadDays ?? 1;
     const inAppNotifications: InAppNotification[] = [];
@@ -145,7 +196,8 @@ export class NativeNotificationService {
     const dueBills = bills.filter((b) => !b.isPaid && b.reminderEnabled !== false);
 
     for (const bill of dueBills) {
-      const diff = bill.dueDay - currentDay;
+      const effectiveDueDay = clampDayToMonth(currentYear, currentMonth, bill.dueDay);
+      const diff = effectiveDueDay - currentDay;
       let isDueSoon = false;
       let timingLabel = '';
 
@@ -160,53 +212,91 @@ export class NativeNotificationService {
         timingLabel = settings.language === 'en' ? `in ${diff} days` : `خلال ${diff} أيام`;
       }
 
-      const formattedAmount = formatMoney(bill.amount, settings.currency);
-      const title =
-        settings.language === 'en'
-          ? `Upcoming Bill: ${bill.title}`
-          : `تذكير فاتورة مستحقة: ${bill.title}`;
-      const body =
-        settings.language === 'en'
-          ? `Bill "${bill.title}" of ${formattedAmount} is due ${timingLabel} (Day ${bill.dueDay}).`
-          : `تستحق فاتورة "${bill.title}" بمبلغ ${formattedAmount} موعد السداد ${timingLabel} (يوم ${bill.dueDay} من الشهر).`;
-
       if (isDueSoon) {
+        const formattedAmount = formatMoney(bill.amount, settings.currency);
+        const title =
+          settings.language === 'en'
+            ? `Upcoming Bill: ${bill.title}`
+            : `تذكير فاتورة مستحقة: ${bill.title}`;
+        const body =
+          settings.language === 'en'
+            ? `Bill "${bill.title}" of ${formattedAmount} is due ${timingLabel} (Day ${effectiveDueDay}).`
+            : `تستحق فاتورة "${bill.title}" بمبلغ ${formattedAmount} موعد السداد ${timingLabel} (يوم ${effectiveDueDay} من الشهر).`;
+
+        const todayStr = now.toISOString().split('T')[0];
         inAppNotifications.push({
-          id: `notif-${bill.id}-${now.toISOString().split('T')[0]}`,
+          id: `notif-${bill.id}-${todayStr}`,
           title,
           body,
           billId: bill.id,
           timestamp: Date.now(),
         });
       }
+    }
+
+    return inAppNotifications;
+  }
+
+  /**
+   * Schedule bill notifications deterministically for the candidate month and the following 2 months.
+   * Cancels prior pending schedules for each bill before re-scheduling.
+   */
+  static async scheduleBillReminders(
+    bills: RecurringBill[],
+    settings: BudgetSettings
+  ): Promise<InAppNotification[]> {
+    if (!settings.notificationsEnabled) return [];
+
+    const now = new Date();
+    const leadDays = settings.notificationLeadDays ?? 1;
+    const inAppNotifications = this.evaluateInAppReminders(bills, settings, now);
+
+    const dueBills = bills.filter((b) => !b.isPaid && b.reminderEnabled !== false);
+
+    for (const bill of dueBills) {
+      const formattedAmount = formatMoney(bill.amount, settings.currency);
+      const title =
+        settings.language === 'en'
+          ? `Upcoming Bill: ${bill.title}`
+          : `تذكير فاتورة مستحقة: ${bill.title}`;
 
       if (this.isNative()) {
         try {
-          const numericId = this.getDeterministicId('bill', bill.id);
-          // Calculate next notification trigger date at 9:00 AM
-          const targetDate = new Date(now.getFullYear(), now.getMonth(), bill.dueDay, 9, 0, 0);
-          if (targetDate.getTime() < now.getTime()) {
-            targetDate.setMonth(targetDate.getMonth() + 1);
-          }
-          const scheduledTrigger = new Date(targetDate.getTime() - leadDays * 86400000);
+          // Cancel previous pending schedules for this bill
+          await this.cancelBillNotification(bill.id);
 
-          if (scheduledTrigger.getTime() > now.getTime()) {
+          // Compute upcoming trigger dates across the next 3 cycles
+          const triggers = computeUpcomingBillTriggers(bill.dueDay, leadDays, now, 3);
+
+          for (let cycleIndex = 0; cycleIndex < triggers.length; cycleIndex++) {
+            const { triggerDate, clampedDay } = triggers[cycleIndex];
+            const numericId = this.getDeterministicId(bill.id, cycleIndex);
+            const body =
+              settings.language === 'en'
+                ? `Bill "${bill.title}" of ${formattedAmount} is due soon (Day ${clampedDay}).`
+                : `تستحق فاتورة "${bill.title}" بمبلغ ${formattedAmount} قريباً (يوم ${clampedDay} من الشهر).`;
+
             await LocalNotifications.schedule({
               notifications: [
                 {
                   id: numericId,
                   title,
                   body,
-                  schedule: { at: scheduledTrigger, allowWhileIdle: true },
+                  schedule: { at: triggerDate, allowWhileIdle: true },
                 },
               ],
             });
           }
-        } catch {
-          // ignore native scheduling error
+        } catch (err) {
+          console.warn('Native bill reminder schedule error:', err);
         }
-      } else if (isDueSoon) {
-        triggerBrowserNotification(title, body, `bill-${bill.id}`);
+      } else {
+        // Web fallback
+        for (const notif of inAppNotifications) {
+          if (notif.billId === bill.id) {
+            triggerBrowserNotification(notif.title, notif.body, `bill-${bill.id}`);
+          }
+        }
       }
     }
 

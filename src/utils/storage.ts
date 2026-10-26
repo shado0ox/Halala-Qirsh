@@ -3,6 +3,7 @@ import { AppData, Category, Expense, RecurringBill, GroceryItem, CurrencyCode } 
 import { NativeShareService } from './nativeShare';
 
 const STORAGE_KEY = 'ios_home_expenses_store_v1';
+const SHOWN_BANNERS_KEY = 'home_expenses_shown_banners_v1';
 
 export const CURRENCY_SYMBOLS: Record<CurrencyCode, { symbol: string; name: string; nameEn: string }> = {
   SAR: { symbol: 'ر.س', name: 'ريال سعودي', nameEn: 'Saudi Riyal' },
@@ -130,6 +131,7 @@ export const getDefaultAppData = (): AppData => ({
     language: 'ar',
     isPasscodeEnabled: false,
     biometricsEnabled: false,
+    autoLockTimeout: 30, // 30 seconds default
   },
 });
 
@@ -182,6 +184,7 @@ export const loadAppData = (): AppData => {
       settings: {
         ...defaultData.settings,
         ...(parsed.settings || {}),
+        autoLockTimeout: parsed.settings?.autoLockTimeout ?? 30,
       },
     };
   } catch (err) {
@@ -209,6 +212,7 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
         settings: {
           ...defaultData.settings,
           ...(parsed.settings || {}),
+          autoLockTimeout: parsed.settings?.autoLockTimeout ?? 30,
         },
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
@@ -228,6 +232,7 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
         settings: {
           ...defaultData.settings,
           ...(parsed.settings || {}),
+          autoLockTimeout: parsed.settings?.autoLockTimeout ?? 30,
         },
       };
       await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(merged) });
@@ -260,6 +265,32 @@ export const saveAppData = (data: AppData): void => {
   Preferences.set({ key: STORAGE_KEY, value: json }).catch((err) => {
     console.error('Failed to save to Capacitor Preferences:', err);
   });
+};
+
+/**
+ * Track shown in-app notification banners so each bill is shown at most once per day
+ */
+export const getShownBannerKeys = async (): Promise<string[]> => {
+  try {
+    const { value } = await Preferences.get({ key: SHOWN_BANNERS_KEY });
+    if (!value) return [];
+    const parsed = JSON.parse(value);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+};
+
+export const markBannerKeyShown = async (key: string): Promise<void> => {
+  try {
+    const existing = await getShownBannerKeys();
+    if (!existing.includes(key)) {
+      const updated = [...existing.slice(-99), key];
+      await Preferences.set({ key: SHOWN_BANNERS_KEY, value: JSON.stringify(updated) });
+    }
+  } catch {
+    // ignore
+  }
 };
 
 /**
