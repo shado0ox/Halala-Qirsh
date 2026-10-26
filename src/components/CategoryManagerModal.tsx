@@ -5,6 +5,8 @@ import { Category, CurrencyCode } from '../types';
 import { AVAILABLE_ICONS, COLOR_PALETTE, CategoryIcon } from './CategoryIcon';
 import { sound } from '../utils/audio';
 import { CURRENCY_SYMBOLS } from '../utils/storage';
+import { Amount } from './Amount';
+import { translations } from '../utils/i18n';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -15,6 +17,8 @@ interface CategoryManagerModalProps {
   onDeleteCategory: (categoryId: string) => void;
   soundEnabled?: boolean;
   onShowToast?: (msg: string) => void;
+  language?: 'ar' | 'en';
+  hideAmounts?: boolean;
 }
 
 export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
@@ -26,7 +30,12 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   onDeleteCategory,
   soundEnabled = true,
   onShowToast,
+  language = 'ar',
+  hideAmounts = false,
 }) => {
+  const t = translations[language || 'ar'];
+  const isEn = language === 'en';
+
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
 
@@ -38,7 +47,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const [monthlyLimit, setMonthlyLimit] = useState<string>('500');
   const [error, setError] = useState<string>('');
 
-  const currencySymbol = CURRENCY_SYMBOLS[currency]?.symbol || 'ر.س';
+  const currencySymbol = CURRENCY_SYMBOLS[currency]?.symbol || (isEn ? 'SAR' : 'ر.س');
 
   const startCreate = () => {
     sound.playTap(soundEnabled);
@@ -56,7 +65,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     sound.playTap(soundEnabled);
     setEditingCategory(cat);
     setIsCreatingNew(false);
-    setName(cat.name);
+    setName(isEn && cat.nameEn ? cat.nameEn : cat.name);
     setIconName(cat.icon);
     setColor(cat.color);
     setBgColor(cat.bgColor);
@@ -74,18 +83,19 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setError('يرجى إدخال اسم التصنيف');
+      setError(t.validationCategoryNameRequired);
       return;
     }
     const limit = parseFloat(monthlyLimit);
     if (isNaN(limit) || limit < 0) {
-      setError('يرجى إدخال ميزانية شهرية صحيحة');
+      setError(t.validationMonthlyLimitRequired);
       return;
     }
 
     const catToSave: Category = {
       id: editingCategory ? editingCategory.id : `cat-custom-${Date.now()}`,
       name: name.trim(),
+      nameEn: isEn ? name.trim() : editingCategory?.nameEn,
       icon: iconName,
       color,
       bgColor,
@@ -112,7 +122,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop */}
+          {/* Backdrop (no blur to preserve 60fps) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -139,16 +149,17 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   onClose();
                 }}
                 className="w-8 h-8 rounded-full bg-[#E5E5EA]/70 dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-[#1C1C1E] dark:hover:text-white transition-colors cursor-pointer"
+                aria-label={t.close}
               >
                 <X size={18} />
               </button>
 
               <h2 className="text-sm md:text-base font-bold text-[#1C1C1E] dark:text-white">
                 {isCreatingNew
-                  ? 'إضافة تصنيف جديد'
+                  ? t.addNewCategoryBtn
                   : editingCategory
-                  ? 'تعديل التصنيف والميزانية'
-                  : 'إدارة تصنيفات المصاريف والميزانية'}
+                  ? t.editCategoryTitle
+                  : t.manageCategoriesTitle}
               </h2>
 
               {!isCreatingNew && !editingCategory ? (
@@ -157,14 +168,14 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   className="flex items-center gap-1 text-xs font-bold text-blue-600 dark:text-blue-400 hover:text-blue-700 cursor-pointer"
                 >
                   <Plus size={16} />
-                  <span>جديد</span>
+                  <span>{isEn ? 'New' : 'جديد'}</span>
                 </button>
               ) : (
                 <button
                   onClick={cancelEdit}
                   className="text-xs font-semibold text-slate-500 hover:text-slate-800 dark:text-slate-400 cursor-pointer"
                 >
-                  إلغاء
+                  {t.cancel}
                 </button>
               )}
             </div>
@@ -186,22 +197,28 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                       <CategoryIcon iconName={iconName} color={color} bgColor={bgColor} size="md" />
                       <div>
                         <div className="text-sm font-bold text-[#1C1C1E] dark:text-white">
-                          {name || 'اسم التصنيف'}
+                          {name || (isEn ? 'Category Name' : 'اسم التصنيف')}
                         </div>
-                        <div className="text-xs text-[#8E8E93]">
-                          الميزانية المقترحة: {monthlyLimit || '0'} {currencySymbol}
+                        <div className="text-xs text-[#8E8E93] flex items-center gap-1">
+                          <span>{t.assignedBudget}</span>
+                          <Amount
+                            value={parseFloat(monthlyLimit) || 0}
+                            currency={currency}
+                            lang={language}
+                            hideAmounts={hideAmounts}
+                          />
                         </div>
                       </div>
                     </div>
                     <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 font-bold">
-                      معاينة
+                      {isEn ? 'Preview' : 'معاينة'}
                     </span>
                   </div>
 
                   {/* Name Input */}
                   <div>
                     <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      اسم التصنيف (مثل: حلويات ومقاهي، ملابس أطفال...)
+                      {t.categoryNameLabel}
                     </label>
                     <input
                       type="text"
@@ -210,7 +227,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                         setName(e.target.value);
                         setError('');
                       }}
-                      placeholder="اسم التصنيف..."
+                      placeholder={t.categoryNamePlaceholder}
                       className="w-full px-3.5 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-medium text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-blue-500/50"
                       autoFocus
                     />
@@ -219,7 +236,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   {/* Monthly Budget Limit */}
                   <div>
                     <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      الميزانية الشهرية المخصصة لهذا التصنيف ({currencySymbol})
+                      {t.monthlyLimitLabel} ({currencySymbol})
                     </label>
                     <div className="flex items-center gap-2">
                       <input
@@ -233,14 +250,16 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                         placeholder="0"
                         className="w-full px-3.5 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-blue-500/50 tabular-nums"
                       />
-                      <span className="text-xs font-bold text-slate-500 shrink-0">{currencySymbol} شهرياً</span>
+                      <span className="text-xs font-bold text-slate-500 shrink-0">
+                        {currencySymbol} {isEn ? '/ mo' : 'شهرياً'}
+                      </span>
                     </div>
                   </div>
 
                   {/* Color Palette */}
                   <div>
                     <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                      لون التصنيف
+                      {t.categoryColorLabel}
                     </label>
                     <div className="flex flex-wrap gap-2">
                       {COLOR_PALETTE.map((pal) => (
@@ -266,7 +285,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   {/* Icon Selector */}
                   <div>
                     <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                      رمز وأيقونة التصنيف
+                      {t.categoryIconLabel}
                     </label>
                     <div className="grid grid-cols-6 gap-2 max-h-36 overflow-y-auto p-1 bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-xl no-scrollbar">
                       {iconKeys.map((k) => {
@@ -299,14 +318,14 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                       className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 cursor-pointer"
                     >
                       <Check size={16} strokeWidth={2.5} />
-                      <span>{editingCategory ? 'حفظ التعديلات' : 'إنشاء التصنيف'}</span>
+                      <span>{editingCategory ? t.save : t.addNewCategoryBtn}</span>
                     </button>
                     <button
                       type="button"
                       onClick={cancelEdit}
                       className="px-4 h-11 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
                     >
-                      إلغاء
+                      {t.cancel}
                     </button>
                   </div>
                 </form>
@@ -314,8 +333,14 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                 /* List of All Categories with Edit/Delete */
                 <div className="space-y-2">
                   <div className="text-xs text-[#8E8E93] px-1 flex items-center justify-between">
-                    <span>جميع تصنيفات مصاريف البيت ({categories.length})</span>
-                    <span className="text-[11px] text-blue-600 dark:text-blue-400">انقر للتعديل أو تغيير الميزانية</span>
+                    <span>
+                      {isEn
+                        ? `All Expense Categories (${categories.length})`
+                        : `جميع تصنيفات مصاريف البيت (${categories.length})`}
+                    </span>
+                    <span className="text-[11px] text-blue-600 dark:text-blue-400">
+                      {isEn ? 'Tap to edit or set limit' : 'انقر للتعديل أو تغيير الميزانية'}
+                    </span>
                   </div>
 
                   <div className="bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-2xl overflow-hidden divide-y divide-[#E5E5EA] dark:divide-[#3A3A3C]">
@@ -327,22 +352,28 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                         <button
                           type="button"
                           onClick={() => startEdit(cat)}
-                          className="flex items-center gap-3 flex-1 text-right cursor-pointer"
+                          className="flex items-center gap-3 flex-1 rtl:text-right ltr:text-left cursor-pointer"
                         >
                           <CategoryIcon iconName={cat.icon} color={cat.color} bgColor={cat.bgColor} size="md" />
                           <div>
                             <div className="flex items-center gap-2">
                               <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-                                {cat.name}
+                                {isEn && cat.nameEn ? cat.nameEn : cat.name}
                               </span>
                               {cat.isCustom && (
                                 <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-semibold flex items-center gap-0.5">
-                                  <Sparkles size={10} /> مخصص
+                                  <Sparkles size={10} /> {t.customTag}
                                 </span>
                               )}
                             </div>
-                            <span className="text-[11px] text-[#8E8E93] tabular-nums">
-                              الميزانية المحددة: {cat.monthlyLimit.toLocaleString('ar-SA')} {currencySymbol}
+                            <span className="text-[11px] text-[#8E8E93] tabular-nums flex items-center gap-1">
+                              <span>{t.assignedBudget}</span>
+                              <Amount
+                                value={cat.monthlyLimit}
+                                currency={currency}
+                                lang={language}
+                                hideAmounts={hideAmounts}
+                              />
                             </span>
                           </div>
                         </button>
@@ -353,14 +384,15 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                             onClick={() => startEdit(cat)}
                             className="px-2.5 py-1 text-xs font-semibold rounded-lg text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-950/40 cursor-pointer"
                           >
-                            تعديل
+                            {t.edit}
                           </button>
                           {cat.isCustom && (
                             <button
                               type="button"
                               onClick={() => handleDelete(cat.id)}
                               className="p-1.5 rounded-lg text-red-500 hover:bg-red-50 dark:hover:bg-red-950/40 cursor-pointer transition-colors"
-                              title="حذف التصنيف"
+                              title={t.deleteCategoryTooltip}
+                              aria-label={t.deleteCategoryTooltip}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -377,7 +409,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                     className="w-full py-3 rounded-2xl border-2 border-dashed border-blue-500/30 hover:border-blue-500 bg-blue-50/40 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 text-xs font-bold flex items-center justify-center gap-2 cursor-pointer transition-all mt-3"
                   >
                     <Plus size={16} />
-                    <span>إضافة تصنيف جديد لمصاريف المنزل</span>
+                    <span>{t.addNewCategoryBtn}</span>
                   </button>
                 </div>
               )}

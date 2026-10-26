@@ -4,6 +4,8 @@ coverage/
 .DS_Store
 *.log
 .env*
+bun.lock
+bun.lockb
 
 # Capacitor & iOS build artifacts (keep ios folder, ignore build files & user data)
 ios/App/Pods/

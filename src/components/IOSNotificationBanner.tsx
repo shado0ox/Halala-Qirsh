@@ -1,19 +1,26 @@
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Bell, X, ChevronLeft } from 'lucide-react';
+import { Bell, X, ChevronLeft, ChevronRight } from 'lucide-react';
 import { InAppNotification } from '../types';
+import { translations } from '../utils/i18n';
 
 interface IOSNotificationBannerProps {
   notification: InAppNotification | null;
   onDismiss: () => void;
   onAction?: (notification: InAppNotification) => void;
+  language?: 'ar' | 'en';
 }
 
 export const IOSNotificationBanner: React.FC<IOSNotificationBannerProps> = ({
   notification,
   onDismiss,
   onAction,
+  language = 'ar',
 }) => {
+  const t = translations[language || 'ar'];
+  const isEn = language === 'en';
+  const isRTL = !isEn;
+
   useEffect(() => {
     if (!notification) return;
     const timer = setTimeout(() => {
@@ -33,6 +40,7 @@ export const IOSNotificationBanner: React.FC<IOSNotificationBannerProps> = ({
             transition={{ type: 'spring', stiffness: 450, damping: 32 }}
             className="w-full max-w-sm pointer-events-auto bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-3.5 shadow-2xl flex flex-col gap-1.5 cursor-pointer select-none"
             onClick={() => onAction?.(notification)}
+            dir={isRTL ? 'rtl' : 'ltr'}
           >
             {/* Header */}
             <div className="flex items-center justify-between text-xs">
@@ -41,12 +49,12 @@ export const IOSNotificationBanner: React.FC<IOSNotificationBannerProps> = ({
                   <Bell size={11} />
                 </div>
                 <span className="text-[11px] font-semibold text-slate-800 dark:text-slate-200">
-                  مصاريف البيت
+                  {t.appNameBanner}
                 </span>
               </div>
 
               <div className="flex items-center gap-2">
-                <span className="text-[10px] text-[#8E8E93]">الآن</span>
+                <span className="text-[10px] text-[#8E8E93]">{t.now}</span>
                 <button
                   type="button"
                   onClick={(e) => {
@@ -54,6 +62,7 @@ export const IOSNotificationBanner: React.FC<IOSNotificationBannerProps> = ({
                     onDismiss();
                   }}
                   className="w-5 h-5 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 cursor-pointer"
+                  aria-label={t.close}
                 >
                   <X size={11} />
                 </button>
@@ -61,7 +70,7 @@ export const IOSNotificationBanner: React.FC<IOSNotificationBannerProps> = ({
             </div>
 
             {/* Content */}
-            <div className="pr-1 text-right">
+            <div className={`pr-1 ${isRTL ? 'text-right' : 'text-left'}`}>
               <div className="text-xs font-bold text-[#1C1C1E] dark:text-white leading-tight">
                 {notification.title}
               </div>
@@ -71,10 +80,10 @@ export const IOSNotificationBanner: React.FC<IOSNotificationBannerProps> = ({
             </div>
 
             {/* Action pill */}
-            <div className="pt-1 flex justify-end">
+            <div className={`pt-1 flex ${isRTL ? 'justify-end' : 'justify-start'}`}>
               <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 flex items-center gap-0.5 hover:underline">
-                <span>الانتقال للفواتير</span>
-                <ChevronLeft size={11} />
+                <span>{t.goToBills}</span>
+                {isRTL ? <ChevronLeft size={11} /> : <ChevronRight size={11} />}
               </span>
             </div>
           </motion.div>

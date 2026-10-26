@@ -101,17 +101,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const isEn = lang === 'en';
   const isRTL = lang === 'ar';
 
-  const monthNamesArabic = [
-    'يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو',
-    'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'
-  ];
-  const monthNamesEnglish = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December'
-  ];
-  const monthFormatted = isEn
-    ? `${monthNamesEnglish[month - 1]} ${year}`
-    : `${monthNamesArabic[month - 1]} ${year}`;
+  const monthFormatted = `${t.monthNames[month - 1]} ${year}`;
 
   // Gauge & progress color logic
   const isDanger = percentageSpent >= 100;
@@ -445,9 +435,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                       {isEn ? `Budget exceeded for ${cat.nameEn || cat.name}!` : `تجاوز ميزانية ${cat.name}!`}
                     </span>
                     <div className="text-[11px] opacity-85 tabular-nums">
-                      {isEn
-                        ? `Spent: ${spent} ${settings.currency} (Limit: ${cat.monthlyLimit} - Over: +${diff})`
-                        : `المصروف: ${spent} ${settings.currency} (الحد: ${cat.monthlyLimit} - زيادة ${diff})`}
+                      {isHidden ? (
+                        '••••••'
+                      ) : isEn ? (
+                        `Spent: ${spent} ${settings.currency} (Limit: ${cat.monthlyLimit} - Over: +${diff})`
+                      ) : (
+                        `المصروف: ${spent} ${settings.currency} (الحد: ${cat.monthlyLimit} - زيادة ${diff})`
+                      )}
                     </div>
                   </div>
                 </div>
@@ -478,7 +472,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     )}
                   </div>
                   <div className="text-[11px] opacity-85">
-                    {b.title} ({formatMoney(b.amount, settings.currency, lang)}) - {isEn ? `Day ${b.dueDay}` : `يوم ${b.dueDay} من الشهر`}
+                    {b.title} ({isHidden ? '••••••' : formatMoney(b.amount, settings.currency, lang)}) - {isEn ? `Day ${b.dueDay}` : `يوم ${b.dueDay} من الشهر`}
                   </div>
                 </div>
               </div>

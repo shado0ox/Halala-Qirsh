@@ -83,10 +83,10 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
   // Add Grocery Modal
   const [showAddGroceryModal, setShowAddGroceryModal] = useState<boolean>(false);
   const [grocName, setGrocName] = useState<string>('');
-  const [grocCategory, setGrocCategory] = useState<string>('خضار وفواكه');
+  const [grocCategory, setGrocCategory] = useState<string>(isEn ? 'Produce' : 'خضار وفواكه');
   const [grocEstimatedPrice, setGrocEstimatedPrice] = useState<string>('');
   const [grocQuantity, setGrocQuantity] = useState<number>(1);
-  const [grocUnit, setGrocUnit] = useState<string>('حبة');
+  const [grocUnit, setGrocUnit] = useState<string>(isEn ? 'pcs' : 'حبة');
 
   const catMap = new Map(categories.map((c) => [c.id, c]));
 

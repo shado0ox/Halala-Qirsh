@@ -63,6 +63,7 @@ export const checkAndScheduleBillReminders = (
   const now = new Date();
   const currentDay = now.getDate();
   const leadDays = settings.notificationLeadDays ?? 1;
+  const isEn = settings.language === 'en';
 
   const inAppNotifications: InAppNotification[] = [];
 
@@ -79,19 +80,25 @@ export const checkAndScheduleBillReminders = (
 
     if (diff === 0) {
       shouldNotify = true;
-      timingLabel = 'اليوم!';
+      timingLabel = isEn ? 'Today!' : 'اليوم!';
     } else if (diff === 1 && leadDays >= 1) {
       shouldNotify = true;
-      timingLabel = 'غداً';
+      timingLabel = isEn ? 'Tomorrow' : 'غداً';
     } else if (diff > 1 && diff <= leadDays) {
       shouldNotify = true;
-      timingLabel = `خلال ${diff} أيام`;
+      timingLabel = isEn ? `in ${diff} days` : `خلال ${diff} أيام`;
     }
 
     if (shouldNotify) {
-      const formattedAmount = formatMoney(bill.amount, settings.currency);
-      const title = `تذكير فاتورة مستحقة: ${bill.title}`;
-      const body = `تستحق فاتورة "${bill.title}" بمبلغ ${formattedAmount} موعد السداد ${timingLabel} (يوم ${bill.dueDay} من الشهر).`;
+      const formattedAmount = settings.hideAmounts
+        ? '••••••'
+        : formatMoney(bill.amount, settings.currency);
+      const title = isEn
+        ? `Due Bill Reminder: ${bill.title}`
+        : `تذكير فاتورة مستحقة: ${bill.title}`;
+      const body = isEn
+        ? `Bill "${bill.title}" of ${formattedAmount} is due ${timingLabel} (Day ${bill.dueDay} of the month).`
+        : `تستحق فاتورة "${bill.title}" بمبلغ ${formattedAmount} موعد السداد ${timingLabel} (يوم ${bill.dueDay} من الشهر).`;
 
       inAppNotifications.push({
         id: `notif-${bill.id}-${now.toISOString().split('T')[0]}`,
@@ -112,10 +119,19 @@ export const checkAndScheduleBillReminders = (
 /**
  * Send an immediate test notification to verify the browser Notification API
  */
-export const sendTestBillNotification = (currency: BudgetSettings['currency']) => {
-  const sampleAmount = formatMoney(420, currency);
-  const title = 'تنبيه تجريبي: فاتورة الكهرباء والتكييف';
-  const body = `هذا إشعار تجريبي لاختبار التنبيهات المحلية لمصاريف البيت. الفاتورة بمبلغ ${sampleAmount} مستحقة السداد.`;
+export const sendTestBillNotification = (
+  currency: BudgetSettings['currency'],
+  language: 'ar' | 'en' = 'ar',
+  hideAmounts: boolean = false
+) => {
+  const isEn = language === 'en';
+  const sampleAmount = hideAmounts ? '••••••' : formatMoney(420, currency);
+  const title = isEn
+    ? 'Test Reminder: Electricity & AC Bill'
+    : 'تنبيه تجريبي: فاتورة الكهرباء والتكييف';
+  const body = isEn
+    ? `This is a test notification for household bills. Bill amount: ${sampleAmount} is due.`
+    : `هذا إشعار تجريبي لاختبار التنبيهات المحلية لمصاريف البيت. الفاتورة بمبلغ ${sampleAmount} مستحقة السداد.`;
 
   const dispatched = triggerBrowserNotification(title, body, 'test-notification');
   return {

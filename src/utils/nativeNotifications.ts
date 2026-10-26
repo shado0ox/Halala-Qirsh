@@ -213,7 +213,9 @@ export class NativeNotificationService {
       }
 
       if (isDueSoon) {
-        const formattedAmount = formatMoney(bill.amount, settings.currency);
+        const formattedAmount = settings.hideAmounts
+          ? '••••••'
+          : formatMoney(bill.amount, settings.currency);
         const title =
           settings.language === 'en'
             ? `Upcoming Bill: ${bill.title}`
@@ -254,7 +256,9 @@ export class NativeNotificationService {
     const dueBills = bills.filter((b) => !b.isPaid && b.reminderEnabled !== false);
 
     for (const bill of dueBills) {
-      const formattedAmount = formatMoney(bill.amount, settings.currency);
+      const formattedAmount = settings.hideAmounts
+        ? '••••••'
+        : formatMoney(bill.amount, settings.currency);
       const title =
         settings.language === 'en'
           ? `Upcoming Bill: ${bill.title}`
@@ -307,7 +311,9 @@ export class NativeNotificationService {
    * Send test notification
    */
   static async sendTest(settings: BudgetSettings) {
-    const formattedAmount = formatMoney(420, settings.currency);
+    const formattedAmount = settings.hideAmounts
+      ? '••••••'
+      : formatMoney(420, settings.currency);
     const title = settings.language === 'en' ? 'Test Notification: Electricity Bill' : 'تنبيه تجريبي: فاتورة الكهرباء';
     const body =
       settings.language === 'en'

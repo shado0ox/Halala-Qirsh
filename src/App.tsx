@@ -33,6 +33,7 @@ import { NativeNotificationService } from './utils/nativeNotifications';
 import { SecurityService } from './utils/security';
 import { isSystemFlowActive } from './utils/systemFlow';
 import { fades, useMotionConfig } from './utils/motion';
+import { translations } from './utils/i18n';
 
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
@@ -137,6 +138,7 @@ function AppContent() {
   const isReduced = motionConfig.isReduced;
   const isEn = data.settings.language === 'en';
   const isRTL = data.settings.language !== 'en';
+  const t = translations[data.settings.language || 'ar'];
 
   // Load shown banner keys from Preferences on launch
   useEffect(() => {
@@ -528,17 +530,18 @@ function AppContent() {
   const handleConvertBoughtToExpense = (items: GroceryItem[]) => {
     nativeHaptics.success(data.settings.soundEnabled);
     const totalAmount = items.reduce((sum, i) => sum + i.estimatedPrice * i.quantity, 0);
-    const itemNames = items.map((i) => i.name).join('، ');
+    const isEnLang = data.settings.language === 'en';
+    const itemNames = items.map((i) => i.name).join(isEnLang ? ', ' : '، ');
 
     const newExpense: Expense = {
       id: `exp-${Date.now()}`,
-      title: data.settings.language === 'en' ? 'Household Grocery Purchase' : 'مشتريات ونواقص تموين البيت',
+      title: isEnLang ? 'Household Grocery Purchase' : 'مشتريات ونواقص تموين البيت',
       amount: totalAmount > 0 ? totalAmount : 150,
       categoryId: data.categories[0]?.id || 'food',
       date: new Date().toISOString().split('T')[0],
       paymentMethod: 'card',
-      payer: 'مشترك',
-      notes: `${data.settings.language === 'en' ? 'Purchased items:' : 'أصناف مشتراة:'} ${itemNames}`,
+      payer: isEnLang ? 'Shared' : 'مشترك',
+      notes: `${isEnLang ? 'Purchased items:' : 'أصناف مشتراة:'} ${itemNames}`,
       createdAt: Date.now(),
     };
 
@@ -646,10 +649,10 @@ function AppContent() {
             <Lock size={32} />
           </div>
           <p className="text-base font-black text-slate-800 dark:text-white">
-            {isEn ? 'Home Expenses' : 'مصاريف البيت'}
+            {t.appTitle}
           </p>
           <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-            {isEn ? 'Secured Offline Tracker' : 'تطبيق الميزانية المشفر محلياً'}
+            {t.securedOfflineTracker}
           </p>
         </div>
       )}
@@ -676,6 +679,7 @@ function AppContent() {
               setCurrentNotification(null);
               handleTabChange('bills_groceries');
             }}
+            language={data.settings.language}
           />
 
           {/* Month-End Congratulatory Banner Card */}
@@ -841,6 +845,7 @@ function AppContent() {
             onSaveExpense={handleSaveExpense}
             initialExpense={editingExpense}
             soundEnabled={data.settings.soundEnabled}
+            language={data.settings.language}
           />
 
           {/* Lazy-Loaded Category Manager Modal */}
@@ -855,6 +860,8 @@ function AppContent() {
                 onDeleteCategory={handleDeleteCategory}
                 soundEnabled={data.settings.soundEnabled}
                 onShowToast={showToast}
+                language={data.settings.language}
+                hideAmounts={Boolean(data.settings.hideAmounts)}
               />
             )}
           </Suspense>

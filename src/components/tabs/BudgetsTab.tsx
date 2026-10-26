@@ -312,14 +312,20 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
                           </span>
                         )}
                       </div>
-                      <span className="text-[11px] text-[#8E8E93] tabular-nums">
-                        {isHidden ? (
-                          '••••••'
-                        ) : (
-                          <>
-                            {spent.toLocaleString()} {isEn ? 'of' : 'من'} {limit.toLocaleString()} {settings.currency}
-                          </>
-                        )}
+                      <span className="text-[11px] text-[#8E8E93] tabular-nums flex items-center gap-1">
+                        <Amount
+                          value={spent}
+                          currency={settings.currency}
+                          lang={lang}
+                          hideAmounts={isHidden}
+                        />
+                        <span>{isEn ? 'of' : 'من'}</span>
+                        <Amount
+                          value={limit}
+                          currency={settings.currency}
+                          lang={lang}
+                          hideAmounts={isHidden}
+                        />
                       </span>
                     </div>
                   </div>

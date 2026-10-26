@@ -46,7 +46,6 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
   const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
 
   const saveBtnRef = useRef<HTMLButtonElement>(null);
-  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     if (isOpen) {
@@ -70,13 +69,6 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
       setError('');
       setIsSubmitting(false);
     }
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
-    };
   }, [initialExpense, isOpen, categories, isEn]);
 
   const currencySymbol = CURRENCY_SYMBOLS[currency]?.symbol || (isEn ? 'SAR' : 'ر.س');
@@ -115,25 +107,22 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
 
     const sourceRect = saveBtnRef.current?.getBoundingClientRect();
 
-    // Close sheet and trigger save with button coordinates
-    onClose();
+    // 1. Synchronously trigger save with captured button coordinates
+    onSaveExpense(
+      {
+        title: title.trim(),
+        amount: parsedAmount,
+        categoryId,
+        date,
+        paymentMethod,
+        payer,
+        notes: notes.trim() || undefined,
+      },
+      sourceRect
+    );
 
-    // Ensure save is executed on next tick
-    timeoutRef.current = setTimeout(() => {
-      onSaveExpense(
-        {
-          title: title.trim(),
-          amount: parsedAmount,
-          categoryId,
-          date,
-          paymentMethod,
-          payer,
-          notes: notes.trim() || undefined,
-        },
-        sourceRect
-      );
-      setIsSubmitting(false);
-    }, 50);
+    // 2. Dismiss sheet
+    onClose();
   };
 
   return (
