@@ -211,7 +211,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
           className={`w-16 h-16 rounded-3xl flex items-center justify-center shadow-xl mb-4 transition-colors duration-300 ${
             isUnlockedSuccess
               ? 'bg-emerald-400 text-emerald-950'
-              : 'bg-white/20 text-white backdrop-blur-md border border-white/20'
+              : 'bg-white/20 text-white border border-white/20'
           }`}
         >
           {isUnlockedSuccess ? <CheckCircle2 size={34} /> : <Lock size={30} />}
@@ -286,7 +286,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
               type="button"
               disabled={lockoutSeconds > 0 || isUnlockedSuccess}
               onClick={() => handleKeyPress(num)}
-              className="w-18 h-18 mx-auto rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 disabled:opacity-30 disabled:pointer-events-none text-white flex flex-col items-center justify-center transition-colors cursor-pointer backdrop-blur-md border border-white/10 shadow-xs"
+              className="w-18 h-18 mx-auto rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 disabled:opacity-30 disabled:pointer-events-none text-white flex flex-col items-center justify-center transition-colors cursor-pointer border border-white/10 shadow-xs"
             >
               <span className="text-2xl font-bold leading-none">{num}</span>
               {letters && <span className="text-[9px] tracking-widest text-white/60 mt-0.5">{letters}</span>}
@@ -317,7 +317,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
             type="button"
             disabled={lockoutSeconds > 0 || isUnlockedSuccess}
             onClick={() => handleKeyPress('0')}
-            className="w-18 h-18 mx-auto rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 disabled:opacity-30 disabled:pointer-events-none text-white flex flex-col items-center justify-center transition-colors cursor-pointer backdrop-blur-md border border-white/10 shadow-xs"
+            className="w-18 h-18 mx-auto rounded-full bg-white/15 hover:bg-white/25 active:bg-white/35 disabled:opacity-30 disabled:pointer-events-none text-white flex flex-col items-center justify-center transition-colors cursor-pointer border border-white/10 shadow-xs"
           >
             <span className="text-2xl font-bold leading-none">0</span>
           </motion.button>

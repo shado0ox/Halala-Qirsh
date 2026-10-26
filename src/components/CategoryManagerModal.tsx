@@ -121,7 +121,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
               sound.playTap(soundEnabled);
               onClose();
             }}
-            className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+            className="absolute inset-0 bg-black/55"
           />
 
           {/* Modal Container */}

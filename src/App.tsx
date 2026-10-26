@@ -41,6 +41,7 @@ import { PasscodeLockModal } from './components/PasscodeLockModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { Toast } from './components/Toast';
 import { LaunchSplash } from './components/LaunchSplash';
+import { CoinFlightProvider, useCoinFlight } from './context/CoinFlightContext';
 
 import { DashboardTab } from './components/tabs/DashboardTab';
 import { ExpensesTab } from './components/tabs/ExpensesTab';
@@ -81,7 +82,8 @@ const TAB_ORDER: TabId[] = [
   'analytics_settings',
 ];
 
-export default function App() {
+function AppContent() {
+  const { flyCoin, setHighlightedExpenseId } = useCoinFlight();
   const [data, setData] = useState<AppData>(() => loadAppData());
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [prevTab, setPrevTab] = useState<TabId>('dashboard');
@@ -321,7 +323,10 @@ export default function App() {
     }));
   };
 
-  const handleSaveExpense = (expenseData: Omit<Expense, 'id' | 'createdAt'>) => {
+  const handleSaveExpense = (
+    expenseData: Omit<Expense, 'id' | 'createdAt'>,
+    sourceRect?: DOMRect
+  ) => {
     if (editingExpense) {
       setData((prev) => ({
         ...prev,
@@ -343,6 +348,26 @@ export default function App() {
         ...prev,
         expenses: [newExp, ...prev.expenses],
       }));
+
+      // Signature fly-to-target coin animation
+      const targetName = activeTab === 'dashboard' ? 'dashboard-remaining' : 'expenses-first-row';
+      if (sourceRect) {
+        flyCoin(
+          sourceRect,
+          targetName,
+          () => {
+            setHighlightedExpenseId(newExp.id);
+            setTimeout(() => setHighlightedExpenseId(null), 1200);
+          },
+          isReduced,
+          data.settings.soundEnabled
+        );
+      } else {
+        nativeHaptics.success(data.settings.soundEnabled);
+        setHighlightedExpenseId(newExp.id);
+        setTimeout(() => setHighlightedExpenseId(null), 1200);
+      }
+
       showToast(data.settings.language === 'en' ? 'Expense recorded' : 'تم تسجيل المصروف بنجاح');
     }
   };
@@ -604,12 +629,6 @@ export default function App() {
         />
       )}
 
-      {/* DEV-Only FPS / Render Debug Indicator (stripped automatically in production builds) */}
-      {import.meta.env.DEV && (
-        <div className="fixed top-2 left-2 z-100 bg-black/80 text-emerald-400 font-mono text-[9px] px-2 py-0.5 rounded-full border border-emerald-500/30 pointer-events-none select-none">
-          DEV · 60 FPS
-        </div>
-      )}
 
       {/* Lightweight Month-End Celebration Confetti Burst */}
       <Suspense fallback={null}>
@@ -879,5 +898,13 @@ export default function App() {
         </>
       )}
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <CoinFlightProvider>
+      <AppContent />
+    </CoinFlightProvider>
   );
 }

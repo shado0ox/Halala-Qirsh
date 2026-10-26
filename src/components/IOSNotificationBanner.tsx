@@ -31,7 +31,7 @@ export const IOSNotificationBanner: React.FC<IOSNotificationBannerProps> = ({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -30, scale: 0.94 }}
             transition={{ type: 'spring', stiffness: 450, damping: 32 }}
-            className="w-full max-w-sm pointer-events-auto bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-xl border border-slate-200/80 dark:border-slate-800 rounded-3xl p-3.5 shadow-2xl flex flex-col gap-1.5 cursor-pointer select-none"
+            className="w-full max-w-sm pointer-events-auto bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-slate-800 rounded-3xl p-3.5 shadow-2xl flex flex-col gap-1.5 cursor-pointer select-none"
             onClick={() => onAction?.(notification)}
           >
             {/* Header */}

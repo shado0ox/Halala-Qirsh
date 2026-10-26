@@ -31,6 +31,7 @@ import {
   AppData,
 } from '../../types';
 import { CategoryIcon } from '../CategoryIcon';
+import { Amount } from '../Amount';
 import {
   CURRENCY_SYMBOLS,
   formatMoney,
@@ -198,7 +199,12 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
             <span>{t.spendByCategory}</span>
           </span>
           <span className="text-xs font-black text-[#1C1C1E] dark:text-white tabular-nums">
-            {formatMoney(totalSpent, settings.currency, lang)}
+            <Amount
+              value={totalSpent}
+              currency={settings.currency}
+              lang={lang}
+              hideAmounts={Boolean(settings.hideAmounts)}
+            />
           </span>
         </div>
 
@@ -290,9 +296,13 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
                       </span>
                     </div>
                     <div className="flex items-center gap-1.5 tabular-nums">
-                      <span className="font-bold text-slate-700 dark:text-slate-300">
-                        {formatMoney(cat.spent, settings.currency, lang)}
-                      </span>
+                      <Amount
+                        value={cat.spent}
+                        currency={settings.currency}
+                        lang={lang}
+                        hideAmounts={Boolean(settings.hideAmounts)}
+                        className="font-bold text-slate-700 dark:text-slate-300"
+                      />
                       <span className="text-[10px] text-[#8E8E93]">({pct}%)</span>
                     </div>
                   </div>
@@ -325,7 +335,12 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
                   <div key={p} className="p-2.5 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
                     <span className="text-[10px] text-[#8E8E93] block font-semibold">{payerLabel}</span>
                     <span className="font-bold text-[#1C1C1E] dark:text-white tabular-nums block mt-0.5">
-                      {formatMoney(amount, settings.currency, lang)}
+                      <Amount
+                        value={amount}
+                        currency={settings.currency}
+                        lang={lang}
+                        hideAmounts={Boolean(settings.hideAmounts)}
+                      />
                     </span>
                     <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold tabular-nums">
                       {pct}%

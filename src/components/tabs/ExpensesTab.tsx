@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import {
   Search,
   X,
@@ -18,9 +18,11 @@ import { motion, AnimatePresence } from 'motion/react';
 import { Category, Expense, BudgetSettings, PaymentMethod } from '../../types';
 import { CategoryIcon } from '../CategoryIcon';
 import { ExpenseListItem } from '../ExpenseListItem';
+import { Amount } from '../Amount';
 import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
+import { useCoinFlight } from '../../context/CoinFlightContext';
 
 interface ExpensesTabProps {
   categories: Category[];
@@ -49,6 +51,20 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
   const isReduced = motionConfig.isReduced;
   const isRTL = settings.language !== 'en';
   const isEn = settings.language === 'en';
+  const lang = settings.language || 'ar';
+  const isHidden = Boolean(settings.hideAmounts);
+
+  const { registerTarget, highlightedExpenseId } = useCoinFlight();
+  const firstRowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (firstRowRef.current) {
+      registerTarget('expenses-first-row', firstRowRef.current);
+    }
+    return () => {
+      registerTarget('expenses-first-row', null);
+    };
+  }, [registerTarget]);
 
   const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c])), [categories]);
 
@@ -280,46 +296,62 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
         <span className="text-emerald-800 dark:text-emerald-300 font-semibold">
           {isEn ? 'Total for selected period:' : 'إجمالي النفقات للمدة المحددة:'}
         </span>
-        <span className="text-sm font-black text-emerald-700 dark:text-emerald-300 tabular-nums">
-          {formatMoney(totalFilteredAmount, settings.currency)}
-        </span>
+        <Amount
+          value={totalFilteredAmount}
+          currency={settings.currency}
+          lang={lang}
+          hideAmounts={isHidden}
+          className="text-sm font-black text-emerald-700 dark:text-emerald-300 tabular-nums"
+        />
       </div>
 
       {/* Grouped Expenses List with Sticky Headers & Swipe Items */}
       <div className="space-y-4 pb-6">
-        {groupedByDate.map((group) => (
+        {groupedByDate.map((group, groupIdx) => (
           <div key={group.date} className="space-y-1.5">
-            {/* Sticky Day Header with clean blur-free background */}
+            {/* Sticky Day Header */}
             <div className="sticky top-0 z-20 bg-[#F2F2F7] dark:bg-black py-1 px-1 flex items-center justify-between text-xs font-extrabold text-[#8E8E93]">
               <span>{group.displayDate}</span>
-              <span className="tabular-nums text-[11px] font-bold">
-                {formatMoney(
-                  group.items.reduce((s, i) => s + i.amount, 0),
-                  settings.currency
-                )}
-              </span>
+              <Amount
+                value={group.items.reduce((s, i) => s + i.amount, 0)}
+                currency={settings.currency}
+                lang={lang}
+                hideAmounts={isHidden}
+                className="tabular-nums text-[11px] font-bold"
+              />
             </div>
 
             {/* List Group Container */}
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-slate-200/60 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden shadow-2xs">
               <AnimatePresence initial={false}>
-                {group.items.map((exp) => (
-                  <ExpenseListItem
-                    key={exp.id}
-                    expense={exp}
-                    category={catMap.get(exp.categoryId)}
-                    currency={settings.currency}
-                    isRTL={isRTL}
-                    soundEnabled={settings.soundEnabled}
-                    isReduced={isReduced}
-                    onEdit={(e) => onEditExpense(e)}
-                    onDelete={(id) => onDeleteExpense(id)}
-                    onClick={(e) => {
-                      nativeHaptics.tap(settings.soundEnabled);
-                      setSelectedExpenseForDetails(e);
-                    }}
-                  />
-                ))}
+                {group.items.map((exp, itemIdx) => {
+                  const isVeryFirstItem = groupIdx === 0 && itemIdx === 0;
+                  return (
+                    <div
+                      key={exp.id}
+                      ref={isVeryFirstItem ? firstRowRef : undefined}
+                      className="relative"
+                    >
+                      <ExpenseListItem
+                        expense={exp}
+                        category={catMap.get(exp.categoryId)}
+                        currency={settings.currency}
+                        lang={lang}
+                        isRTL={isRTL}
+                        soundEnabled={settings.soundEnabled}
+                        isReduced={isReduced}
+                        hideAmounts={isHidden}
+                        isHighlighted={exp.id === highlightedExpenseId}
+                        onEdit={(e) => onEditExpense(e)}
+                        onDelete={(id) => onDeleteExpense(id)}
+                        onClick={(e) => {
+                          nativeHaptics.tap(settings.soundEnabled);
+                          setSelectedExpenseForDetails(e);
+                        }}
+                      />
+                    </div>
+                  );
+                })}
               </AnimatePresence>
             </div>
           </div>
@@ -346,7 +378,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
         )}
       </div>
 
-      {/* Expense Detail Modal */}
+      {/* Expense Detail Modal (Zero backdrop-blur to preserve 60fps) */}
       <AnimatePresence>
         {selectedExpenseForDetails && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -355,7 +387,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedExpenseForDetails(null)}
-              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+              className="absolute inset-0 bg-black/55"
             />
             <motion.div
               initial={{ scale: 0.92, opacity: 0 }}
@@ -377,8 +409,14 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
               </div>
 
               <div className="text-center py-2">
-                <div className="text-3xl font-black text-[#1C1C1E] dark:text-white tabular-nums mb-1">
-                  {formatMoney(selectedExpenseForDetails.amount, settings.currency)}
+                <div className="mb-1">
+                  <Amount
+                    value={selectedExpenseForDetails.amount}
+                    currency={settings.currency}
+                    lang={lang}
+                    hideAmounts={isHidden}
+                    className="text-3xl font-black text-[#1C1C1E] dark:text-white tabular-nums"
+                  />
                 </div>
                 <div className="text-sm font-bold text-slate-700 dark:text-slate-300">
                   {selectedExpenseForDetails.title}
@@ -389,7 +427,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
                 <div className="flex items-center justify-between">
                   <span className="text-[#8E8E93]">{isEn ? 'Category' : 'التصنيف'}</span>
                   <span className="font-bold text-[#1C1C1E] dark:text-white">
-                    {catMap.get(selectedExpenseForDetails.categoryId)?.name || 'عام'}
+                    {isEn ? (catMap.get(selectedExpenseForDetails.categoryId)?.nameEn || catMap.get(selectedExpenseForDetails.categoryId)?.name || 'General') : (catMap.get(selectedExpenseForDetails.categoryId)?.name || 'عام')}
                   </span>
                 </div>
                 <div className="flex items-center justify-between">

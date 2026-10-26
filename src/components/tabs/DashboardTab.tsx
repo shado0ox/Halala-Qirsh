@@ -22,6 +22,8 @@ import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { translations } from '../../utils/i18n';
 import { AnimatedCounter } from '../AnimatedCounter';
+import { Amount } from '../Amount';
+import { useCoinFlight } from '../../context/CoinFlightContext';
 import { cardVariants, reducedCardVariants, useMotionConfig, springs } from '../../utils/motion';
 
 interface DashboardTabProps {
@@ -48,6 +50,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const currentMonth = settings.selectedMonth;
   const motionConfig = useMotionConfig(settings.animations);
   const isReduced = motionConfig.isReduced;
+  const isHidden = Boolean(settings.hideAmounts);
 
   // Filter expenses for selected month
   const monthlyExpenses = expenses.filter((e) => e.date.startsWith(currentMonth));
@@ -61,6 +64,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   const remainingBudget = totalBudget - totalSpent;
   const percentageSpent = totalBudget > 0 ? Math.min(Math.round((totalSpent / totalBudget) * 100), 999) : 0;
+  const progressRatio = Math.min(percentageSpent, 100) / 100;
 
   // Days in month & remaining days
   const now = new Date();
@@ -112,7 +116,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   // Gauge & progress color logic
   const isDanger = percentageSpent >= 100;
   const isWarning = percentageSpent >= 80 && !isDanger;
-  const gaugeColor = isDanger ? '#EF4444' : isWarning ? '#F59E0B' : '#10B981';
 
   // SVG Gauge calculations
   const radius = 54;
@@ -121,7 +124,19 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   // Parallax tilt on hero card (transform only, no layout thrashing)
   const containerRef = useRef<HTMLDivElement>(null);
+  const remainingTargetRef = useRef<HTMLDivElement>(null);
   const [scrollY, setScrollY] = useState(0);
+
+  const { registerTarget } = useCoinFlight();
+
+  useEffect(() => {
+    if (remainingTargetRef.current) {
+      registerTarget('dashboard-remaining', remainingTargetRef.current);
+    }
+    return () => {
+      registerTarget('dashboard-remaining', null);
+    };
+  }, [registerTarget]);
 
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
     if (!isReduced) {
@@ -132,8 +147,6 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const heroParallaxTransform = !isReduced && scrollY > 0
     ? `translateY(${Math.min(scrollY * 0.12, 16)}px)`
     : 'none';
-
-  const isHidden = Boolean(settings.hideAmounts);
 
   const handleToggleHideAmounts = () => {
     nativeHaptics.tap(settings.soundEnabled);
@@ -174,8 +187,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             whileTap={{ scale: 0.92 }}
             onClick={handleToggleHideAmounts}
             className="p-2.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-slate-800 text-slate-600 dark:text-slate-300 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            aria-label={isHidden ? 'إظهار المبالغ' : 'إخفاء المبالغ'}
-            title={isHidden ? 'إظهار المبالغ' : 'إخفاء المبالغ'}
+            aria-label={isHidden ? (isEn ? 'Show amounts' : 'إظهار المبالغ') : (isEn ? 'Hide amounts' : 'إخفاء المبالغ')}
+            title={isHidden ? (isEn ? 'Show amounts' : 'إظهار المبالغ') : (isEn ? 'Hide amounts' : 'إخفاء المبالغ')}
           >
             {isHidden ? <EyeOff size={16} /> : <Eye size={16} />}
           </motion.button>
@@ -188,7 +201,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               onOpenCategoryManager();
             }}
             className="p-2.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-slate-800 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-            title="تعديل الميزانية والتصنيفات"
+            title={isEn ? 'Manage Categories & Limits' : 'تعديل الميزانية والتصنيفات'}
           >
             <Sliders size={15} />
             <span className="hidden xs:inline">{t.categoriesBtn}</span>
@@ -212,18 +225,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               <Sparkles size={14} className="text-emerald-300" />
               <span>{isEn ? 'Monthly Available Balance' : 'المتبقي من ميزانية الشهر'}</span>
             </span>
-            <span className="text-[11px] bg-white/15 px-2 py-0.5 rounded-full backdrop-blur-xs font-medium">
+            <span className="text-[11px] bg-white/20 px-2 py-0.5 rounded-full font-medium">
               {remainingDays} {isEn ? 'days left' : 'يوم متبقي'}
             </span>
           </div>
 
           {/* Giant Remaining Counter */}
           <div className="flex items-baseline justify-between gap-3 flex-wrap">
-            <div>
+            <div ref={remainingTargetRef}>
               <div className="text-3xl sm:text-4xl font-black tracking-tight text-white drop-shadow-xs flex items-baseline gap-2">
                 <AnimatedCounter
                   value={remainingBudget}
-                  formatFn={(val) => formatMoney(val, settings.currency)}
+                  formatFn={(val) => formatMoney(val, settings.currency, lang)}
                   durationMs={700}
                   isReduced={isReduced}
                   isHidden={isHidden}
@@ -275,14 +288,21 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
           </div>
 
-          {/* Dynamic Spring Progress Bar */}
+          {/* Dynamic Spring Progress Bar: GPU Transform only via scaleX */}
           <div className="space-y-1.5 pt-1">
-            <div className="w-full h-2.5 rounded-full bg-black/20 overflow-hidden relative">
+            <div
+              role="progressbar"
+              aria-valuenow={Math.min(percentageSpent, 100)}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              className="w-full h-2.5 rounded-full bg-black/20 overflow-hidden relative"
+            >
               <motion.div
-                initial={isReduced ? { width: `${Math.min(percentageSpent, 100)}%` } : { width: '0%' }}
-                animate={{ width: `${Math.min(percentageSpent, 100)}%` }}
+                initial={{ scaleX: isReduced ? progressRatio : 0 }}
+                animate={{ scaleX: progressRatio }}
+                style={{ transformOrigin: isRTL ? 'right' : 'left' }}
                 transition={springs.smooth}
-                className={`h-full rounded-full transition-colors duration-500 ${
+                className={`w-full h-full rounded-full transition-colors duration-500 ${
                   isDanger
                     ? 'bg-red-400'
                     : isWarning
@@ -293,44 +313,58 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             </div>
           </div>
 
-          {/* Hero Bottom Mini Stats Grid */}
+          {/* Hero Bottom Mini Stats Grid (No backdrop-blur on moving hero card) */}
           <div className="grid grid-cols-2 gap-2 pt-2 border-t border-white/15 text-xs">
-            <div className="bg-white/10 rounded-xl p-2.5 backdrop-blur-xs">
+            <div className="bg-white/10 rounded-xl p-2.5">
               <span className="text-[11px] text-emerald-100 block opacity-85">
                 {isEn ? 'Total Budget' : 'الميزانية الكلية'}
               </span>
               <div className="text-sm font-extrabold text-white mt-0.5">
-                <AnimatedCounter
+                <Amount
                   value={totalBudget}
-                  formatFn={(val) => formatMoney(val, settings.currency)}
-                  isReduced={isReduced}
-                  isHidden={isHidden}
+                  currency={settings.currency}
+                  lang={lang}
+                  hideAmounts={isHidden}
+                  className="tabular-nums"
                 />
               </div>
             </div>
 
-            <div className="bg-white/10 rounded-xl p-2.5 backdrop-blur-xs">
+            <div className="bg-white/10 rounded-xl p-2.5">
               <span className="text-[11px] text-emerald-100 block opacity-85">
                 {isEn ? 'Actual Spent' : 'المصروف الفعلي'}
               </span>
               <div className="text-sm font-extrabold text-white mt-0.5">
-                <AnimatedCounter
+                <Amount
                   value={totalSpent}
-                  formatFn={(val) => formatMoney(val, settings.currency)}
-                  isReduced={isReduced}
-                  isHidden={isHidden}
+                  currency={settings.currency}
+                  lang={lang}
+                  hideAmounts={isHidden}
+                  className="tabular-nums"
                 />
               </div>
             </div>
           </div>
 
           {/* Suggested Daily Spending Card inside Hero */}
-          <div className="px-3 py-2 rounded-xl bg-black/15 flex items-center justify-between text-xs backdrop-blur-xs">
+          <div className="px-3 py-2 rounded-xl bg-black/15 flex items-center justify-between text-xs">
             <span className="text-emerald-100 font-medium">
               {isEn ? 'Daily target spend:' : 'معدل الصرف اليومي المتاح:'}
             </span>
             <span className="font-extrabold text-white tabular-nums">
-              {isHidden ? '••••••' : `${formatMoney(dailySuggestedSpend, settings.currency)} / ${isEn ? 'day' : 'يوم'}`}
+              {isHidden ? (
+                '••••••'
+              ) : (
+                <>
+                  <Amount
+                    value={dailySuggestedSpend}
+                    currency={settings.currency}
+                    lang={lang}
+                    hideAmounts={false}
+                  />{' '}
+                  / {isEn ? 'day' : 'يوم'}
+                </>
+              )}
             </span>
           </div>
         </div>
@@ -444,7 +478,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     )}
                   </div>
                   <div className="text-[11px] opacity-85">
-                    {b.title} ({formatMoney(b.amount, settings.currency)}) - {isEn ? `Day ${b.dueDay}` : `يوم ${b.dueDay} من الشهر`}
+                    {b.title} ({formatMoney(b.amount, settings.currency, lang)}) - {isEn ? `Day ${b.dueDay}` : `يوم ${b.dueDay} من الشهر`}
                   </div>
                 </div>
               </div>
@@ -475,11 +509,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             <TrendingDown size={14} className="text-emerald-500" />
           </div>
           <div className="text-lg font-extrabold text-[#1C1C1E] dark:text-white tabular-nums">
-            <AnimatedCounter
+            <Amount
               value={todaySpent}
-              formatFn={(val) => formatMoney(val, settings.currency)}
-              isReduced={isReduced}
-              isHidden={isHidden}
+              currency={settings.currency}
+              lang={lang}
+              hideAmounts={isHidden}
             />
           </div>
           <span className="text-[10px] text-[#8E8E93]">
@@ -499,9 +533,12 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </div>
           <span className="text-[10px] text-[#8E8E93]">
             {isEn ? 'Total: ' : 'بإجمالي '}
-            {isHidden
-              ? '••••••'
-              : formatMoney(unpaidBills.reduce((s, b) => s + b.amount, 0), settings.currency)}
+            <Amount
+              value={unpaidBills.reduce((s, b) => s + b.amount, 0)}
+              currency={settings.currency}
+              lang={lang}
+              hideAmounts={isHidden}
+            />
           </span>
         </div>
       </motion.div>
@@ -557,9 +594,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                 </div>
 
                 <div className="text-right">
-                  <span className="text-xs font-extrabold text-[#1C1C1E] dark:text-white tabular-nums">
-                    {isHidden ? '••••••' : `-${formatMoney(exp.amount, settings.currency)}`}
-                  </span>
+                  <Amount
+                    value={exp.amount}
+                    currency={settings.currency}
+                    lang={lang}
+                    hideAmounts={isHidden}
+                    prefix="-"
+                    className="text-xs font-extrabold text-[#1C1C1E] dark:text-white"
+                  />
                 </div>
               </div>
             );

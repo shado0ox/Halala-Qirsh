@@ -40,7 +40,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             nativeHaptics.tap();
             onCancel();
           }}
-          className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+          className="absolute inset-0 bg-black/55"
         />
 
         {/* Modal Dialog Card */}

@@ -38,7 +38,7 @@ export const Toast: React.FC<ToastProps> = ({
           initial={{ opacity: 0, y: -20, scale: 0.95 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: -20, scale: 0.95 }}
-          className="pointer-events-auto bg-white/95 dark:bg-[#1C1C1E]/95 backdrop-blur-md border border-slate-200/80 dark:border-slate-800 rounded-2xl px-4 py-2.5 shadow-xl flex items-center gap-2 text-xs font-semibold text-[#1C1C1E] dark:text-white max-w-sm"
+          className="pointer-events-auto bg-white dark:bg-[#1C1C1E] border border-slate-200/80 dark:border-slate-800 rounded-2xl px-4 py-2.5 shadow-xl flex items-center gap-2 text-xs font-semibold text-[#1C1C1E] dark:text-white max-w-sm"
         >
           {icon}
           <span>{message}</span>

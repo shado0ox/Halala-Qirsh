@@ -17,9 +17,9 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Category, Expense, BudgetSettings } from '../../types';
 import { CategoryIcon } from '../CategoryIcon';
+import { Amount } from '../Amount';
 import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
-import { AnimatedCounter } from '../AnimatedCounter';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
 
 interface BudgetsTabProps {
@@ -43,6 +43,9 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
   const motionConfig = useMotionConfig(settings.animations);
   const isReduced = motionConfig.isReduced;
   const isEn = settings.language === 'en';
+  const isRTL = settings.language !== 'en';
+  const lang = settings.language || 'ar';
+  const isHidden = Boolean(settings.hideAmounts);
 
   const monthlyExpenses = useMemo(
     () => expenses.filter((e) => e.date.startsWith(currentMonth)),
@@ -78,6 +81,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
     effectiveTotalBudget > 0
       ? Math.round((totalActualSpent / effectiveTotalBudget) * 100)
       : 0;
+  const totalRatio = Math.min(totalPercent, 100) / 100;
 
   // Selected Category Detail state
   const [selectedDetailCat, setSelectedDetailCat] = useState<Category | null>(null);
@@ -85,12 +89,6 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
   // Inline editing category limit
   const [editingCatId, setEditingCatId] = useState<string | null>(null);
   const [editingLimitValue, setEditingLimitValue] = useState<string>('');
-
-  // Editing overall custom total budget
-  const [isEditingTotalCustom, setIsEditingTotalCustom] = useState<boolean>(false);
-  const [customTotalInput, setCustomTotalInput] = useState<string>(
-    String(settings.totalMonthlyBudget)
-  );
 
   const handleStartEditCat = (cat: Category, e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
@@ -107,15 +105,6 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
       onUpdateCategoryLimit(catId, val);
     }
     setEditingCatId(null);
-  };
-
-  const handleSaveTotalCustom = () => {
-    const val = parseFloat(customTotalInput);
-    if (!isNaN(val) && val > 0) {
-      nativeHaptics.success(settings.soundEnabled);
-      onUpdateSettings({ totalMonthlyBudget: val });
-    }
-    setIsEditingTotalCustom(false);
   };
 
   // 6-month historical spend for selected detail category
@@ -189,9 +178,13 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
             <span className="text-xs font-extrabold text-emerald-600 dark:text-emerald-400 block tabular-nums">
               {totalPercent}% {isEn ? 'used' : 'مستهلك'}
             </span>
-            <span className="text-lg font-black text-[#1C1C1E] dark:text-white tabular-nums">
-              {formatMoney(effectiveTotalBudget, settings.currency)}
-            </span>
+            <Amount
+              value={effectiveTotalBudget}
+              currency={settings.currency}
+              lang={lang}
+              hideAmounts={isHidden}
+              className="text-lg font-black text-[#1C1C1E] dark:text-white tabular-nums block"
+            />
           </div>
         </div>
 
@@ -199,32 +192,46 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
         <div className="grid grid-cols-2 gap-2 pt-2 border-t border-[#E5E5EA] dark:border-[#2C2C2E] text-xs">
           <div>
             <span className="text-[11px] text-[#8E8E93] block">{isEn ? 'Actual Spent' : 'المصروف الفعلي'}</span>
-            <span className="text-sm font-extrabold text-[#1C1C1E] dark:text-white tabular-nums">
-              {formatMoney(totalActualSpent, settings.currency)}
-            </span>
+            <Amount
+              value={totalActualSpent}
+              currency={settings.currency}
+              lang={lang}
+              hideAmounts={isHidden}
+              className="text-sm font-extrabold text-[#1C1C1E] dark:text-white tabular-nums block mt-0.5"
+            />
           </div>
           <div>
             <span className="text-[11px] text-[#8E8E93] block">
               {totalRemaining >= 0 ? (isEn ? 'Remaining' : 'المتبقي للتوفير') : (isEn ? 'Over Budget' : 'تجاوز الميزانية')}
             </span>
-            <span
-              className={`text-sm font-extrabold tabular-nums ${
+            <Amount
+              value={Math.abs(totalRemaining)}
+              currency={settings.currency}
+              lang={lang}
+              hideAmounts={isHidden}
+              prefix={totalRemaining < 0 ? '+' : ''}
+              className={`text-sm font-extrabold tabular-nums block mt-0.5 ${
                 totalRemaining >= 0 ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500'
               }`}
-            >
-              {formatMoney(Math.abs(totalRemaining), settings.currency)}
-            </span>
+            />
           </div>
         </div>
 
-        {/* Total Progress Bar with Smooth Color Transition */}
+        {/* Total Progress Bar: GPU Transform only via scaleX */}
         <div className="space-y-1 pt-1">
-          <div className="w-full h-3 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] overflow-hidden">
+          <div
+            role="progressbar"
+            aria-valuenow={Math.min(totalPercent, 100)}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            className="w-full h-3 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] overflow-hidden"
+          >
             <motion.div
-              initial={isReduced ? { width: `${Math.min(totalPercent, 100)}%` } : { width: '0%' }}
-              animate={{ width: `${Math.min(totalPercent, 100)}%` }}
+              initial={{ scaleX: isReduced ? totalRatio : 0 }}
+              animate={{ scaleX: totalRatio }}
+              style={{ transformOrigin: isRTL ? 'right' : 'left' }}
               transition={springs.smooth}
-              className={`h-full rounded-full transition-colors duration-500 ${
+              className={`w-full h-full rounded-full transition-colors duration-500 ${
                 totalPercent >= 100
                   ? 'bg-red-500'
                   : totalPercent >= 80
@@ -235,7 +242,15 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
           </div>
           <div className="flex justify-between text-[10px] text-[#8E8E93] font-semibold">
             <span>0</span>
-            <span>{isEn ? `Cap: ${formatMoney(effectiveTotalBudget, settings.currency)}` : `الحد: ${formatMoney(effectiveTotalBudget, settings.currency)}`}</span>
+            <span>
+              {isEn ? 'Cap: ' : 'الحد: '}
+              <Amount
+                value={effectiveTotalBudget}
+                currency={settings.currency}
+                lang={lang}
+                hideAmounts={isHidden}
+              />
+            </span>
           </div>
         </div>
       </div>
@@ -257,6 +272,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
             const limit = cat.monthlyLimit;
             const remaining = limit - spent;
             const percent = limit > 0 ? Math.round((spent / limit) * 100) : 0;
+            const ratio = limit > 0 ? Math.min(spent / limit, 1) : 0;
             const isOver = percent > 100;
             const isNear = percent >= 80 && !isOver;
             const isEditing = editingCatId === cat.id;
@@ -271,20 +287,25 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
                 }}
                 className="bg-white dark:bg-[#1C1C1E] p-4 rounded-2xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-3 cursor-pointer hover:border-emerald-500/40 transition-colors"
               >
-                {/* Header row */}
+                {/* Header row with shared element layoutId */}
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2.5">
-                    <CategoryIcon
-                      iconName={cat.icon}
-                      color={cat.color}
-                      bgColor={cat.bgColor}
-                      size="md"
-                    />
+                    <motion.div layoutId={isReduced ? undefined : `budget-cat-icon-${cat.id}`}>
+                      <CategoryIcon
+                        iconName={cat.icon}
+                        color={cat.color}
+                        bgColor={cat.bgColor}
+                        size="md"
+                      />
+                    </motion.div>
                     <div>
                       <div className="flex items-center gap-1.5">
-                        <span className="text-xs font-bold text-[#1C1C1E] dark:text-white">
+                        <motion.span
+                          layoutId={isReduced ? undefined : `budget-cat-name-${cat.id}`}
+                          className="text-xs font-bold text-[#1C1C1E] dark:text-white"
+                        >
                           {isEn ? (cat.nameEn || cat.name) : cat.name}
-                        </span>
+                        </motion.span>
                         {cat.isCustom && (
                           <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 font-bold">
                             {isEn ? 'Custom' : 'مخصص'}
@@ -292,7 +313,13 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
                         )}
                       </div>
                       <span className="text-[11px] text-[#8E8E93] tabular-nums">
-                        {spent.toLocaleString()} {isEn ? 'of' : 'من'} {limit.toLocaleString()} {settings.currency}
+                        {isHidden ? (
+                          '••••••'
+                        ) : (
+                          <>
+                            {spent.toLocaleString()} {isEn ? 'of' : 'من'} {limit.toLocaleString()} {settings.currency}
+                          </>
+                        )}
                       </span>
                     </div>
                   </div>
@@ -316,7 +343,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
                     <button
                       onClick={(e) => handleStartEditCat(cat, e)}
                       className="p-1 rounded-lg text-slate-400 hover:text-emerald-600 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                      title="تعديل الحد"
+                      title={isEn ? 'Edit Limit' : 'تعديل الحد'}
                     >
                       <Edit2 size={13} />
                     </button>
@@ -358,14 +385,21 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
                   </div>
                 )}
 
-                {/* Progress Bar with Spring Fill & Attention Shake on 80%/100% */}
+                {/* Progress Bar: GPU Transform via scaleX */}
                 <div className="space-y-1">
-                  <div className="w-full h-2 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] overflow-hidden">
+                  <div
+                    role="progressbar"
+                    aria-valuenow={Math.min(percent, 100)}
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    className="w-full h-2 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] overflow-hidden"
+                  >
                     <motion.div
-                      initial={isReduced ? { width: `${Math.min(percent, 100)}%` } : { width: '0%' }}
-                      animate={{ width: `${Math.min(percent, 100)}%` }}
+                      initial={{ scaleX: isReduced ? ratio : 0 }}
+                      animate={{ scaleX: ratio }}
+                      style={{ transformOrigin: isRTL ? 'right' : 'left' }}
                       transition={springs.smooth}
-                      className={`h-full rounded-full transition-colors duration-500 ${
+                      className={`w-full h-full rounded-full transition-colors duration-500 ${
                         isOver
                           ? 'bg-red-500'
                           : isNear
@@ -377,9 +411,27 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
 
                   <div className="flex items-center justify-between text-[10px] text-[#8E8E93]">
                     <span>
-                      {remaining >= 0
-                        ? (isEn ? `Remaining: ${formatMoney(remaining, settings.currency)}` : `متبقي: ${formatMoney(remaining, settings.currency)}`)
-                        : (isEn ? `Over by: +${formatMoney(Math.abs(remaining), settings.currency)}` : `تجاوز بـ: +${formatMoney(Math.abs(remaining), settings.currency)}`)}
+                      {remaining >= 0 ? (
+                        <>
+                          {isEn ? 'Remaining: ' : 'متبقي: '}
+                          <Amount
+                            value={remaining}
+                            currency={settings.currency}
+                            lang={lang}
+                            hideAmounts={isHidden}
+                          />
+                        </>
+                      ) : (
+                        <>
+                          {isEn ? 'Over by: +' : 'تجاوز بـ: +'}
+                          <Amount
+                            value={Math.abs(remaining)}
+                            currency={settings.currency}
+                            lang={lang}
+                            hideAmounts={isHidden}
+                          />
+                        </>
+                      )}
                     </span>
                     <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
                       {isEn ? '6-mo trend →' : 'التحليل الشهري ←'}
@@ -392,7 +444,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
         </div>
       </div>
 
-      {/* CATEGORY 6-MONTH DETAIL MODAL WITH SVG CHART */}
+      {/* CATEGORY 6-MONTH DETAIL MODAL WITH GPU-ACCELERATED SCALE-Y CHART */}
       <AnimatePresence>
         {selectedDetailCat && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -401,7 +453,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setSelectedDetailCat(null)}
-              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+              className="absolute inset-0 bg-black/55"
             />
 
             <motion.div
@@ -411,18 +463,23 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
               transition={springs.smooth}
               className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4"
             >
-              {/* Header */}
+              {/* Header with shared element layoutId */}
               <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
                 <div className="flex items-center gap-2">
-                  <CategoryIcon
-                    iconName={selectedDetailCat.icon}
-                    color={selectedDetailCat.color}
-                    bgColor={selectedDetailCat.bgColor}
-                    size="sm"
-                  />
-                  <span className="text-sm font-bold text-[#1C1C1E] dark:text-white">
+                  <motion.div layoutId={isReduced ? undefined : `budget-cat-icon-${selectedDetailCat.id}`}>
+                    <CategoryIcon
+                      iconName={selectedDetailCat.icon}
+                      color={selectedDetailCat.color}
+                      bgColor={selectedDetailCat.bgColor}
+                      size="sm"
+                    />
+                  </motion.div>
+                  <motion.span
+                    layoutId={isReduced ? undefined : `budget-cat-name-${selectedDetailCat.id}`}
+                    className="text-sm font-bold text-[#1C1C1E] dark:text-white"
+                  >
                     {isEn ? (selectedDetailCat.nameEn || selectedDetailCat.name) : selectedDetailCat.name}
-                  </span>
+                  </motion.span>
                 </div>
 
                 <button
@@ -437,9 +494,13 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
               <div className="p-3 bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-2xl flex items-center justify-between text-xs">
                 <div>
                   <span className="text-[#8E8E93] block">{isEn ? 'Monthly Envelope Limit' : 'الحد الشهري للظرف'}</span>
-                  <span className="text-sm font-extrabold text-[#1C1C1E] dark:text-white tabular-nums">
-                    {formatMoney(selectedDetailCat.monthlyLimit, settings.currency)}
-                  </span>
+                  <Amount
+                    value={selectedDetailCat.monthlyLimit}
+                    currency={settings.currency}
+                    lang={lang}
+                    hideAmounts={isHidden}
+                    className="text-sm font-extrabold text-[#1C1C1E] dark:text-white tabular-nums block mt-0.5"
+                  />
                 </div>
                 <button
                   onClick={() => handleStartEditCat(selectedDetailCat)}
@@ -449,7 +510,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
                 </button>
               </div>
 
-              {/* 6-Month Animated SVG Bar Chart */}
+              {/* 6-Month Animated SVG Bar Chart using GPU transform scaleY */}
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-xs font-bold text-[#1C1C1E] dark:text-white flex items-center gap-1.5">
@@ -461,19 +522,27 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
                 <div className="h-32 w-full pt-3 flex items-end justify-between gap-2 px-1 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
                   {detailHistoricalData.map((pt, idx) => {
                     const heightPercent = Math.min(Math.round((pt.spent / maxHistoricalSpend) * 100), 100);
+                    const scaleYRatio = heightPercent / 100;
                     const isLimitCrossed = pt.spent > selectedDetailCat.monthlyLimit;
 
                     return (
                       <div key={idx} className="flex-1 flex flex-col items-center gap-1.5 h-full justify-end">
                         <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 tabular-nums">
-                          {pt.spent > 0 ? pt.spent : '0'}
+                          {isHidden ? '•••' : (pt.spent > 0 ? pt.spent : '0')}
                         </span>
-                        <div className="w-full h-20 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-end">
+                        <div
+                          role="progressbar"
+                          aria-valuenow={heightPercent}
+                          aria-valuemin={0}
+                          aria-valuemax={100}
+                          className="w-full h-20 bg-slate-100 dark:bg-slate-800 rounded-lg overflow-hidden flex items-end"
+                        >
                           <motion.div
-                            initial={isReduced ? { height: `${heightPercent}%` } : { height: '0%' }}
-                            animate={{ height: `${heightPercent}%` }}
-                            transition={{ ...springs.smooth, delay: idx * 0.04 }}
-                            className={`w-full rounded-t-md ${
+                            initial={{ scaleY: isReduced ? scaleYRatio : 0 }}
+                            animate={{ scaleY: scaleYRatio }}
+                            style={{ transformOrigin: 'bottom' }}
+                            transition={{ ...springs.smooth, delay: isReduced ? 0 : idx * 0.04 }}
+                            className={`w-full h-full rounded-t-md ${
                               isLimitCrossed ? 'bg-red-500' : 'bg-emerald-500'
                             }`}
                           />

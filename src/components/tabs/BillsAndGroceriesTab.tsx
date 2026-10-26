@@ -20,6 +20,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { RecurringBill, GroceryItem, Category, BudgetSettings } from '../../types';
 import { SegmentedControl } from '../SegmentedControl';
 import { CategoryIcon } from '../CategoryIcon';
+import { Amount } from '../Amount';
 import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { NotificationPermissionState } from '../../utils/notifications';
@@ -67,6 +68,8 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
   const motionConfig = useMotionConfig(settings.animations);
   const isReduced = motionConfig.isReduced;
   const isEn = settings.language === 'en';
+  const lang = settings.language || 'ar';
+  const isHidden = Boolean(settings.hideAmounts);
 
   // Add Bill Modal
   const [showAddBillModal, setShowAddBillModal] = useState<boolean>(false);
@@ -162,8 +165,12 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
             </h1>
             <span className="text-xs text-[#8E8E93] font-medium">
               {activeSubTab === 'bills'
-                ? isEn ? `${unpaidCount} unpaid bills this month` : `${unpaidCount} فواتير متبقية للاستحقاق`
-                : isEn ? `${unboughtItems.length} items needed` : `${unboughtItems.length} أصناف مطلوبة للقائمة`}
+                ? isEn
+                  ? `${unpaidCount} unpaid household bills`
+                  : `${unpaidCount} فواتير متبقية للسداد`
+                : isEn
+                ? `${unboughtItems.length} items needed`
+                : `${unboughtItems.length} أغراض وطلبات مطلوبة`}
             </span>
           </div>
 
@@ -177,275 +184,166 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
                 setShowAddGroceryModal(true);
               }
             }}
-            className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer transition-colors"
+            className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm shadow-emerald-600/25 cursor-pointer"
           >
-            {activeSubTab === 'bills'
-              ? (isEn ? '+ Recurring Bill' : '+ فاتورة دورية')
-              : (isEn ? '+ Grocery Item' : '+ سلعة للقائمة')}
+            <Plus size={16} strokeWidth={2.8} />
+            <span>{activeSubTab === 'bills' ? (isEn ? 'New Bill' : 'إضافة فاتورة') : (isEn ? 'Add Item' : 'إضافة سلعة')}</span>
           </motion.button>
         </div>
 
-        {/* Segmented Control */}
+        {/* Sub-Tab Selector */}
         <SegmentedControl
-          value={activeSubTab}
-          onChange={setActiveSubTab}
-          soundEnabled={settings.soundEnabled}
           options={[
-            { value: 'bills', label: isEn ? 'Monthly Bills' : 'الفواتير والأقساط الشهرية', badge: unpaidCount },
-            { value: 'groceries', label: isEn ? 'Household Groceries' : 'قائمة مشتريات ونواقص البيت', badge: unboughtItems.length },
+            { id: 'bills', label: isEn ? 'Recurring Bills' : 'فواتير دورية' },
+            { id: 'groceries', label: isEn ? 'Grocery List' : 'قائمة النواقص' },
           ]}
+          value={activeSubTab}
+          onChange={(val) => {
+            nativeHaptics.tap(settings.soundEnabled);
+            setActiveSubTab(val as any);
+          }}
+          isReduced={isReduced}
         />
       </div>
 
-      {/* ===================== TAB 1: BILLS ===================== */}
+      {/* SUB-TAB 1: RECURRING BILLS */}
       {activeSubTab === 'bills' && (
         <div className="space-y-3.5 pb-6">
-          {/* Bills Summary Box */}
-          <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#8E8E93]">
-                {isEn ? 'Monthly Bills Status' : 'حالة فواتير هذا الشهر'}
+          {/* Summary Strip */}
+          <div className="grid grid-cols-2 gap-2.5">
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200/70 dark:border-slate-800 shadow-2xs">
+              <span className="text-[11px] text-[#8E8E93] block font-semibold">
+                {isEn ? 'Unpaid Balance' : 'متبقي للسداد'}
               </span>
-              <span className="text-[11px] font-bold text-slate-600 dark:text-slate-300">
-                {bills.filter((b) => b.isPaid).length} {isEn ? 'of' : 'من'} {bills.length} {isEn ? 'paid' : 'مسددة'}
+              <Amount
+                value={unpaidBillsAmount}
+                currency={settings.currency}
+                lang={lang}
+                hideAmounts={isHidden}
+                className="text-lg font-black text-amber-600 dark:text-amber-400 tabular-nums block mt-0.5"
+              />
+              <span className="text-[10px] text-[#8E8E93]">
+                {unpaidCount} {isEn ? 'bills' : 'فواتير'}
               </span>
             </div>
 
-            <div className="grid grid-cols-2 gap-2 text-center">
-              <div className="p-2.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200/50 dark:border-emerald-900/40">
-                <span className="text-[10px] text-emerald-800 dark:text-emerald-300 font-semibold block">
-                  {isEn ? 'Paid' : 'تم سداده'}
-                </span>
-                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 tabular-nums">
-                  {formatMoney(paidBillsAmount, settings.currency)}
-                </span>
-              </div>
-
-              <div className="p-2.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-200/50 dark:border-amber-900/40">
-                <span className="text-[10px] text-amber-800 dark:text-amber-300 font-semibold block">
-                  {isEn ? 'Remaining Due' : 'المتبقي مستحق السداد'}
-                </span>
-                <span className="text-sm font-black text-amber-600 dark:text-amber-400 tabular-nums">
-                  {formatMoney(unpaidBillsAmount, settings.currency)}
-                </span>
-              </div>
+            <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200/70 dark:border-slate-800 shadow-2xs">
+              <span className="text-[11px] text-[#8E8E93] block font-semibold">
+                {isEn ? 'Paid This Month' : 'تم سداده'}
+              </span>
+              <Amount
+                value={paidBillsAmount}
+                currency={settings.currency}
+                lang={lang}
+                hideAmounts={isHidden}
+                className="text-lg font-black text-emerald-600 dark:text-emerald-400 tabular-nums block mt-0.5"
+              />
+              <span className="text-[10px] text-[#8E8E93]">
+                {bills.length - unpaidCount} {isEn ? 'bills' : 'فواتير'}
+              </span>
             </div>
           </div>
 
-          {/* Local Bill Reminders Card */}
-          <div className="bg-white dark:bg-[#1C1C1E] p-4 rounded-3xl border border-emerald-200/60 dark:border-emerald-900/40 shadow-2xs space-y-3">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-emerald-100 dark:bg-emerald-900/50 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
-                  <BellRing size={16} />
-                </div>
-                <div>
-                  <span className="text-xs font-bold text-[#1C1C1E] dark:text-white block">
-                    {isEn ? 'Local Apple Notifications' : 'تنبيهات الفواتير المحلية (Apple)'}
-                  </span>
-                  <span className="text-[10px] text-[#8E8E93]">
-                    {isEn ? 'Automatic reminder before bill due date' : 'تذكير محلي قبل موعد الاستحقاق'}
-                  </span>
-                </div>
-              </div>
-
-              <span
-                className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                  notificationPermission === 'granted'
-                    ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300'
-                    : notificationPermission === 'denied'
-                    ? 'bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300'
-                    : 'bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300'
-                }`}
-              >
-                {notificationPermission === 'granted'
-                  ? (isEn ? 'Active ✓' : 'مفعلة ✓')
-                  : notificationPermission === 'denied'
-                  ? (isEn ? 'Denied' : 'محظورة')
-                  : (isEn ? 'Action needed' : 'تحتاج إذن')}
-              </span>
-            </div>
-
-            {/* Reminder Lead Days Selector */}
-            <div className="flex items-center justify-between p-2 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs">
-              <span className="font-semibold text-slate-700 dark:text-slate-300 text-[11px]">
-                {isEn ? 'Remind me:' : 'موعد التنبيه:'}
-              </span>
-              <div className="flex items-center gap-1 font-semibold text-[11px]">
-                {[
-                  { days: 0, label: isEn ? 'On Due Day' : 'في نفس اليوم' },
-                  { days: 1, label: isEn ? '1 Day Before' : 'قبل يوم' },
-                  { days: 3, label: isEn ? '3 Days Before' : 'قبل 3 أيام' },
-                ].map((opt) => (
-                  <button
-                    key={opt.days}
-                    type="button"
-                    onClick={() => {
-                      nativeHaptics.tap(settings.soundEnabled);
-                      onUpdateSettings({ notificationLeadDays: opt.days });
-                    }}
-                    className={`px-2.5 py-1 rounded-xl transition-all cursor-pointer ${
-                      settings.notificationLeadDays === opt.days
-                        ? 'bg-emerald-600 text-white shadow-2xs font-bold'
-                        : 'text-slate-600 dark:text-slate-300 hover:text-slate-900'
-                    }`}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Action Buttons */}
-            <div className="flex items-center gap-2">
-              {notificationPermission !== 'granted' ? (
-                <button
-                  type="button"
-                  onClick={onRequestNotificationPermission}
-                  className="flex-1 py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-xs cursor-pointer"
-                >
-                  <Bell size={14} />
-                  <span>{isEn ? 'Enable Local Reminders' : 'تفعيل إشعارات الجهاز الآن'}</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  onClick={onSendTestNotification}
-                  className="flex-1 py-2 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-100 font-bold text-xs flex items-center justify-center gap-1.5 border border-emerald-200/60 dark:border-emerald-900/50 cursor-pointer"
-                >
-                  <Sparkles size={14} />
-                  <span>{isEn ? 'Send Test Reminder' : 'إرسال إشعار تجريبي لاختبار التنبيه'}</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Bills List with Path Animation & Urgency Glow */}
+          {/* Bills List */}
           <div className="space-y-2">
             <span className="text-xs font-bold text-[#8E8E93] px-1">
-              {isEn ? 'Monthly Bills Schedule' : 'جدول الفواتير المستحقة شهرياً'}
+              {isEn ? `Monthly Bills (${bills.length})` : `فواتير الشهر (${bills.length})`}
             </span>
 
             <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-slate-200/60 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden shadow-2xs">
               <AnimatePresence initial={false}>
                 {bills.map((bill) => {
                   const cat = catMap.get(bill.categoryId);
-                  const isReminderOn = bill.reminderEnabled !== false;
-                  const isUrgent = !bill.isPaid && Math.abs(bill.dueDay - todayDay) <= (settings.notificationLeadDays || 1);
+                  const isDueSoon = !bill.isPaid && Math.abs(bill.dueDay - todayDay) <= 4;
 
                   return (
                     <motion.div
                       layout
                       key={bill.id}
-                      initial={{ opacity: 0, y: 8 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, scale: 0.95 }}
+                      initial={{ opacity: 0 }}
+                      animate={{ opacity: 1 }}
+                      exit={{ opacity: 0, x: -60 }}
                       transition={springs.smooth}
-                      className={`p-3.5 flex items-center justify-between transition-colors relative ${
-                        bill.isPaid
-                          ? 'bg-slate-50/50 dark:bg-slate-900/25 opacity-70'
-                          : 'hover:bg-slate-50/70 dark:hover:bg-slate-800/40'
+                      className={`p-3.5 flex items-center justify-between hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors ${
+                        bill.isPaid ? 'opacity-65' : ''
                       }`}
                     >
-                      {/* Urgency glow if due soon */}
-                      {isUrgent && (
-                        <motion.div
-                          animate={{ opacity: [0.3, 0.8, 0.3] }}
-                          transition={{ duration: 2, repeat: Infinity, ease: 'easeInOut' }}
-                          className="absolute inset-y-0 right-0 w-1 bg-amber-500 rounded-r-md pointer-events-none"
-                        />
-                      )}
-
                       <div className="flex items-center gap-3">
-                        {/* Animated Checkmark Path Checkbox */}
                         <motion.button
                           whileTap={{ scale: 0.88 }}
                           onClick={() => {
-                            nativeHaptics.success(settings.soundEnabled);
+                            nativeHaptics.tap(settings.soundEnabled);
                             onToggleBill(bill.id);
                           }}
-                          className="cursor-pointer text-emerald-600 dark:text-emerald-400 shrink-0"
-                          title={bill.isPaid ? 'تحديد كغير مسددة' : 'تحديد كمسددة'}
+                          className="cursor-pointer"
                         >
                           {bill.isPaid ? (
-                            <svg className="w-6 h-6 text-emerald-500" viewBox="0 0 24 24" fill="none">
-                              <circle cx="12" cy="12" r="10" fill="#10B981" />
-                              <motion.path
-                                d="M8 12.5l2.5 2.5 5.5-5.5"
-                                stroke="#FFFFFF"
-                                strokeWidth="2.5"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                                initial={{ pathLength: 0 }}
-                                animate={{ pathLength: 1 }}
-                                transition={springs.bouncy}
-                              />
-                            </svg>
+                            <CheckCircle2 size={24} className="text-emerald-600 fill-emerald-100 dark:fill-emerald-950" />
                           ) : (
-                            <Circle size={24} className="text-slate-300 dark:text-slate-600 hover:text-emerald-500" />
+                            <Circle size={24} className="text-slate-300 hover:text-emerald-600" />
                           )}
                         </motion.button>
 
-                        <CategoryIcon
-                          iconName={cat?.icon || 'Zap'}
-                          color={cat?.color || '#F59E0B'}
-                          bgColor={cat?.bgColor}
-                          size="md"
-                        />
-
                         <div>
-                          <div
-                            className={`text-xs font-bold ${
-                              bill.isPaid
-                                ? 'line-through text-[#8E8E93]'
-                                : 'text-[#1C1C1E] dark:text-white'
-                            }`}
-                          >
-                            {bill.title}
-                          </div>
-                          <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5 flex-wrap">
-                            <span className="flex items-center gap-0.5">
-                              <Calendar size={11} />
-                              <span>{isEn ? `Day ${bill.dueDay} of month` : `يوم ${bill.dueDay} من الشهر`}</span>
+                          <div className="flex items-center gap-1.5">
+                            <span
+                              className={`text-xs font-bold ${
+                                bill.isPaid
+                                  ? 'line-through text-[#8E8E93]'
+                                  : 'text-[#1C1C1E] dark:text-white'
+                              }`}
+                            >
+                              {bill.title}
                             </span>
+                            {isDueSoon && (
+                              <span className="text-[9px] px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-700 dark:bg-amber-950/60 dark:text-amber-300 font-bold">
+                                {isEn ? 'Due Soon' : 'قريباً'}
+                              </span>
+                            )}
+                          </div>
+                          <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5">
+                            <span>{isEn ? (cat?.nameEn || cat?.name || 'Bill') : (cat?.name || 'فاتورة')}</span>
                             <span>·</span>
-                            <span>{isEn ? (cat?.nameEn || cat?.name || 'Bills') : (cat?.name || 'فواتير')}</span>
-                            {bill.notes && <span>· {bill.notes}</span>}
+                            <span>{isEn ? `Due day ${bill.dueDay}` : `يوم ${bill.dueDay} شهرياً`}</span>
                           </div>
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-[#1C1C1E] dark:text-white tabular-nums">
-                          {formatMoney(bill.amount, settings.currency)}
-                        </span>
+                        <Amount
+                          value={bill.amount}
+                          currency={settings.currency}
+                          lang={lang}
+                          hideAmounts={isHidden}
+                          className="text-xs font-extrabold text-[#1C1C1E] dark:text-white tabular-nums"
+                        />
 
+                        {/* Reminder Bell Toggle */}
                         <motion.button
-                          whileTap={{ scale: 0.9 }}
-                          type="button"
+                          whileTap={{ scale: 0.88 }}
                           onClick={() => {
                             nativeHaptics.tap(settings.soundEnabled);
                             onToggleBillReminder(bill.id);
                           }}
-                          className={`p-1.5 rounded-xl transition-colors cursor-pointer ${
-                            isReminderOn
-                              ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40'
-                              : 'text-slate-300 dark:text-slate-600 hover:text-slate-500'
+                          className={`p-1.5 rounded-xl cursor-pointer ${
+                            bill.reminderEnabled !== false
+                              ? 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/50'
+                              : 'text-slate-400 bg-slate-100 dark:bg-slate-800'
                           }`}
-                          title={isReminderOn ? 'Reminder enabled' : 'Reminder disabled'}
+                          title={isEn ? 'Toggle Local Reminder' : 'تفعيل أو إيقاف التنبيه'}
                         >
-                          {isReminderOn ? <Bell size={14} /> : <BellOff size={14} />}
+                          {bill.reminderEnabled !== false ? <BellRing size={13} /> : <BellOff size={13} />}
                         </motion.button>
 
                         <motion.button
-                          whileTap={{ scale: 0.9 }}
+                          whileTap={{ scale: 0.88 }}
                           onClick={() => {
                             nativeHaptics.impactLight(settings.soundEnabled);
                             onDeleteBill(bill.id);
                           }}
-                          className="p-1 rounded-lg text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 cursor-pointer transition-colors"
+                          className="p-1.5 rounded-xl text-slate-300 hover:text-red-500 dark:text-slate-600 dark:hover:text-red-400 cursor-pointer"
                         >
-                          <Trash2 size={14} />
+                          <Trash2 size={13} />
                         </motion.button>
                       </div>
                     </motion.div>
@@ -454,10 +352,20 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
               </AnimatePresence>
 
               {bills.length === 0 && (
-                <div className="p-8 text-center text-xs text-[#8E8E93]">
-                  {isEn
-                    ? 'No bills added yet. Tap "+ Recurring Bill" to add rent, utilities, or subscriptions.'
-                    : 'لا توجد فواتير مضافة بعد. اضغط على "+ فاتورة دورية" لإضافة كهرباء، إيجار، أو إنترنت.'}
+                <div className="p-7 text-center space-y-2">
+                  <motion.div
+                    animate={isReduced ? {} : { y: [0, -4, 0] }}
+                    transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
+                    className="w-12 h-12 rounded-full bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 mx-auto flex items-center justify-center"
+                  >
+                    <Receipt size={22} />
+                  </motion.div>
+                  <div className="text-xs font-bold text-[#1C1C1E] dark:text-white">
+                    {isEn ? 'No recurring bills added' : 'لا توجد فواتير دورية مسجلة'}
+                  </div>
+                  <p className="text-[11px] text-[#8E8E93] max-w-xs mx-auto">
+                    {isEn ? 'Add monthly rent, electricity, phone, or internet bills.' : 'أضف فواتير الكهرباء، الإيجار، الجوال، أو الإنترنت لتصلك تذكيرات دورية.'}
+                  </p>
                 </div>
               )}
             </div>
@@ -465,38 +373,37 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
         </div>
       )}
 
-      {/* ===================== TAB 2: GROCERIES ===================== */}
+      {/* SUB-TAB 2: GROCERIES LIST */}
       {activeSubTab === 'groceries' && (
         <div className="space-y-3.5 pb-6">
-          {/* Action Banner to Convert to Expense */}
+          {/* Action to convert bought items to an actual expense */}
           {boughtItems.length > 0 && (
             <motion.div
-              layout
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              className="p-3.5 rounded-3xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-900/50 flex items-center justify-between"
+              className="p-3.5 rounded-2xl bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 flex items-center justify-between"
             >
               <div>
-                <span className="text-xs font-bold text-emerald-900 dark:text-emerald-200 block">
-                  {isEn ? `${boughtItems.length} items purchased!` : `تم شراء ${boughtItems.length} أصناف بنجاح!`}
+                <span className="text-xs font-bold text-emerald-800 dark:text-emerald-200 block">
+                  {boughtItems.length} {isEn ? 'purchased items' : 'أصناف تم شراؤها'}
                 </span>
-                <span className="text-[11px] text-emerald-700 dark:text-emerald-300">
-                  {isEn ? 'Estimated Total: ' : 'إجمالي التكلفة التقريبية: '}
-                  <AnimatedCounter
+                <span className="text-[11px] text-emerald-600 dark:text-emerald-400">
+                  {isEn ? 'Est. Total: ' : 'الإجمالي التقديري: '}
+                  <Amount
                     value={totalBoughtEst}
-                    formatFn={(v) => formatMoney(v, settings.currency)}
-                    isReduced={isReduced}
+                    currency={settings.currency}
+                    lang={lang}
+                    hideAmounts={isHidden}
                   />
                 </span>
               </div>
-
               <motion.button
-                whileTap={{ scale: 0.93 }}
+                whileTap={{ scale: 0.94 }}
                 onClick={handleConvertBought}
-                className="px-3.5 py-2 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer transition-all"
+                className="px-3 py-1.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs shadow-2xs flex items-center gap-1.5 cursor-pointer"
               >
-                <Receipt size={14} />
-                <span>{isEn ? 'Log as Expense' : 'ترحيل لمصروف فعلي'}</span>
+                <Sparkles size={14} />
+                <span>{isEn ? 'Record as Expense' : 'ترحيل كمصروف'}</span>
               </motion.button>
             </motion.div>
           )}
@@ -550,9 +457,14 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
 
                     <div className="flex items-center gap-2">
                       {item.estimatedPrice > 0 && (
-                        <span className="text-xs font-bold text-slate-700 dark:text-slate-300 tabular-nums">
-                          ~{formatMoney(item.estimatedPrice * item.quantity, settings.currency)}
-                        </span>
+                        <Amount
+                          value={item.estimatedPrice * item.quantity}
+                          currency={settings.currency}
+                          lang={lang}
+                          hideAmounts={isHidden}
+                          prefix="~"
+                          className="text-xs font-bold text-slate-700 dark:text-slate-300 tabular-nums"
+                        />
                       )}
 
                       <motion.button
@@ -590,7 +502,7 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
             </div>
           </div>
 
-          {/* Bought Items Group with Strike-through line drawing */}
+          {/* Bought Items Group */}
           {boughtItems.length > 0 && (
             <div className="space-y-2 pt-2">
               <span className="text-xs font-bold text-[#8E8E93] px-1">
@@ -647,7 +559,7 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
         </div>
       )}
 
-      {/* Add Bill Modal */}
+      {/* Add Bill Modal (Zero backdrop-blur to preserve 60fps) */}
       <AnimatePresence>
         {showAddBillModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -656,7 +568,7 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowAddBillModal(false)}
-              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+              className="absolute inset-0 bg-black/55"
             />
             <motion.div
               initial={{ scale: 0.93, opacity: 0 }}
@@ -704,14 +616,14 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
                       required
                       value={billAmount}
                       onChange={(e) => setBillAmount(e.target.value)}
-                      placeholder="0"
+                      placeholder="0.00"
                       className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
                     />
                   </div>
 
                   <div>
                     <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      {isEn ? 'Due Day (1-31)' : 'يوم الاستحقاق (1-31)'}
+                      {isEn ? 'Due Day (1-31)' : 'يوم الاستحقاق'}
                     </label>
                     <input
                       type="number"
@@ -727,12 +639,12 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
 
                 <div>
                   <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                    {isEn ? 'Category' : 'التصنيف'}
+                    {isEn ? 'Category' : 'التصنيف التابع له'}
                   </label>
                   <select
                     value={billCategoryId}
                     onChange={(e) => setBillCategoryId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden"
+                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden cursor-pointer"
                   >
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
@@ -742,9 +654,9 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
                   </select>
                 </div>
 
-                <div className="flex items-center justify-between p-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
-                  <span className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                    {isEn ? 'Schedule local reminder' : 'جدولة تنبيه محلي'}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs">
+                  <span className="font-semibold text-slate-800 dark:text-slate-200">
+                    {isEn ? 'Send Notification Reminder' : 'إرسال تنبيه قبل الموعد'}
                   </span>
                   <input
                     type="checkbox"
@@ -766,7 +678,7 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
         )}
       </AnimatePresence>
 
-      {/* Add Grocery Modal */}
+      {/* Add Grocery Modal (Zero backdrop-blur to preserve 60fps) */}
       <AnimatePresence>
         {showAddGroceryModal && (
           <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
@@ -775,7 +687,7 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               onClick={() => setShowAddGroceryModal(false)}
-              className="absolute inset-0 bg-black/50 backdrop-blur-xs"
+              className="absolute inset-0 bg-black/55"
             />
             <motion.div
               initial={{ scale: 0.93, opacity: 0 }}

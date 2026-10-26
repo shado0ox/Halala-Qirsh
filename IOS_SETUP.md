@@ -100,11 +100,24 @@ npx cap sync ios
 
 ## 5. تجهيز أيقونة التطبيق وشاشات العرض (App Store Assets)
 
-### أ) أيقونة التطبيق (App Store Icon):
-- الحجم: **1024 × 1024 بكسل** (مربعة تماماً).
-- الصيغة: **PNG**.
-- **مهم جداً:** بدون قنوات شفافة (No Alpha / Transparency) وبدون زوايا دائرية (أبل تضيف الزوايا الدائرية آلياً).
-- في Xcode: ضعها داخل `App/Assets.xcassets/AppIcon`.
+### أ) توليد الأيقونات آلياً بأمر واحد (Automatic Icon Generation):
+قمنا بتضمين سكربت احترافي مدمج يعتمد على مكتبة `sharp` لتوليد حزمة أيقونات Xcode بالكامل وبدقة فائقة بدون شفافية (Zero Transparency) وبدون زوايا دائرية، متوافقة 100% مع معايير متجر أبل:
+
+```bash
+npm run icons
+```
+
+هذا الأمر يولد تلقائياً:
+1. أيقونة المتجر الأساسية: `resources/AppIcon-1024.png` (بدقة 1024×1024 بكسل معتمة تماماً).
+2. حزمة Xcode كاملة: `resources/AppIcon.appiconset` شاملة ملف الفهرسة `Contents.json` وكافة أحجام الآيفون والآيباد (`20x20`, `29x29`, `40x40`, `60x60`, `76x76`, `83.5x83.5`, `1024x1024`).
+3. شاشة البداية: `resources/LaunchImage.png`.
+
+**طريقة نسخ الأيقونات إلى مشروع Xcode:**
+بعد تشغيل `npx cap add ios`، قم بنسخ مجلد الأيقونات إلى أصول Xcode عبر الأمر التالي في الطرفية:
+```bash
+cp -R resources/AppIcon.appiconset/* ios/App/App/Assets.xcassets/AppIcon.appiconset/
+```
+أو اسحب محتويات `resources/AppIcon.appiconset` وأفلتها مباشرة داخل Xcode في قسم `Assets.xcassets > AppIcon`.
 
 ### ب) لقطات الشاشة (Screenshots):
 مطلوب رفع لقطات شاشة للحجمين التاليين كحد أدنى في App Store Connect:
