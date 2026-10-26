@@ -2,8 +2,10 @@ export type Language = 'ar' | 'en';
 
 export const translations = {
   ar: {
-    appTitle: 'مصاريف البيت',
-    appSubtitle: 'تتبع المصاريف والميزانية - تخزين محلي 100%',
+    appTitle: 'هللة وقرش',
+    appSubtitle: 'Halala & Qirsh · تتبع المصاريف والميزانية - تخزين محلي 100%',
+    brandNameEn: 'Halala & Qirsh',
+    brandTagline: 'نحفظ لك كل هللة وقرش',
     tabDashboard: 'الرئيسية',
     tabExpenses: 'المصاريف',
     tabBudgets: 'الميزانية',
@@ -30,7 +32,7 @@ export const translations = {
 
     // Dashboard
     monthlyBudgetTitle: 'ميزانية شهر',
-    dashboardHeading: 'لوحة مصاريف البيت',
+    dashboardHeading: 'لوحة هللة وقرش',
     categoriesBtn: 'التصنيفات',
     actualSpent: 'المصروف الفعلي حتى الآن',
     totalBudget: 'الميزانية الكلية',
@@ -249,9 +251,9 @@ export const translations = {
     deleteCategoryTooltip: 'حذف التصنيف',
 
     // Notification Banner & Toasts
-    appNameBanner: 'مصاريف البيت',
+    appNameBanner: 'هللة وقرش',
     goToBills: 'الانتقال للفواتير',
-    securedOfflineTracker: 'تطبيق الميزانية المشفر محلياً',
+    securedOfflineTracker: 'هللة وقرش · محفظة مشفرة محلياً',
 
     // Settings & Native
     reportsSettings: 'التقارير والإعدادات',
@@ -300,8 +302,10 @@ export const translations = {
     joint: 'مشترك',
   },
   en: {
-    appTitle: 'Home Expenses',
-    appSubtitle: 'Offline Expense & Budget Tracker',
+    appTitle: 'Halala & Qirsh',
+    appSubtitle: 'Halala & Qirsh · Household Budget & Expense Tracker',
+    brandNameEn: 'Halala & Qirsh',
+    brandTagline: 'Every Halala & Qirsh counts',
     tabDashboard: 'Dashboard',
     tabExpenses: 'Expenses',
     tabBudgets: 'Budgets',
@@ -328,7 +332,7 @@ export const translations = {
 
     // Dashboard
     monthlyBudgetTitle: 'Budget for',
-    dashboardHeading: 'Home Expense Overview',
+    dashboardHeading: 'Halala & Qirsh Overview',
     categoriesBtn: 'Categories',
     actualSpent: 'Actual Spent So Far',
     totalBudget: 'Total Monthly Budget',
@@ -547,9 +551,9 @@ export const translations = {
     deleteCategoryTooltip: 'Delete Category',
 
     // Notification Banner & Toasts
-    appNameBanner: 'Home Expenses',
+    appNameBanner: 'Halala & Qirsh',
     goToBills: 'Go to Bills',
-    securedOfflineTracker: 'Secured Offline Tracker',
+    securedOfflineTracker: 'Halala & Qirsh · Secured Offline Tracker',
 
     // Settings & Native
     reportsSettings: 'Analytics & App Settings',

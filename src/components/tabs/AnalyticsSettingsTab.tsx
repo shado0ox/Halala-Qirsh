@@ -23,6 +23,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { HalalaQirshLogo } from '../HalalaQirshLogo';
 import {
   Category,
   Expense,
@@ -643,6 +644,26 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           <Trash2 size={15} />
           <span>{isEn ? 'Erase All Data' : 'مسح كافة البيانات من الجهاز'}</span>
         </motion.button>
+      </div>
+
+      {/* BRAND CARD: HALALA & QIRSH */}
+      <div className="bg-gradient-to-br from-emerald-500/10 via-amber-500/5 to-slate-500/10 dark:from-emerald-950/40 dark:via-amber-950/20 dark:to-slate-900/40 p-5 rounded-3xl border border-emerald-500/20 dark:border-emerald-500/20 flex flex-col items-center text-center space-y-3">
+        <HalalaQirshLogo size="md" withText={false} />
+        <div>
+          <h3 className="text-sm font-extrabold text-slate-900 dark:text-white tracking-tight">
+            {isEn ? 'Halala & Qirsh' : 'هللة وقرش'}
+          </h3>
+          <p className="text-[11px] text-[#8E8E93] mt-0.5">
+            {isEn
+              ? 'Every coin accounted for · 100% Offline & Private'
+              : 'نحفظ لك كل هللة وقرش · محلي ومشفر بالكامل على جهازك'}
+          </p>
+        </div>
+        <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/80 dark:bg-black/30 border border-slate-200/80 dark:border-slate-800 text-[10px] text-slate-500 dark:text-slate-400 font-mono">
+          <span>v2.4.0</span>
+          <span>•</span>
+          <span>Apple Local Vault</span>
+        </div>
       </div>
     </div>
   );

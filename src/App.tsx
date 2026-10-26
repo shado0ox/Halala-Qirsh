@@ -42,6 +42,7 @@ import { PasscodeLockModal } from './components/PasscodeLockModal';
 import { ConfirmModal } from './components/ConfirmModal';
 import { Toast } from './components/Toast';
 import { LaunchSplash } from './components/LaunchSplash';
+import { HalalaQirshLogo } from './components/HalalaQirshLogo';
 import { CoinFlightProvider, useCoinFlight } from './context/CoinFlightContext';
 
 import { DashboardTab } from './components/tabs/DashboardTab';
@@ -645,8 +646,11 @@ function AppContent() {
       {/* App Switcher Multitasking Privacy Cover */}
       {isAppInactive && (
         <div className="fixed inset-0 z-100 bg-[#F2F2F7] dark:bg-black flex flex-col items-center justify-center p-6 select-none">
-          <div className="w-16 h-16 rounded-3xl bg-emerald-600 flex items-center justify-center text-white shadow-xl mb-3">
-            <Lock size={32} />
+          <div className="relative mb-3 flex items-center justify-center">
+            <HalalaQirshLogo size="lg" isEnglish={isEn} />
+            <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md">
+              <Lock size={12} />
+            </div>
           </div>
           <p className="text-base font-black text-slate-800 dark:text-white">
             {t.appTitle}

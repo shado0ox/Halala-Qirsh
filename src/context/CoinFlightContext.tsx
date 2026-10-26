@@ -128,9 +128,11 @@ export const CoinFlightProvider: React.FC<{ children: React.ReactNode }> = ({ ch
               pointerEvents: 'none',
               willChange: 'transform, opacity',
             }}
-            className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-400 to-amber-300 text-amber-950 shadow-xl flex items-center justify-center border border-amber-200"
+            className="w-9 h-9 rounded-full bg-gradient-to-tr from-amber-500 via-amber-300 to-amber-100 text-amber-950 shadow-2xl flex items-center justify-center border-2 border-amber-300 ring-2 ring-emerald-500/40"
           >
-            <Coins size={18} strokeWidth={2.4} />
+            <div className="w-6 h-6 rounded-full bg-[#059669] flex items-center justify-center text-amber-200 font-black text-[11px] select-none">
+              هـ
+            </div>
           </motion.div>
         )}
       </AnimatePresence>

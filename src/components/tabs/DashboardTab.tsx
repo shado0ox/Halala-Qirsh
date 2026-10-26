@@ -25,6 +25,7 @@ import { AnimatedCounter } from '../AnimatedCounter';
 import { Amount } from '../Amount';
 import { useCoinFlight } from '../../context/CoinFlightContext';
 import { cardVariants, reducedCardVariants, useMotionConfig, springs } from '../../utils/motion';
+import { HalalaQirshLogo } from '../HalalaQirshLogo';
 
 interface DashboardTabProps {
   categories: Category[];
@@ -161,14 +162,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         variants={variants}
         className="flex items-center justify-between pt-1"
       >
-        <div>
-          <span className="text-xs font-semibold text-[#8E8E93] flex items-center gap-1.5">
-            <Calendar size={13} className="text-emerald-600 dark:text-emerald-400" />
-            <span>{t.monthlyBudgetTitle} {monthFormatted}</span>
-          </span>
-          <h1 className="text-2xl font-black text-[#1C1C1E] dark:text-white tracking-tight mt-0.5">
-            {t.dashboardHeading}
-          </h1>
+        <div className="flex items-center gap-2.5">
+          <HalalaQirshLogo size="sm" isEnglish={isEn} />
+          <div>
+            <span className="text-[11px] font-semibold text-[#8E8E93] flex items-center gap-1.5 leading-none">
+              <Calendar size={12} className="text-emerald-600 dark:text-emerald-400" />
+              <span>{t.monthlyBudgetTitle} {monthFormatted}</span>
+            </span>
+            <h1 className="text-xl sm:text-2xl font-black text-[#1C1C1E] dark:text-white tracking-tight mt-0.5 leading-tight">
+              {t.appTitle}
+            </h1>
+          </div>
         </div>
 
         <div className="flex items-center gap-2">

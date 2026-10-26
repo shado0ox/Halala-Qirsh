@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { springs, fades } from '../utils/motion';
+import { HalalaQirshLogo } from './HalalaQirshLogo';
 
 interface LaunchSplashProps {
   onFinish: () => void;
@@ -19,7 +20,7 @@ export const LaunchSplash: React.FC<LaunchSplashProps> = ({
     const timer = setTimeout(() => {
       setIsVisible(false);
       setTimeout(onFinish, 200);
-    }, isReduced ? 200 : 900);
+    }, isReduced ? 200 : 950);
 
     return () => clearTimeout(timer);
   }, [onFinish, isReduced]);
@@ -31,44 +32,41 @@ export const LaunchSplash: React.FC<LaunchSplashProps> = ({
           initial={{ opacity: 1 }}
           exit={{ opacity: 0 }}
           transition={fades.standard}
-          className="fixed inset-0 z-100 bg-[#064E3B] flex flex-col items-center justify-center p-6 select-none"
+          className="fixed inset-0 z-100 bg-[#022c22] flex flex-col items-center justify-center p-6 select-none"
         >
-          {/* Emerald Brand Logo Glyph with Spring Scale */}
+          {/* Halala & Qirsh Minted Coins Emblem */}
           <motion.div
-            initial={isReduced ? { scale: 1 } : { scale: 0.6, rotate: -10 }}
+            initial={isReduced ? { scale: 1 } : { scale: 0.7, rotate: -8 }}
             animate={{ scale: 1, rotate: 0 }}
             transition={springs.bouncy}
-            className="w-24 h-24 rounded-[28px] bg-gradient-to-tr from-[#059669] to-[#10B981] flex items-center justify-center text-white shadow-2xl shadow-emerald-950/60 mb-4 border border-white/20"
+            className="mb-5 flex items-center justify-center"
           >
-            <svg className="w-14 h-14" viewBox="0 0 48 48" fill="none">
-              <path
-                d="M10 24L24 10L38 24V38C38 39.1046 37.1046 40 36 40H12C10.8954 40 10 39.1046 10 38V24Z"
-                fill="#FFFFFF"
-              />
-              <path
-                d="M20 28H28V36H20V28Z"
-                fill="#059669"
-              />
-              <circle cx="24" cy="20" r="3" fill="#059669" />
-            </svg>
+            <HalalaQirshLogo size="xl" isEnglish={isEnglish} />
           </motion.div>
 
-          <motion.h1
-            initial={{ opacity: 0, y: 10 }}
+          <motion.div
+            initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             transition={springs.smooth}
-            className="text-xl font-black text-white tracking-tight"
+            className="text-center"
           >
-            {isEnglish ? 'Home Expenses' : 'مصاريف البيت'}
-          </motion.h1>
+            <h1 className="text-2xl font-black text-white tracking-tight flex items-center justify-center gap-2">
+              <span>{isEnglish ? 'Halala & Qirsh' : 'هللة وقرش'}</span>
+            </h1>
+            <p className="text-[11px] font-bold text-amber-300/90 mt-0.5 tracking-wider uppercase">
+              {isEnglish ? 'Halala & Qirsh' : 'Halala & Qirsh'}
+            </p>
+          </motion.div>
 
           <motion.p
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.2, ...fades.fast }}
-            className="text-xs text-emerald-200/80 mt-1"
+            transition={{ delay: 0.25, ...fades.fast }}
+            className="text-xs text-emerald-200/80 mt-2 text-center max-w-xs"
           >
-            {isEnglish ? 'Private Household Budget Tracker' : 'تطبيق الميزانية والمصاريف المشفر محلياً'}
+            {isEnglish
+              ? 'Every Halala & Qirsh Counts · 100% Private & Offline'
+              : 'نحفظ لك كل هللة وقرش · ميزانية مشفرة ومحفوظة محلياً'}
           </motion.p>
         </motion.div>
       )}

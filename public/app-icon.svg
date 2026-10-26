@@ -1,37 +1,124 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
   <defs>
-    <linearGradient id="bgEmerald" x1="15%" y1="10%" x2="85%" y2="90%">
-      <stop offset="0%" stop-color="#064E3B"/>
-      <stop offset="50%" stop-color="#059669"/>
-      <stop offset="100%" stop-color="#10B981"/>
+    <!-- Deep Royal Emerald Gradient Canvas -->
+    <linearGradient id="bgCanvas" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#022c22"/>
+      <stop offset="40%" stop-color="#064E3B"/>
+      <stop offset="75%" stop-color="#065F46"/>
+      <stop offset="100%" stop-color="#047857"/>
     </linearGradient>
-    <radialGradient id="highlight" cx="25%" cy="20%" r="70%">
-      <stop offset="0%" stop-color="#34D399" stop-opacity="0.3"/>
-      <stop offset="100%" stop-color="#064E3B" stop-opacity="0"/>
+
+    <!-- Radial Ambient Lighting -->
+    <radialGradient id="ambientLight" cx="40%" cy="30%" r="70%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.35"/>
+      <stop offset="60%" stop-color="#064E3B" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#022c22" stop-opacity="0.6"/>
     </radialGradient>
-    <filter id="subtleGlow" x="-10%" y="-10%" width="120%" height="120%">
-      <feDropShadow dx="0" dy="16" stdDeviation="24" flood-color="#022c22" flood-opacity="0.45"/>
+
+    <!-- Halala Coin Minted Gold Gradient -->
+    <linearGradient id="goldRim" x1="10%" y1="0%" x2="90%" y2="100%">
+      <stop offset="0%" stop-color="#FEF3C7"/>
+      <stop offset="25%" stop-color="#F59E0B"/>
+      <stop offset="55%" stop-color="#D97706"/>
+      <stop offset="85%" stop-color="#B45309"/>
+      <stop offset="100%" stop-color="#78350F"/>
+    </linearGradient>
+
+    <!-- Halala Emerald Core -->
+    <radialGradient id="emeraldCore" cx="45%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#10B981"/>
+      <stop offset="45%" stop-color="#059669"/>
+      <stop offset="85%" stop-color="#047857"/>
+      <stop offset="100%" stop-color="#064E3B"/>
+    </radialGradient>
+
+    <!-- Qirsh Platinum/Silver Gradient -->
+    <linearGradient id="platinumRim" x1="15%" y1="15%" x2="85%" y2="85%">
+      <stop offset="0%" stop-color="#FFFFFF"/>
+      <stop offset="35%" stop-color="#CBD5E1"/>
+      <stop offset="70%" stop-color="#64748B"/>
+      <stop offset="100%" stop-color="#334155"/>
+    </linearGradient>
+
+    <radialGradient id="qirshFace" cx="45%" cy="40%" r="65%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="60%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#020617"/>
+    </radialGradient>
+
+    <!-- Drop Shadows for 3D Layering -->
+    <filter id="coinDepth" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="28" stdDeviation="32" flood-color="#01140e" flood-opacity="0.6"/>
+      <feDropShadow dx="0" dy="10" stdDeviation="12" flood-color="#000000" flood-opacity="0.4"/>
+    </filter>
+
+    <filter id="softGlow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="16" result="blur"/>
+      <feComposite in="SourceGraphic" in2="blur" operator="over"/>
     </filter>
   </defs>
 
-  <!-- Opaque Background (Zero Transparency) -->
-  <rect width="1024" height="1024" fill="url(#bgEmerald)"/>
-  <rect width="1024" height="1024" fill="url(#highlight)"/>
+  <!-- Opaque Background Canvas -->
+  <rect width="1024" height="1024" fill="url(#bgCanvas)"/>
+  <rect width="1024" height="1024" fill="url(#ambientLight)"/>
 
-  <!-- Main House Structure with Integrated Coin Wallet -->
-  <g filter="url(#subtleGlow)">
-    <!-- Roof -->
-    <path d="M512 216L240 436C228 446 220 460 220 476C220 504 242 524 270 524H300V752C300 774 318 792 340 792H684C706 792 724 774 724 752V524H754C782 524 804 504 804 476C804 460 796 446 784 436L512 216Z" fill="#FFFFFF"/>
-    
-    <!-- Chimney -->
-    <path d="M640 290V232C640 221 649 212 660 212H700C711 212 720 221 720 232V356L640 290Z" fill="#FFFFFF"/>
-    
-    <!-- Central Coin Silhouette Inside House -->
-    <circle cx="512" cy="580" r="120" fill="#059669"/>
-    <circle cx="512" cy="580" r="102" fill="none" stroke="#FFFFFF" stroke-width="12"/>
-    
-    <!-- Coin Symbol / Currency Bar -->
-    <path d="M512 508V652" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
-    <path d="M464 544C464 526 484 518 512 518C540 518 558 528 558 546C558 578 464 572 464 612C464 632 484 642 512 642C542 642 560 630 560 612" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+  <!-- Subtle Mint Guilloché Starburst in background -->
+  <g opacity="0.12" stroke="#34D399" stroke-width="2">
+    <circle cx="512" cy="512" r="420" fill="none" stroke-dasharray="6 8"/>
+    <circle cx="512" cy="512" r="460" fill="none" stroke-dasharray="4 10"/>
+  </g>
+
+  <!-- MAIN DUAL-COIN EMBLEM: QIRSH (قرش) + HALALA (هللة) -->
+  <g filter="url(#coinDepth)">
+    <!-- BACK COIN: QIRSH (قرش) Platinum & Steel -->
+    <g transform="translate(380, 440)">
+      <!-- Outer Reeded Ring -->
+      <circle cx="0" cy="0" r="280" fill="url(#platinumRim)" stroke="#1E293B" stroke-width="8"/>
+      <!-- Milling Notches -->
+      <circle cx="0" cy="0" r="265" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-dasharray="14 18"/>
+      <!-- Inner Steel Core -->
+      <circle cx="0" cy="0" r="235" fill="url(#qirshFace)" stroke="#475569" stroke-width="6"/>
+      <!-- Guilloché Rings -->
+      <circle cx="0" cy="0" r="190" fill="none" stroke="#64748B" stroke-width="3" stroke-dasharray="8 6"/>
+      <circle cx="0" cy="0" r="140" fill="none" stroke="#94A3B8" stroke-width="3"/>
+
+      <!-- Qirsh Classical Caliber Geometry (Scale of Precision) -->
+      <path d="M-50 -10 C-50 -38 -28 -60 0 -60 C28 -60 50 -38 50 -10 C50 18 28 40 0 40 C-28 40 -50 18 -50 -10 Z" fill="none" stroke="#F1F5F9" stroke-width="14"/>
+      <path d="M0 -100 V-60" stroke="#FDE68A" stroke-width="14" stroke-linecap="round"/>
+      <path d="M-60 80 H60" stroke="#E2E8F0" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="-25" cy="-85" r="9" fill="#FDE68A"/>
+      <circle cx="25" cy="-85" r="9" fill="#FDE68A"/>
+    </g>
+
+    <!-- FRONT COIN: HALALA (هللة) Minted Gold & Emerald -->
+    <g transform="translate(600, 560)">
+      <!-- Golden Outer Milled Rim -->
+      <circle cx="0" cy="0" r="300" fill="url(#goldRim)" stroke="#5B2108" stroke-width="10"/>
+      <!-- Raised Milled Edge Teeth -->
+      <circle cx="0" cy="0" r="282" fill="none" stroke="#FEF3C7" stroke-width="16" stroke-dasharray="16 20"/>
+      <!-- Stepped Inner Golden Bezel -->
+      <circle cx="0" cy="0" r="255" fill="url(#goldRim)" stroke="#78350F" stroke-width="6"/>
+      <!-- Royal Emerald Medallion Face -->
+      <circle cx="0" cy="0" r="225" fill="url(#emeraldCore)"/>
+
+      <!-- Arabesque Mint Palm & Crest of Growth -->
+      <!-- Palm Leaves Center -->
+      <path d="M0 -115 C0 -115 -25 -80 -25 -45 C-25 -10 0 25 0 25 C0 25 25 -10 25 -45 C25 -80 0 -115 0 -115 Z" fill="#FDE68A"/>
+      <path d="M0 -90 C-35 -80 -60 -50 -65 -15" stroke="#FDE68A" stroke-width="13" stroke-linecap="round" fill="none"/>
+      <path d="M0 -90 C35 -80 60 -50 65 -15" stroke="#FDE68A" stroke-width="13" stroke-linecap="round" fill="none"/>
+      <path d="M0 -50 C-45 -35 -65 5 -60 40" stroke="#FDE68A" stroke-width="12" stroke-linecap="round" fill="none"/>
+      <path d="M0 -50 C45 -35 65 5 60 40" stroke="#FDE68A" stroke-width="12" stroke-linecap="round" fill="none"/>
+      <!-- Palm Stem -->
+      <path d="M0 0 V85" stroke="#FEF3C7" stroke-width="16" stroke-linecap="round"/>
+
+      <!-- Crossed Precision Swords Base -->
+      <path d="M-65 115 L65 45" stroke="#FDE68A" stroke-width="14" stroke-linecap="round"/>
+      <path d="M65 115 L-65 45" stroke="#FDE68A" stroke-width="14" stroke-linecap="round"/>
+      <circle cx="-60" cy="120" r="10" fill="#FEF3C7"/>
+      <circle cx="60" cy="120" r="10" fill="#FEF3C7"/>
+
+      <!-- Golden Mint Star at Apex -->
+      <polygon points="0,-160 12,-132 40,-130 18,-110 25,-82 0,-100 -25,-82 -18,-110 -40,-130 -12,-132" fill="#FEF3C7"/>
+    </g>
   </g>
 </svg>

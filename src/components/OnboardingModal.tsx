@@ -14,6 +14,7 @@ import { CurrencyCode, BudgetSettings } from '../types';
 import { CURRENCY_SYMBOLS } from '../utils/storage';
 import { nativeHaptics } from '../utils/nativeHaptics';
 import { springs, fades } from '../utils/motion';
+import { HalalaQirshLogo } from './HalalaQirshLogo';
 
 interface OnboardingModalProps {
   isOpen: boolean;
@@ -39,22 +40,14 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
   const slides = [
     {
       icon: (
-        <svg className="w-20 h-20 text-emerald-500" viewBox="0 0 80 80" fill="none">
-          <circle cx="40" cy="40" r="38" fill="rgba(16, 185, 129, 0.12)" />
-          <path
-            d="M24 42L40 26L56 42V56C56 57.1046 55.1046 58 54 58H26C24.8954 58 24 57.1046 24 56V42Z"
-            stroke="#10B981"
-            strokeWidth="3.5"
-            strokeLinecap="round"
-            strokeLinejoin="round"
-          />
-          <circle cx="40" cy="45" r="5" stroke="#10B981" strokeWidth="3" />
-        </svg>
+        <div className="w-20 h-20 flex items-center justify-center">
+          <HalalaQirshLogo size="lg" isEnglish={isEn} />
+        </div>
       ),
-      title: isEn ? 'Private & 100% Offline' : 'خصوصية مطلقة وتخزين محلي 100%',
+      title: isEn ? 'Welcome to Halala & Qirsh' : 'أهلاً بك في هللة وقرش',
       subtitle: isEn
-        ? 'No cloud servers, no account required, and zero telemetry. All household budgets stay encrypted exclusively on your iPhone.'
-        : 'لا خوادم سحابية ولا حسابات ولا تتبع. كافة مصاريف وفواتير البيت مشفرة ومحفوظة حصراً على جهازك داخل سلسلة مفاتيح أبل.',
+        ? 'Conscious budgeting starts from every Halala and Qirsh. Zero cloud servers, zero telemetry, and 100% private offline encryption on your device.'
+        : 'من الهللة والقرش تبدأ الميزانية الرابحة. لا خوادم سحابية ولا حسابات ولا تتبع. كافة مصاريف وفواتيرك مشفرة ومحفوظة حصراً على جهازك.',
     },
     {
       icon: (

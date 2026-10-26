@@ -48,7 +48,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
             <>
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300">
                 <span className="font-bold block mb-1">100% Offline & Zero Data Collection</span>
-                Home Expenses is designed with complete privacy at its core. We do not operate any backend servers, accounts, analytics SDKs, or tracking services.
+                Halala & Qirsh is designed with complete privacy at its core. We do not operate any backend servers, accounts, analytics SDKs, or tracking services.
               </div>
 
               <div>
@@ -90,7 +90,7 @@ export const PrivacyPolicyModal: React.FC<PrivacyPolicyModalProps> = ({
             <>
               <div className="p-3 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200/60 dark:border-emerald-900/40 text-emerald-800 dark:text-emerald-300">
                 <span className="font-bold block mb-1">خصوصية تامة وتخزين محلي 100% على جهازك</span>
-                تطبيق «مصاريف البيت» صُمم بمبدأ حماية الخصوصية المطلقة. لا نستخدم أي خوادم خارجية، ولا نتتبع أي نشاط أو نجمع أي بيانات شخصية أو مالية أو تحليلات.
+                تطبيق «هللة وقرش» صُمم بمبدأ حماية الخصوصية المطلقة. لا نستخدم أي خوادم خارجية، ولا نتتبع أي نشاط أو نجمع أي بيانات شخصية أو مالية أو تحليلات.
               </div>
 
               <div>
