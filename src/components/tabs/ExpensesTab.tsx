@@ -23,6 +23,7 @@ import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
 import { useCoinFlight } from '../../context/CoinFlightContext';
+import { getLocalToday } from '../../utils/smsParser';
 import { translations } from '../../utils/i18n';
 
 interface ExpensesTabProps {
@@ -73,7 +74,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
   // Date filters
   const filteredExpenses = useMemo(() => {
     const now = new Date();
-    const todayStr = now.toISOString().split('T')[0];
+    const todayStr = getLocalToday(now);
     const currentMonth = settings.selectedMonth;
 
     return expenses.filter((exp) => {
@@ -134,10 +135,10 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
       map.get(exp.date)!.push(exp);
     });
 
-    const todayStr = new Date().toISOString().split('T')[0];
+    const todayStr = getLocalToday();
     const yesterdayDate = new Date();
     yesterdayDate.setDate(yesterdayDate.getDate() - 1);
-    const yesterdayStr = yesterdayDate.toISOString().split('T')[0];
+    const yesterdayStr = getLocalToday(yesterdayDate);
 
     map.forEach((items, dateStr) => {
       let displayDate = dateStr;

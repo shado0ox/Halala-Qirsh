@@ -38,6 +38,7 @@ import { translations } from './utils/i18n';
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
 import { SmartSmsSheet } from './components/SmartSmsSheet';
+import { getLocalToday } from './utils/smsParser';
 import { IOSNotificationBanner } from './components/IOSNotificationBanner';
 import { PasscodeLockModal } from './components/PasscodeLockModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -545,7 +546,7 @@ function AppContent() {
       title: isEnLang ? 'Household Grocery Purchase' : 'مشتريات ونواقص تموين البيت',
       amount: totalAmount > 0 ? totalAmount : 150,
       categoryId: data.categories[0]?.id || 'food',
-      date: new Date().toISOString().split('T')[0],
+      date: getLocalToday(),
       paymentMethod: 'card',
       payer: isEnLang ? 'Shared' : 'مشترك',
       notes: `${isEnLang ? 'Purchased items:' : 'أصناف مشتراة:'} ${itemNames}`,

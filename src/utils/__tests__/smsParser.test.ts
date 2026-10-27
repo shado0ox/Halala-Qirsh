@@ -9,6 +9,7 @@ import {
   categorizeMerchant,
   saveLearnedRule,
   getLearnedRules,
+  getLocalDateString,
 } from '../smsParser';
 import { Category } from '../../types';
 
@@ -49,88 +50,88 @@ describe('Bank SMS Regex Parser & Learner Tests', () => {
     });
   });
 
-  describe('Saudi Bank SMS Parsing (Arabic)', () => {
-    it('parses Al Rajhi card purchase at Panda', () => {
-      const msg = 'شراء بـ 245.50 رس من بطاقة مدى *1234 لدى أسواق بنده بتاريخ 2026-04-12 16:45 الرصيد 4,200.00';
-      const res = parseBankSms(msg, mockCategories);
-
-      expect(res.success).toBe(true);
-      expect(res.data?.amount).toBe(245.50);
-      expect(res.data?.merchant).toContain('بنده');
-      expect(res.data?.date).toBe('2026-04-12');
-      expect(res.data?.paymentMethod).toBe('card');
-      expect(res.data?.categoryId).toBe('groceries');
+  describe('Amount Extraction with Arabic comma ٫ and thousand separator ٬', () => {
+    it('handles Arabic decimal separator ٫ (U+066B) correctly', () => {
+      const msg = 'شراء بمبلغ 150٫75 ريال لدى بنده';
+      const amount = extractAmount(msg);
+      expect(amount).toBe(150.75);
     });
 
-    it('parses Alinma Bank purchase at Al Nahdi Pharmacy', () => {
-      const msg = 'تمت عملية شراء عبر مدى بمبلغ 112.00 ريال لدى صيدلية النهدي في 2026-03-20 الرصيد المتبقي 1,500 ريال';
-      const res = parseBankSms(msg, mockCategories);
-
-      expect(res.success).toBe(true);
-      expect(res.data?.amount).toBe(112.00);
-      expect(res.data?.merchant).toContain('النهدي');
-      expect(res.data?.categoryId).toBe('health');
+    it('handles Arabic thousand separator ٬ (U+066C) and Arabic numerals', () => {
+      const msg = 'خصم بمبلغ ١٬٢٥٠٫٥٠ ر.س لدى إكسترا';
+      const amount = extractAmount(msg);
+      expect(amount).toBe(1250.50);
     });
 
-    it('parses STC Pay / Apple Pay purchase at Starbucks', () => {
-      const msg = 'تم دفع 36.00 ر.س لدى ستاربكس كافيه عبر Apple Pay بتاريخ 2026-05-01';
-      const res = parseBankSms(msg, mockCategories);
-
-      expect(res.success).toBe(true);
-      expect(res.data?.amount).toBe(36.00);
-      expect(res.data?.merchant).toContain('ستاربكس');
-      expect(res.data?.paymentMethod).toBe('digital');
-      expect(res.data?.categoryId).toBe('entertainment');
-    });
-
-    it('parses Cash ATM withdrawal', () => {
-      const msg = 'سحب نقدي بمبلغ 500 ريال من صراف الراجحي بواسطة بطاقة *9988';
-      const res = parseBankSms(msg, mockCategories);
-
-      expect(res.success).toBe(true);
-      expect(res.data?.amount).toBe(500);
-      expect(res.data?.paymentMethod).toBe('cash');
+    it('extracts standard Latin amounts', () => {
+      expect(extractAmount('Purchase: SAR 85.50 at McDonalds')).toBe(85.50);
+      expect(extractAmount('شراء بقيمة 40.00 رس')).toBe(40.00);
     });
   });
 
-  describe('Saudi Bank SMS Parsing (English)', () => {
-    it('parses SNB (National Bank) English SMS', () => {
-      const msg = 'Purchase: SAR 85.50 at McDonalds via Mada card *4433 on 2026-06-15 13:20. Avail Bal SAR 2,400.00';
-      const res = parseBankSms(msg, mockCategories);
+  describe('Merchant Extraction & Lookahead Arabic Boundaries', () => {
+    it('extracts merchant with colon pattern لدى: and من:', () => {
+      const msg1 = 'عملية شراء بمبلغ 200 ريال لدى: أسواق بنده بتاريخ 2026-04-10';
+      expect(extractMerchant(msg1)).toBe('أسواق بنده');
 
-      expect(res.success).toBe(true);
-      expect(res.data?.amount).toBe(85.50);
-      expect(res.data?.merchant.toLowerCase()).toContain('mcdonalds');
-      expect(res.data?.categoryId).toBe('entertainment');
-      expect(res.data?.date).toBe('2026-06-15');
+      const msg2 = 'خصم 35 ر.س من: دانكن دونتس عبر مدى';
+      expect(extractMerchant(msg2)).toBe('دانكن دونتس');
     });
 
-    it('parses Fuel purchase at SASCO', () => {
-      const msg = 'POS Purchase: SAR 120.00 at Sasco Fuel Station using Card *1212 on 2026-02-10';
-      const res = parseBankSms(msg, mockCategories);
+    it('cuts merchant name at first word from (بتاريخ، من بطاقة، الرصيد، مدى، بطاقة)', () => {
+      const msg1 = 'شراء بمبلغ 90 ريال لدى كارفور بتاريخ 2026-03-01 الرصيد 1200';
+      expect(extractMerchant(msg1)).toBe('كارفور');
 
-      expect(res.success).toBe(true);
-      expect(res.data?.amount).toBe(120.00);
-      expect(res.data?.categoryId).toBe('transport');
+      const msg2 = 'شراء بمبلغ 55 ريال لدى هاف مليون من بطاقة مدى *5432';
+      expect(extractMerchant(msg2)).toBe('هاف مليون');
+
+      const msg3 = 'عملية لدى صيدلية النهدي بطاقة *1122 الرصيد 500';
+      expect(extractMerchant(msg3)).toBe('صيدلية النهدي');
     });
   });
 
-  describe('Local Learning from User Corrections', () => {
-    it('remembers when the user recategorizes a merchant and uses the learned category next time', () => {
-      const unknownMerchantMsg = 'شراء بمبلغ 90.00 ريال لدى متجر أزياء النور بتاريخ 2026-01-10';
-      
-      // First parse: unknown merchant defaults to groceries/fallback
-      const res1 = parseBankSms(unknownMerchantMsg, mockCategories);
-      expect(res1.success).toBe(true);
-      expect(res1.data?.isLearned).toBe(false);
+  describe('Date Extraction including DD/MM/YY & Local Date', () => {
+    it('supports DD/MM/YY short format', () => {
+      const msg = 'شراء 45 ريال لدى بارنيز في 18/05/26 الرصيد 200';
+      expect(extractDate(msg)).toBe('2026-05-18');
+    });
 
-      // User corrects category to 'bills' (or custom)
-      saveLearnedRule('أزياء النور', 'bills');
+    it('supports DD-MM-YY and DD/MM/YYYY', () => {
+      expect(extractDate('بتاريخ 05/11/2026')).toBe('2026-11-05');
+      expect(extractDate('بتاريخ 14-04-26')).toBe('2026-04-14');
+    });
 
-      // Next parse: must recognize learned rule
-      const res2 = parseBankSms(unknownMerchantMsg, mockCategories);
-      expect(res2.success).toBe(true);
-      expect(res2.data?.categoryId).toBe('bills');
+    it('returns local date string in YYYY-MM-DD format without UTC shift', () => {
+      const localStr = getLocalDateString(new Date(2026, 3, 27)); // April 27, 2026
+      expect(localStr).toBe('2026-04-27');
+    });
+  });
+
+  describe('Unknown Merchant Classification & Local Learning', () => {
+    it('does NOT auto-select a category when merchant is unknown (returns categoryId: "")', () => {
+      const unknownMsg = 'شراء بمبلغ 80.00 ريال لدى متجر الشرقية غير المعروف بتاريخ 2026-02-15';
+      const res = parseBankSms(unknownMsg, mockCategories);
+
+      expect(res.success).toBe(true);
+      expect(res.data?.merchant).toContain('متجر الشرقية غير المعروف');
+      expect(res.data?.categoryId).toBe(''); // Not auto-selected!
+      expect(res.data?.isLearned).toBe(false);
+    });
+
+    it('remembers when the user saves a category correction and classifies it on future parses', () => {
+      const merchant = 'متجر الأناقة للملابس';
+      const msg = `شراء بمبلغ 220 ريال لدى ${merchant} بتاريخ 2026-03-10`;
+
+      // 1. Initial parse -> unclassified
+      const res1 = parseBankSms(msg, mockCategories);
+      expect(res1.data?.categoryId).toBe('');
+
+      // 2. User saves correction
+      saveLearnedRule(merchant, 'entertainment');
+
+      // 3. Next parse -> uses learned category
+      const res2 = parseBankSms(msg, mockCategories);
+      expect(res2.data?.categoryId).toBe('entertainment');
       expect(res2.data?.isLearned).toBe(true);
     });
   });

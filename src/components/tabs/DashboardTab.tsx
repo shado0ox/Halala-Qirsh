@@ -26,6 +26,7 @@ import { Amount } from '../Amount';
 import { useCoinFlight } from '../../context/CoinFlightContext';
 import { cardVariants, reducedCardVariants, useMotionConfig, springs } from '../../utils/motion';
 import { HalalaQirshLogo } from '../HalalaQirshLogo';
+import { getLocalToday } from '../../utils/smsParser';
 
 interface DashboardTabProps {
   categories: Category[];
@@ -79,7 +80,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const dailySuggestedSpend = remainingBudget > 0 ? Math.round(remainingBudget / remainingDays) : 0;
 
   // Today's expenses
-  const todayStr = now.toISOString().split('T')[0];
+  const todayStr = getLocalToday(now);
   const todayExpenses = expenses.filter((e) => e.date === todayStr);
   const todaySpent = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
 
@@ -131,7 +132,10 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     };
   }, [registerTarget]);
 
+  const lastScrollTimeRef = useRef<number>(0);
+
   const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+    lastScrollTimeRef.current = Date.now();
     if (!isReduced) {
       setScrollY(e.currentTarget.scrollTop);
     }
@@ -148,12 +152,44 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     }
   };
 
-  // Double-tap on dashboard container detection (Requirement: double-tap opens smart SMS parser)
+  // Double-tap on dashboard container detection
   const lastTapTimeRef = useRef<number>(0);
-  const handleContainerTap = (e: React.TouchEvent | React.MouseEvent) => {
+  const touchStartPosRef = useRef<{ x: number; y: number } | null>(null);
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length === 1) {
+      touchStartPosRef.current = {
+        x: e.touches[0].clientX,
+        y: e.touches[0].clientY,
+      };
+    }
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
     const target = e.target as HTMLElement;
-    // Don't trigger if user was tapping a button, link, or input
     if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('a')) {
+      return;
+    }
+
+    if (!touchStartPosRef.current || e.changedTouches.length === 0) {
+      return;
+    }
+
+    // Ignore if container was scrolled in the last 150ms
+    if (Date.now() - lastScrollTimeRef.current < 150) {
+      lastTapTimeRef.current = 0;
+      touchStartPosRef.current = null;
+      return;
+    }
+
+    // Ignore if finger moved > 10px
+    const dx = e.changedTouches[0].clientX - touchStartPosRef.current.x;
+    const dy = e.changedTouches[0].clientY - touchStartPosRef.current.y;
+    const distance = Math.hypot(dx, dy);
+    touchStartPosRef.current = null;
+
+    if (distance > 10) {
+      lastTapTimeRef.current = 0;
       return;
     }
 
@@ -175,8 +211,8 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     <div
       ref={containerRef}
       onScroll={handleScroll}
-      onTouchEnd={handleContainerTap}
-      onDoubleClick={() => onOpenSmartSms && onOpenSmartSms()}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
       className="flex-1 w-full overflow-y-auto px-4 py-3 space-y-4 no-scrollbar"
     >
       {/* Top Header Row */}

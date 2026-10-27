@@ -1,0 +1,71 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <defs>
+    <!-- Deep Royal Emerald Gradient (Opaque) -->
+    <linearGradient id="bgCanvas" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#022c22"/>
+      <stop offset="35%" stop-color="#064E3B"/>
+      <stop offset="75%" stop-color="#065F46"/>
+      <stop offset="100%" stop-color="#047857"/>
+    </linearGradient>
+
+    <!-- Radial Lighting -->
+    <radialGradient id="ambientLight" cx="45%" cy="35%" r="70%">
+      <stop offset="0%" stop-color="#10B981" stop-opacity="0.25"/>
+      <stop offset="65%" stop-color="#064E3B" stop-opacity="0.05"/>
+      <stop offset="100%" stop-color="#022c22" stop-opacity="0.4"/>
+    </radialGradient>
+  </defs>
+
+  <!-- 100% Opaque Emerald Background Canvas (No Transparency) -->
+  <rect width="1024" height="1024" fill="url(#bgCanvas)"/>
+  <rect width="1024" height="1024" fill="url(#ambientLight)"/>
+
+  <!-- Centered White House Silhouette -->
+  <g>
+    <!-- House Roof and Body -->
+    <path
+      d="M512 216L240 436C228 446 220 460 220 476C220 504 242 524 270 524H300V752C300 774 318 792 340 792H684C706 792 724 774 724 752V524H754C782 524 804 504 804 476C804 460 796 446 784 436L512 216Z"
+      fill="#FFFFFF"
+    />
+
+    <!-- Central Minted Coin Disc (Emerald) -->
+    <circle cx="512" cy="595" r="128" fill="#064E3B"/>
+
+    <!-- Reeded / Milled Coin Outer Teeth -->
+    <circle
+      cx="512"
+      cy="595"
+      r="114"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="12"
+      stroke-dasharray="10 12"
+    />
+
+    <!-- Concentric Guilloché Inner Ring -->
+    <circle cx="512" cy="595" r="96" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+
+    <!-- Inner Core Face -->
+    <circle cx="512" cy="595" r="92" fill="#047857"/>
+
+    <!-- Stylized Arabic "هـ" (Halala) Mark (No Dollar Sign) -->
+    <!-- Inner Counter Loop -->
+    <circle
+      cx="504"
+      cy="592"
+      r="24"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="12"
+    />
+    <!-- Outer Envelope & Baseline Extension -->
+    <path
+      d="M552 580 C552 546 526 528 496 528 C462 528 440 556 440 594 C440 632 466 658 506 658 L424 658"
+      fill="none"
+      stroke="#FFFFFF"
+      stroke-width="14"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+  </g>
+</svg>

@@ -15,6 +15,8 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Capacitor } from '@capacitor/core';
+import { Clipboard } from '@capacitor/clipboard';
 import { Category, Expense, PaymentMethod, CurrencyCode } from '../types';
 import { CategoryIcon } from './CategoryIcon';
 import { nativeHaptics } from '../utils/nativeHaptics';
@@ -23,6 +25,8 @@ import {
   parseBankSms,
   saveLearnedRule,
   ParsedBankSms,
+  getLocalToday,
+  getLocalDateString,
 } from '../utils/smsParser';
 
 interface SmartSmsSheetProps {
@@ -67,16 +71,34 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
   const [initialPredictedCategoryId, setInitialPredictedCategoryId] = useState<string>('');
 
   const handleResetAndClose = () => {
-    // Zero out raw SMS text immediately for privacy
+    // Zero out raw SMS text immediately for privacy - never persist
     setRawSms('');
     setParseError(null);
     setIsDepositIgnored(false);
     setPreviewData(null);
+    setTitle('');
+    setAmountStr('');
+    setCategoryId('');
+    setDate('');
+    setNotes('');
     onClose();
   };
 
   const handlePasteFromClipboard = async () => {
     nativeHaptics.tap(soundEnabled);
+    try {
+      if (Capacitor.isNativePlatform()) {
+        const clipResult = await Clipboard.read();
+        if (clipResult && clipResult.value) {
+          setRawSms(clipResult.value);
+          triggerParse(clipResult.value);
+          return;
+        }
+      }
+    } catch {
+      // Fallback to web clipboard
+    }
+
     try {
       if (navigator.clipboard && navigator.clipboard.readText) {
         const text = await navigator.clipboard.readText();
@@ -86,7 +108,7 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
           return;
         }
       }
-      setParseError(isEn ? 'Could not read from clipboard. Please paste manually.' : 'تعذر القراءة من الحافظة تلقائياً، يرجى اللصق يدوياً.');
+      setParseError(isEn ? 'Clipboard is empty or could not be read.' : 'الحافظة فارغة أو تعذر القراءة منها، يرجى اللصق يدوياً.');
     } catch {
       setParseError(isEn ? 'Please allow clipboard access or paste manually.' : 'يرجى منح إذن الحافظة أو لصق الرسالة يدوياً في الحقل.');
     }
@@ -112,9 +134,9 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
       setPreviewData(d);
       setTitle(d.merchant);
       setAmountStr(String(d.amount));
-      setCategoryId(d.categoryId);
+      setCategoryId(d.categoryId); // will be '' if merchant unknown
       setInitialPredictedCategoryId(d.categoryId);
-      setDate(d.date);
+      setDate(d.date || getLocalToday());
       setPaymentMethod(d.paymentMethod);
       setIsLearnedBadge(Boolean(d.isLearned));
       setPayer(isEn ? 'Husband' : 'الزوج');
@@ -129,6 +151,10 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
 
   const handleSaveParsedExpense = (e: React.FormEvent) => {
     e.preventDefault();
+    if (!categoryId) {
+      setParseError(isEn ? 'Choose a category' : 'اختر تصنيفاً');
+      return;
+    }
     const finalAmount = parseFloat(amountStr);
     if (isNaN(finalAmount) || finalAmount <= 0) {
       setParseError(isEn ? 'Please enter a valid amount' : 'يرجى كتابة مبلغ صالح');
@@ -141,16 +167,16 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
 
     nativeHaptics.tap(soundEnabled);
 
-    // If user changed or confirmed the category for this merchant, learn it!
-    if (title.trim() && categoryId) {
+    // Call saveLearnedRule only when merchant !== 'عملية بنكية' and categoryId is non-empty
+    if (title.trim() && title.trim() !== 'عملية بنكية' && categoryId) {
       saveLearnedRule(title.trim(), categoryId);
     }
 
     onSaveExpense({
       title: title.trim(),
       amount: finalAmount,
-      categoryId: categoryId || categories[0]?.id || 'groceries',
-      date: date || new Date().toISOString().split('T')[0],
+      categoryId,
+      date: date || getLocalToday(),
       paymentMethod,
       payer,
       notes: notes.trim() || undefined,
@@ -374,19 +400,40 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                     />
                   </div>
 
-                  {/* Category Selection with Instant Learning Indicator */}
-                  <div>
+                  {/* Category Selection with Instant Learning Indicator & Visual Warning */}
+                  <div
+                    data-testid="category-picker-container"
+                    className={`transition-all ${
+                      previewData.needsCategory && !categoryId
+                        ? 'border-2 border-red-500 bg-red-50/40 dark:bg-red-950/20 rounded-2xl p-2.5 ring-2 ring-red-500/20'
+                        : ''
+                    }`}
+                  >
                     <div className="flex items-center justify-between mb-1.5">
                       <label className="text-xs font-bold text-[#636366] dark:text-[#AEAEB2] flex items-center gap-1.5">
                         <Tag size={14} />
-                        <span>{isEn ? 'Category (Editable)' : 'التصنيف (قابل للتعديل)'}</span>
+                        <span>{isEn ? 'Category' : 'التصنيف'}</span>
                       </label>
-                      {categoryId !== initialPredictedCategoryId && (
+                      {categoryId && categoryId !== initialPredictedCategoryId ? (
                         <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold">
                           {isEn ? 'Will learn for next time' : 'سيتم حفظه للتعلم مستقبلاً'}
                         </span>
-                      )}
+                      ) : previewData.needsCategory && !categoryId ? (
+                        <span className="text-[11px] text-red-600 dark:text-red-400 font-bold">
+                          {isEn ? 'Choose a category' : 'اختر تصنيفاً'}
+                        </span>
+                      ) : null}
                     </div>
+
+                    {!categoryId && (
+                      <div
+                        data-testid="category-warning-banner"
+                        className="p-2 mb-2 rounded-xl bg-red-100 dark:bg-red-950/50 border border-red-300 dark:border-red-900/60 text-red-700 dark:text-red-200 text-xs font-semibold flex items-center gap-1.5"
+                      >
+                        <AlertCircle size={14} className="text-red-500 shrink-0" />
+                        <span>{isEn ? 'Choose a category' : 'اختر تصنيفاً'}</span>
+                      </div>
+                    )}
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                       {categories.map((cat) => {
                         const isSelected = categoryId === cat.id;
@@ -496,12 +543,28 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                   {/* Bottom Action Buttons: Save or Re-parse */}
                   <div className="pt-2 flex items-center gap-2">
                     <motion.button
-                      whileTap={{ scale: 0.95 }}
+                      whileTap={!categoryId ? {} : { scale: 0.95 }}
                       type="submit"
-                      className="flex-1 py-3.5 px-4 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white font-black text-xs shadow-lg shadow-emerald-600/25 flex items-center justify-center gap-2 cursor-pointer hover:brightness-105"
+                      disabled={!categoryId}
+                      aria-disabled={!categoryId}
+                      data-testid="save-parsed-expense"
+                      className={`flex-1 py-3.5 px-4 rounded-2xl font-black text-xs flex items-center justify-center gap-2 transition-all ${
+                        !categoryId
+                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-300 dark:border-slate-700 cursor-not-allowed shadow-none'
+                          : 'bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/25 cursor-pointer hover:brightness-105'
+                      }`}
                     >
-                      <CheckCircle2 size={16} />
-                      <span>{isEn ? 'Save Expense' : 'حفظ المصروف المستخرج'}</span>
+                      {!categoryId ? (
+                        <>
+                          <AlertCircle size={16} className="text-amber-500 shrink-0" />
+                          <span>{isEn ? 'Choose a category' : 'اختر تصنيفاً'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <CheckCircle2 size={16} />
+                          <span>{isEn ? 'Save Expense' : 'حفظ المصروف المستخرج'}</span>
+                        </>
+                      )}
                     </motion.button>
 
                     <motion.button

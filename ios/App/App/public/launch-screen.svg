@@ -1,0 +1,20 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" width="1024" height="1024">
+  <!-- Flat Launch Screen using gradient start color #064E3B -->
+  <rect width="1024" height="1024" fill="#064E3B"/>
+
+  <!-- Centered Clean App Glyph -->
+  <g transform="translate(362, 362) scale(0.293)">
+    <!-- Roof -->
+    <path d="M512 216L240 436C228 446 220 460 220 476C220 504 242 524 270 524H300V752C300 774 318 792 340 792H684C706 792 724 774 724 752V524H754C782 524 804 504 804 476C804 460 796 446 784 436L512 216Z" fill="#FFFFFF"/>
+    
+    <!-- Central Coin Silhouette -->
+    <circle cx="512" cy="595" r="128" fill="#064E3B"/>
+    <circle cx="512" cy="595" r="114" fill="none" stroke="#FFFFFF" stroke-width="12" stroke-dasharray="10 12"/>
+    <circle cx="512" cy="595" r="96" fill="none" stroke="#FFFFFF" stroke-width="4"/>
+    <circle cx="512" cy="595" r="92" fill="#047857"/>
+
+    <!-- Stylized Arabic "هـ" (Halala) Mark -->
+    <circle cx="504" cy="592" r="24" fill="none" stroke="#FFFFFF" stroke-width="12"/>
+    <path d="M552 580 C552 546 526 528 496 528 C462 528 440 556 440 594 C440 632 466 658 506 658 L424 658" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round" stroke-linejoin="round"/>
+  </g>
+</svg>

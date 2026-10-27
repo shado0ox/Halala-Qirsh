@@ -5,9 +5,10 @@ export interface ParsedBankSms {
   merchant: string;
   date: string; // YYYY-MM-DD
   paymentMethod: PaymentMethod;
-  categoryId: string;
+  categoryId: string; // empty string '' if unknown
   categoryName?: string;
   isLearned?: boolean;
+  needsCategory?: boolean; // true when merchant is unknown and categoryId is ''
 }
 
 export interface SmsParseResult {
@@ -18,6 +19,18 @@ export interface SmsParseResult {
 }
 
 const LEARNED_RULES_KEY = 'halala_qirsh_learned_merchant_categories';
+
+/**
+ * Returns YYYY-MM-DD using local time (avoids UTC timezone shift of toISOString)
+ */
+export function getLocalToday(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+export const getLocalDateString = getLocalToday;
 
 /**
  * Retrieve user-corrected merchant-to-category mappings from local storage.
@@ -35,10 +48,11 @@ export function getLearnedRules(): Record<string, string> {
 
 /**
  * Save a new user correction to the local dictionary to learn for future parses.
+ * Only saves when merchant is meaningful and not a generic placeholder.
  */
 export function saveLearnedRule(merchant: string, categoryId: string): void {
   const normalized = normalizeMerchantKey(merchant);
-  if (!normalized || !categoryId) return;
+  if (!normalized || normalized === 'عملية بنكية' || !categoryId) return;
   try {
     const current = getLearnedRules();
     current[normalized] = categoryId;
@@ -161,23 +175,20 @@ const DEFAULT_KEYWORD_MAP: Array<{ keywords: string[]; categoryId: string }> = [
  */
 export function isDepositOrIncomingMessage(text: string): boolean {
   const depositRegex = /(إيداع|راتب|حوالة\s*واردة|تحويل\s*وارد|تم\s*إضافة|أودع\s*في\s*حسابك|استرداد|استرجاع|عكس\s*عملية|deposit|salary|incoming\s*transfer|refund|credited\s*to|received\s*from|added\s*to\s*your\s*account)/i;
-  
-  // Also check if text says "إيداع" without explicitly saying "شراء" or "خصم"
   return depositRegex.test(text);
 }
 
 /**
  * Extracts amount from bank SMS text in Saudi Riyals (SAR / ر.س)
+ * Converts ٫ (U+066B) -> . and ٬ (U+066C) -> removed before extracting
  */
 export function extractAmount(text: string): number | null {
-  // Pattern 1: e.g. "بمبلغ 150.00 ر.س" or "بـ 150 رس" or "SAR 150.50" or "150.00 SAR"
-  // Normalize arabic numerals to latin first
   const normalizedText = text
     .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632))
+    .replace(/٫/g, '.') // Arabic decimal separator U+066B -> dot
+    .replace(/٬/g, '')  // Arabic thousands separator U+066C -> remove
     .replace(/،/g, ',');
 
-  // Regex matches:
-  // (amount) followed or preceded by SAR, SR, ر.س, رس, ريال, ريال سعودي
   const patterns = [
     // Preceded by currency: SAR 120.50, ر.س 120, ريال 50
     /(?:SAR|SR|ر\.?س|ريال(?:\s*سعودي)?)\s*[:\s]?\s*([0-9]+(?:[,.][0-9]+)?)/i,
@@ -190,7 +201,6 @@ export function extractAmount(text: string): number | null {
   for (const pat of patterns) {
     const match = normalizedText.match(pat);
     if (match && match[1]) {
-      // Clean comma if used as thousand separator or decimal
       let numStr = match[1].replace(/,/g, '');
       const parsed = parseFloat(numStr);
       if (!isNaN(parsed) && parsed > 0 && parsed < 1000000) {
@@ -204,18 +214,23 @@ export function extractAmount(text: string): number | null {
 
 /**
  * Extracts merchant name from bank SMS text
+ * Uses Arabic-compatible lookahead (?=\s|$) and cuts at first occurrence of (بتاريخ، من بطاقة، الرصيد، مدى، بطاقة، عبر، بواسطة)
  */
 export function extractMerchant(text: string): string {
-  // Preposition patterns for Arabic & English
   const merchantPatterns = [
+    /لدى\s*:\s*([^\n\r,.;]+)/i,
+    /من\s*:\s*([^\n\r,.;]+)/i,
     /لدى\s+([^\n\r,.;]+)/i,
     /في\s+([^\n\r,.;]+)/i,
     /من\s+([^\n\r,.;]+)/i,
     /إلى\s+([^\n\r,.;]+)/i,
     /عبر\s+([^\n\r,.;]+)/i,
     /متجر\s+([^\n\r,.;]+)/i,
+    /at\s*:\s*([^\n\r,.;]+)/i,
     /at\s+([^\n\r,.;]+)/i,
+    /to\s*:\s*([^\n\r,.;]+)/i,
     /to\s+([^\n\r,.;]+)/i,
+    /from\s*:\s*([^\n\r,.;]+)/i,
     /from\s+([^\n\r,.;]+)/i,
     /pos\s*-\s*([^\n\r,.;]+)/i,
   ];
@@ -225,12 +240,15 @@ export function extractMerchant(text: string): string {
     if (match && match[1]) {
       let candidate = match[1].trim();
 
-      // Clean up common trailing or clutter tokens with word boundaries
+      // Cut name at the first occurrence of: بتاريخ، من بطاقة، الرصيد، مدى، بطاقة، عبر، بواسطة
+      candidate = candidate.replace(/\s+(?:بتاريخ|من\s+بطاقة|الرصيد|مدى|بطاقة|عبر|بواسطة)(?=\s|$).*$/i, '');
+      candidate = candidate.replace(/\s+(?:on|via|using|card|ending|account|balance|avail|date)(?=\s|$).*$/i, '');
+
+      // Remove artifacts
       candidate = candidate
-        .replace(/\s+(?:بتاريخ|في|من|بواسطة|عبر|بطاقة|مدى|حساب|الرصيد|المتبقي|بمبلغ|على)\b.*$/i, '')
-        .replace(/\s+\b(?:on|via|using|card|ending|account|balance|avail|date)\b.*$/i, '')
         .replace(/\*+\d+/g, '') // remove *1234
-        .replace(/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}/g, '') // remove dates
+        .replace(/\d{4}[-/.]\d{1,2}[-/.]\d{1,2}/g, '') // remove YYYY-MM-DD
+        .replace(/\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}/g, '') // remove DD/MM/YY or DD/MM/YYYY
         .replace(/\d{1,2}:\d{2}(?::\d{2})?/g, '') // remove time
         .replace(/[0-9]+(?:[,.][0-9]+)?\s*(?:SAR|SR|ر\.?س|ريال)/gi, '') // remove inline amounts
         .replace(/["'«»]/g, '')
@@ -246,13 +264,14 @@ export function extractMerchant(text: string): string {
 }
 
 /**
- * Extracts transaction date from SMS or defaults to current date (YYYY-MM-DD)
+ * Extracts transaction date from SMS or defaults to local current date (YYYY-MM-DD)
+ * Supports YYYY-MM-DD, DD/MM/YYYY, and DD/MM/YY
  */
 export function extractDate(text: string): string {
   const normalizedText = text.replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 1632));
 
-  // Pattern YYYY-MM-DD or YYYY/MM/DD
-  const ymdMatch = normalizedText.match(/\b(202[4-9]|203[0-9])[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12][0-9]|3[01])\b/);
+  // Pattern 1: YYYY-MM-DD or YYYY/MM/DD
+  const ymdMatch = normalizedText.match(/\b(202[4-9]|203[0-9])[-/.](0?[1-9]|1[0-2])[-/.](0?[1-9]|[12][0-9]|3[01])(?=\s|[.,;]|$)/);
   if (ymdMatch) {
     const y = ymdMatch[1];
     const m = String(parseInt(ymdMatch[2], 10)).padStart(2, '0');
@@ -260,8 +279,8 @@ export function extractDate(text: string): string {
     return `${y}-${m}-${d}`;
   }
 
-  // Pattern DD/MM/YYYY or DD-MM-YYYY
-  const dmyMatch = normalizedText.match(/\b(0?[1-9]|[12][0-9]|3[01])[-/.](0?[1-9]|1[0-2])[-/.](202[4-9]|203[0-9])\b/);
+  // Pattern 2: DD/MM/YYYY or DD-MM-YYYY
+  const dmyMatch = normalizedText.match(/\b(0?[1-9]|[12][0-9]|3[01])[-/.](0?[1-9]|1[0-2])[-/.](202[4-9]|203[0-9])(?=\s|[.,;]|$)/);
   if (dmyMatch) {
     const d = String(parseInt(dmyMatch[1], 10)).padStart(2, '0');
     const m = String(parseInt(dmyMatch[2], 10)).padStart(2, '0');
@@ -269,8 +288,17 @@ export function extractDate(text: string): string {
     return `${y}-${m}-${d}`;
   }
 
-  // Fallback to today
-  return new Date().toISOString().split('T')[0];
+  // Pattern 3: DD/MM/YY or DD-MM-YY (e.g. 15/04/26 -> 2026-04-15)
+  const dmyShortMatch = normalizedText.match(/\b(0?[1-9]|[12][0-9]|3[01])[-/.](0?[1-9]|1[0-2])[-/.](2[4-9]|3[0-9])(?=\s|[.,;]|$)/);
+  if (dmyShortMatch) {
+    const d = String(parseInt(dmyShortMatch[1], 10)).padStart(2, '0');
+    const m = String(parseInt(dmyShortMatch[2], 10)).padStart(2, '0');
+    const y = `20${dmyShortMatch[3]}`;
+    return `${y}-${m}-${d}`;
+  }
+
+  // Fallback to today in local device time
+  return getLocalToday();
 }
 
 /**
@@ -312,7 +340,8 @@ export function extractPaymentMethod(text: string): PaymentMethod {
 }
 
 /**
- * Categorizes a merchant using learned user corrections first, then the built-in dictionary
+ * Categorizes a merchant using learned user corrections first, then the built-in dictionary.
+ * If the merchant is unknown, it does NOT choose a category automatically (returns categoryId: '').
  */
 export function categorizeMerchant(
   merchant: string,
@@ -320,6 +349,10 @@ export function categorizeMerchant(
   learnedRules?: Record<string, string>
 ): { categoryId: string; isLearned: boolean } {
   const normalized = normalizeMerchantKey(merchant);
+  if (!normalized) {
+    return { categoryId: '', isLearned: false };
+  }
+
   const rules = learnedRules || getLearnedRules();
 
   // 1. Check learned user rules
@@ -330,7 +363,7 @@ export function categorizeMerchant(
     }
   }
 
-  // Also check if any learned key is a substring of the merchant
+  // Substring match in learned rules
   for (const [key, catId] of Object.entries(rules)) {
     if (key.length >= 3 && (normalized.includes(key) || key.includes(normalized))) {
       const matchedCategory = categories.find((c) => c.id === catId);
@@ -353,9 +386,8 @@ export function categorizeMerchant(
     }
   }
 
-  // 3. Fallback: groceries or first category
-  const fallback = categories.find((c) => c.id === 'groceries') || categories[0];
-  return { categoryId: fallback?.id || 'groceries', isLearned: false };
+  // 3. Unknown merchant -> Return empty categoryId (Do NOT choose automatically)
+  return { categoryId: '', isLearned: false };
 }
 
 /**
@@ -402,9 +434,10 @@ export function parseBankSms(
   // Extract payment method
   const paymentMethod = extractPaymentMethod(trimmed);
 
-  // Categorize
+  // Categorize (returns '' if unknown)
   const { categoryId, isLearned } = categorizeMerchant(merchant, categories, learnedRules);
-  const category = categories.find((c) => c.id === categoryId);
+  const category = categoryId ? categories.find((c) => c.id === categoryId) : undefined;
+  const needsCategory = !categoryId;
 
   return {
     success: true,
@@ -416,6 +449,7 @@ export function parseBankSms(
       categoryId,
       categoryName: category?.name,
       isLearned,
+      needsCategory,
     },
   };
 }

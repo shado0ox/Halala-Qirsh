@@ -7,6 +7,7 @@ import { nativeHaptics } from '../utils/nativeHaptics';
 import { CURRENCY_SYMBOLS } from '../utils/storage';
 import { springs, fades } from '../utils/motion';
 import { translations } from '../utils/i18n';
+import { getLocalToday } from '../utils/smsParser';
 
 interface AddExpenseSheetProps {
   isOpen: boolean;
@@ -38,7 +39,7 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
   const [title, setTitle] = useState<string>('');
   const [amountStr, setAmountStr] = useState<string>('');
   const [categoryId, setCategoryId] = useState<string>('');
-  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [date, setDate] = useState<string>(getLocalToday());
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
   const [payer, setPayer] = useState<string>('الزوج');
   const [notes, setNotes] = useState<string>('');
@@ -61,7 +62,7 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
         setTitle('');
         setAmountStr('');
         setCategoryId(categories[0]?.id || '');
-        setDate(new Date().toISOString().split('T')[0]);
+        setDate(getLocalToday());
         setPaymentMethod('card');
         setPayer(isEn ? 'Husband' : 'الزوج');
         setNotes('');
