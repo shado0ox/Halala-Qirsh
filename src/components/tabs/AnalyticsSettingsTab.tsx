@@ -139,10 +139,6 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   const handleLanguageToggle = (newLang: 'ar' | 'en') => {
     nativeHaptics.tap(settings.soundEnabled);
     onUpdateSettings({ language: newLang });
-    if (typeof document !== 'undefined') {
-      document.documentElement.dir = newLang === 'ar' ? 'rtl' : 'ltr';
-      document.documentElement.lang = newLang;
-    }
   };
 
   const handleThemeModeChange = (mode: 'system' | 'light' | 'dark') => {

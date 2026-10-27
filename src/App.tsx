@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useEffect, useCallback, useRef, Suspense } from 'react';
+import React, { useLayoutEffect, useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { App as CapApp } from '@capacitor/app';
 import { StatusBar, Style } from '@capacitor/status-bar';
 import { Lock, Sparkles, X } from 'lucide-react';
@@ -134,6 +134,8 @@ function AppContent() {
   );
   const [currentNotification, setCurrentNotification] = useState<InAppNotification | null>(null);
   const shownBannersRef = useRef<Set<string>>(new Set());
+  // Becomes true once data was loaded from Capacitor Preferences. Saving is blocked until then.
+  const hasHydratedRef = useRef<boolean>(false);
 
   const motionConfig = useMotionConfig(data.settings.animations);
   const isReduced = motionConfig.isReduced;
@@ -152,6 +154,7 @@ function AppContent() {
   useEffect(() => {
     loadAppDataFromPreferences().then(async (prefData) => {
       setData(prefData);
+      hasHydratedRef.current = true;
       await SecurityService.migrateIfNeeded();
       const hasPass = await SecurityService.hasPasscode();
       if (prefData.settings.isPasscodeEnabled && hasPass) {
@@ -175,7 +178,7 @@ function AppContent() {
         if (prevExpenses.length > 0 && prevTotalSpent <= budgetLimit) {
           setShowCelebration(true);
           setCelebrationMessage(
-            isEn
+            prefData.settings.language === 'en'
               ? `Congratulations! You stayed under budget last month and saved successfully.`
               : `تهانينا! لقد أنهيت الشهر الماضي بنجاح تحت حد الميزانية المحددة.`
           );
@@ -186,10 +189,10 @@ function AppContent() {
         }
       }
     });
-  }, [isEn]);
+  }, []);
 
-  // Sync document RTL/LTR and language attribute
-  useEffect(() => {
+  // Sync document RTL/LTR and language attribute (layout effect = no frame with a wrong direction)
+  useLayoutEffect(() => {
     const lang = data.settings.language || 'ar';
     if (typeof document !== 'undefined') {
       document.documentElement.lang = lang;
@@ -199,6 +202,7 @@ function AppContent() {
 
   // Sync to Capacitor Preferences & localStorage whenever data changes
   useEffect(() => {
+    if (!hasHydratedRef.current) return; // never overwrite stored data with pre-hydration state
     saveAppData(data);
   }, [data]);
 
@@ -727,7 +731,7 @@ function AppContent() {
           />
 
           {/* Active Tab View with Direction-Aware Page Transitions */}
-          <main className="flex-1 w-full flex flex-col overflow-hidden relative">
+          <main key={`main-${data.settings.language}`} className="flex-1 w-full flex flex-col overflow-hidden relative">
             <AnimatePresence mode="wait">
               <motion.div
                 key={activeTab}
@@ -825,6 +829,7 @@ function AppContent() {
 
           {/* iOS Native TabBar with Shared Layout Pill */}
           <TabBar
+            key={`tabbar-${data.settings.language}`}
             activeTab={activeTab}
             onChangeTab={handleTabChange}
             onOpenAddExpense={() => {
