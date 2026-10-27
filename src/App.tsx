@@ -35,10 +35,12 @@ import { isSystemFlowActive } from './utils/systemFlow';
 import { fades, useMotionConfig } from './utils/motion';
 import { translations } from './utils/i18n';
 
+import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
 import { SmartSmsSheet } from './components/SmartSmsSheet';
 import { getLocalToday } from './utils/smsParser';
+import { isSmartSmsDeepLink } from './utils/deepLink';
 import { IOSNotificationBanner } from './components/IOSNotificationBanner';
 import { PasscodeLockModal } from './components/PasscodeLockModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -107,6 +109,68 @@ function AppContent() {
   const [passcodeModalMode, setPasscodeModalMode] = useState<'set' | 'change' | null>(null);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
   const [isSmartSmsOpen, setIsSmartSmsOpen] = useState<boolean>(false);
+  const isLockedRef = useRef<boolean>(isLocked);
+  const pendingSmartSmsOpenRef = useRef<boolean>(false);
+
+  useEffect(() => {
+    isLockedRef.current = isLocked;
+    if (!isLocked && pendingSmartSmsOpenRef.current) {
+      pendingSmartSmsOpenRef.current = false;
+      setIsSmartSmsOpen(true);
+    }
+  }, [isLocked]);
+
+  // Deep Link listener for halalaqirsh://sms (Back Tap iOS Shortcut)
+  useEffect(() => {
+    if (!Capacitor.isNativePlatform()) return;
+
+    const handleDeepLink = (url?: string | null) => {
+      if (isSmartSmsDeepLink(url)) {
+        if (isLockedRef.current) {
+          pendingSmartSmsOpenRef.current = true;
+        } else {
+          setIsSmartSmsOpen(true);
+        }
+      }
+    };
+
+    // 1. Check launch URL upon cold start
+    CapApp.getLaunchUrl()
+      .then((launchUrl) => {
+        if (launchUrl?.url) {
+          handleDeepLink(launchUrl.url);
+        }
+      })
+      .catch(() => {});
+
+    // 2. Listen for URL opens while app is running / foregrounded
+    let listenerHandle: PluginListenerHandle | null = null;
+    let isMounted = true;
+
+    const registerListener = async () => {
+      try {
+        const handle = await CapApp.addListener('appUrlOpen', (event) => {
+          handleDeepLink(event.url);
+        });
+        if (!isMounted) {
+          await handle.remove();
+        } else {
+          listenerHandle = handle;
+        }
+      } catch {
+        // Fallback for non-supported environments
+      }
+    };
+
+    registerListener();
+
+    return () => {
+      isMounted = false;
+      if (listenerHandle) {
+        listenerHandle.remove();
+      }
+    };
+  }, []);
 
   // Month-end celebration state
   const [showCelebration, setShowCelebration] = useState<boolean>(false);

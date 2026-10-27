@@ -298,6 +298,16 @@ export const translations = {
     lock1m: 'دقيقة',
     lock5m: '5 دقائق',
 
+    // Back Tap Shortcut
+    backTapSectionTitle: 'تسجيل بالضغط على ظهر الهاتف',
+    backTapSectionSubtitle: 'فتح استيراد الرسائل الذكية مباشرة بالضغط مرتين على ظهر الهاتف',
+    backTapAddShortcutBtn: 'إضافة الاختصار',
+    backTapStep1: 'اضغط "إضافة الاختصار" ثم Add Shortcut.',
+    backTapStep2: 'الإعدادات ثم تسهيلات الاستخدام ثم اللمس ثم Back Tap.',
+    backTapStep3: 'اختر Double Tap ثم اختر الاختصار.',
+    backTapStep4: 'جرّب بالضغط مرتين على ظهر الهاتف.',
+    backTapNote: 'Back Tap يعمل على iPhone 8 وأحدث مع iOS 14 أو أحدث، وقد يقل مع الجراب السميك.',
+
     // Payer labels
     husband: 'الزوج',
     wife: 'الزوجة',
@@ -599,6 +609,16 @@ export const translations = {
     lock30s: '30s',
     lock1m: '1m',
     lock5m: '5m',
+
+    // Back Tap Shortcut
+    backTapSectionTitle: 'Log Expense via Back Tap',
+    backTapSectionSubtitle: 'Open Smart SMS sheet directly by tapping twice on the back of your phone',
+    backTapAddShortcutBtn: 'Add Shortcut',
+    backTapStep1: 'Tap "Add Shortcut" then tap Add Shortcut.',
+    backTapStep2: 'Go to Settings > Accessibility > Touch > Back Tap.',
+    backTapStep3: 'Choose Double Tap then select the shortcut.',
+    backTapStep4: 'Try it by tapping twice on the back of your phone.',
+    backTapNote: 'Back Tap works on iPhone 8 and later with iOS 14 or later, and may be less responsive with thick cases.',
 
     // Payer labels
     husband: 'Husband',

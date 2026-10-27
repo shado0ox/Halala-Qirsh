@@ -19,6 +19,7 @@
 	"packageClassList": [
 		"BiometricAuthNative",
 		"AppPlugin",
+		"AppLauncherPlugin",
 		"ClipboardPlugin",
 		"FilesystemPlugin",
 		"HapticsPlugin",

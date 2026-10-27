@@ -21,8 +21,12 @@ import {
   Eye,
   Activity,
   Layers,
+  ExternalLink,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
+import { Capacitor } from '@capacitor/core';
+import { AppLauncher } from '@capacitor/app-launcher';
+import { SHORTCUT_ICLOUD_URL } from '../../utils/config';
 import { HalalaQirshLogo } from '../HalalaQirshLogo';
 import {
   Category,
@@ -61,6 +65,7 @@ interface AnalyticsSettingsTabProps {
   onDisablePasscode: () => void;
   onOpenPrivacyPolicy: () => void;
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  shortcutICloudUrl?: string;
 }
 
 export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
@@ -78,6 +83,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   onDisablePasscode,
   onOpenPrivacyPolicy,
   onShowToast,
+  shortcutICloudUrl,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const motionConfig = useMotionConfig(settings.animations);
@@ -175,6 +181,24 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
       e.target.value = '';
     } finally {
       endSystemFlow();
+    }
+  };
+
+  const effectiveShortcutUrl = shortcutICloudUrl ?? SHORTCUT_ICLOUD_URL;
+  const isShortcutConfigured = Boolean(
+    effectiveShortcutUrl && !effectiveShortcutUrl.includes('REPLACE_ME')
+  );
+
+  const handleOpenShortcut = async () => {
+    nativeHaptics.tap(settings.soundEnabled);
+    try {
+      if (Capacitor.isNativePlatform()) {
+        await AppLauncher.openUrl({ url: effectiveShortcutUrl });
+      } else {
+        window.open(effectiveShortcutUrl, '_blank', 'noopener,noreferrer');
+      }
+    } catch {
+      window.open(effectiveShortcutUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -548,6 +572,61 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
             </div>
           </div>
         )}
+      </div>
+
+      {/* SECTION: BACK TAP SHORTCUT (تسجيل بالضغط على ظهر الهاتف) */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-4">
+        <div className="flex items-center gap-3">
+          <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+            <Smartphone size={18} />
+          </div>
+          <div>
+            <h4 className="text-xs font-bold text-[#1C1C1E] dark:text-white">
+              {t.backTapSectionTitle}
+            </h4>
+            <p className="text-[10px] text-[#8E8E93]">
+              {t.backTapSectionSubtitle}
+            </p>
+          </div>
+        </div>
+
+        {/* Add Shortcut Action Button - hidden if URL contains REPLACE_ME */}
+        {isShortcutConfigured && (
+          <motion.button
+            whileTap={{ scale: 0.96 }}
+            type="button"
+            data-testid="add-back-tap-shortcut-btn"
+            onClick={handleOpenShortcut}
+            className="w-full min-h-[44px] p-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer hover:brightness-105 transition-all"
+          >
+            <Sparkles size={16} />
+            <span>{t.backTapAddShortcutBtn}</span>
+            <ExternalLink size={14} className="opacity-80" />
+          </motion.button>
+        )}
+
+        {/* Numbered Setup Steps */}
+        <div className="space-y-2.5 pt-1 border-t border-[#E5E5EA] dark:border-[#2C2C2E]">
+          {[
+            { num: 1, text: t.backTapStep1 },
+            { num: 2, text: t.backTapStep2 },
+            { num: 3, text: t.backTapStep3 },
+            { num: 4, text: t.backTapStep4 },
+          ].map((st) => (
+            <div key={st.num} className="flex items-start gap-2.5 text-xs text-slate-700 dark:text-slate-300">
+              <span className="w-5 h-5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center text-[10px] font-black shrink-0 mt-0.5">
+                {st.num}
+              </span>
+              <span className="leading-relaxed font-medium">{st.text}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Note banner */}
+        <div className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-[11px] text-[#8E8E93] dark:text-[#AEAEB2] leading-relaxed flex items-start gap-2">
+          <ShieldCheck size={14} className="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+          <span>{t.backTapNote}</span>
+        </div>
       </div>
 
       {/* SECTION 4: DATA EXPORT & SHARE SHEET */}
