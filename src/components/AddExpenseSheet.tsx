@@ -198,7 +198,7 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
             </div>
 
             {/* Form Body */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 pb-[max(env(safe-area-inset-bottom),24px)] space-y-4 no-scrollbar">
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -6 }}

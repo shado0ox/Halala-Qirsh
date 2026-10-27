@@ -122,7 +122,7 @@ export const getDefaultAppData = (): AppData => ({
     salaryDay: 27,
     currency: 'SAR',
     soundEnabled: true,
-    themeMode: 'system',
+    themeMode: 'light',
     selectedMonth: getCurrentMonthString(),
     notificationsEnabled: true,
     notificationLeadDays: 1,

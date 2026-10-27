@@ -361,10 +361,10 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           <span className="font-bold text-[#1C1C1E] dark:text-white">
             {isEn ? 'Theme' : 'سمة المظهر'}
           </span>
-          <div className="flex items-center gap-1 bg-[#F2F2F7] dark:bg-[#2C2C2E] p-1 rounded-2xl">
+          <div className="flex items-center gap-1 bg-[#EAF6F0] dark:bg-[#2C2C2E] p-1 rounded-2xl border border-emerald-500/15 dark:border-transparent">
             {[
               { id: 'system', label: isEn ? 'System' : 'تلقائي' },
-              { id: 'light', label: isEn ? 'Light' : 'فاتح' },
+              { id: 'light', label: isEn ? 'Luminous' : 'مشرق (أخضر)' },
               { id: 'dark', label: isEn ? 'Dark' : 'داكن' },
             ].map((th) => {
               const isActive = settings.themeMode === th.id;
@@ -374,8 +374,8 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
                   onClick={() => handleThemeModeChange(th.id as any)}
                   className={`px-3 py-1.5 rounded-xl font-bold text-[11px] transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-emerald-600 text-white shadow-2xs'
-                      : 'text-slate-600 dark:text-slate-300'
+                      ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-sm'
+                      : 'text-emerald-900/70 hover:text-emerald-900 dark:text-slate-300'
                   }`}
                 >
                   {th.label}

@@ -58,15 +58,15 @@ export const TabBar: React.FC<TabBarProps> = ({
       aria-label="Navigation bar"
       className="relative w-full shrink-0 select-none z-30"
     >
-      {/* Floating Center Quick Add Button */}
-      <div className="absolute -top-5 left-1/2 -translate-x-1/2 z-40">
+      {/* Floating Action Quick Add Button (Elevated FAB above tab bar, never covering bottom tabs) */}
+      <div className="absolute -top-16 end-4 sm:end-6 z-40">
         <div className="relative flex items-center justify-center">
           {/* Subtle breathing pulse ring (idle state) */}
           {!isAddExpenseOpen && (
             <motion.div
               animate={{
                 scale: [1, 1.15, 1],
-                opacity: [0.4, 0.1, 0.4],
+                opacity: [0.45, 0.1, 0.45],
               }}
               transition={{
                 duration: 2.8,
@@ -85,19 +85,19 @@ export const TabBar: React.FC<TabBarProps> = ({
               nativeHaptics.tap(soundEnabled);
               onOpenAddExpense();
             }}
-            className="w-13 h-13 rounded-full bg-gradient-to-tr from-emerald-600 to-emerald-500 text-white shadow-lg shadow-emerald-600/35 flex items-center justify-center cursor-pointer border-4 border-[#F2F2F7] dark:border-black active:shadow-md transition-shadow"
+            className="w-14 h-14 rounded-full bg-gradient-to-tr from-emerald-500 via-teal-500 to-cyan-500 text-white shadow-xl shadow-emerald-500/35 flex items-center justify-center cursor-pointer border-2 border-white/80 dark:border-white/15 active:shadow-md transition-shadow hover:brightness-105"
             aria-label={isEn ? 'Quick Add Expense' : 'إضافة مصروف سريع'}
             title={isEn ? 'Quick Add Expense' : 'إضافة مصروف سريع'}
           >
-            <Plus size={26} strokeWidth={2.8} />
+            <Plus size={28} strokeWidth={2.8} />
           </motion.button>
         </div>
       </div>
 
       {/* iOS Blur Glass Tab Bar Surface */}
-      <div className="w-full bg-white/85 dark:bg-[#161618]/90 backdrop-blur-xl border-t border-[#E5E5EA] dark:border-[#2C2C2E] px-2 pt-1.5 pb-1 transition-colors">
+      <div className="w-full bg-white/92 dark:bg-[#161618]/90 backdrop-blur-xl border-t border-emerald-500/15 dark:border-[#2C2C2E] px-2 pt-1.5 pb-[max(env(safe-area-inset-bottom),10px)] transition-colors shadow-[0_-4px_24px_rgba(16,185,129,0.06)] dark:shadow-none">
         <div className="grid grid-cols-5 items-center max-w-md mx-auto">
-          {tabs.map((tab, idx) => {
+          {tabs.map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
 
@@ -105,16 +105,14 @@ export const TabBar: React.FC<TabBarProps> = ({
               <button
                 key={tab.id}
                 onClick={() => handleTabClick(tab.id)}
-                className={`relative flex flex-col items-center justify-center py-1 min-h-[46px] cursor-pointer group select-none ${
-                  idx === 2 ? 'mt-2' : ''
-                }`}
+                className="relative flex flex-col items-center justify-center py-1 min-h-[46px] cursor-pointer group select-none"
               >
                 {/* Shared-layout sliding active pill indicator */}
                 {isActive && (
                   <motion.div
                     layoutId="activeTabIndicator"
                     transition={springs.smooth}
-                    className="absolute inset-x-1.5 inset-y-0.5 rounded-2xl bg-emerald-500/10 dark:bg-emerald-400/15 pointer-events-none"
+                    className="absolute inset-x-1.5 inset-y-0.5 rounded-2xl bg-emerald-500/15 dark:bg-emerald-400/15 border border-emerald-500/20 dark:border-transparent pointer-events-none"
                   />
                 )}
 
@@ -159,11 +157,6 @@ export const TabBar: React.FC<TabBarProps> = ({
               </button>
             );
           })}
-        </div>
-
-        {/* iOS Home Indicator Bar */}
-        <div className="w-full flex justify-center pt-2 pb-0.5">
-          <div className="w-32 h-1 bg-black/25 dark:bg-white/25 rounded-full" />
         </div>
       </div>
     </nav>

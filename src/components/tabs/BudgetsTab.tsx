@@ -135,10 +135,10 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
       <div className="flex items-center justify-between pt-1">
         <div>
           <h1 className="text-2xl font-black text-[#1C1C1E] dark:text-white tracking-tight">
-            {isEn ? 'Budgets & Envelopes' : 'الميزانية وأظرف النفقات'}
+            {isEn ? 'Budgets & Expense Categories' : 'الميزانية وبنود المصاريف'}
           </h1>
           <span className="text-xs text-[#8E8E93] font-medium">
-            {isEn ? `${categories.length} active budget envelopes` : `${categories.length} أظرف نفقات مفعلة`}
+            {isEn ? `${categories.length} active budget categories` : `${categories.length} بنود مصاريف مفعلة`}
           </span>
         </div>
 
@@ -169,7 +169,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
               <span className="text-sm font-bold text-slate-800 dark:text-slate-100">
                 {settings.budgetMode === 'custom_total'
                   ? (isEn ? 'Custom fixed target' : 'ميزانية عامة موحدة')
-                  : (isEn ? 'Sum of category envelopes' : 'مجموع أظرف التصنيفات')}
+                  : (isEn ? 'Sum of category budgets' : 'مجموع بنود التصنيفات')}
               </span>
             </div>
           </div>
@@ -259,7 +259,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
       <div className="space-y-2.5 pb-6">
         <div className="flex items-center justify-between px-1">
           <h2 className="text-sm font-bold text-[#1C1C1E] dark:text-white">
-            {isEn ? `Category Envelopes (${categories.length})` : `أظرف وميزانيات الفئات (${categories.length})`}
+            {isEn ? `Category Budgets (${categories.length})` : `بنود وميزانيات الفئات (${categories.length})`}
           </h2>
           <span className="text-xs text-[#8E8E93]">
             {isEn ? 'Tap to view 6-month trends' : 'اضغط على الفئة لعرض التحليل'}
@@ -499,7 +499,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
               {/* Monthly Limit Info */}
               <div className="p-3 bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-2xl flex items-center justify-between text-xs">
                 <div>
-                  <span className="text-[#8E8E93] block">{isEn ? 'Monthly Envelope Limit' : 'الحد الشهري للظرف'}</span>
+                  <span className="text-[#8E8E93] block">{isEn ? 'Monthly Limit' : 'الحد الشهري للبند'}</span>
                   <Amount
                     value={selectedDetailCat.monthlyLimit}
                     currency={settings.currency}

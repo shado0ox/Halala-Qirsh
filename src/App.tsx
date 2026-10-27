@@ -37,6 +37,7 @@ import { translations } from './utils/i18n';
 
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
+import { SmartSmsSheet } from './components/SmartSmsSheet';
 import { IOSNotificationBanner } from './components/IOSNotificationBanner';
 import { PasscodeLockModal } from './components/PasscodeLockModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -104,6 +105,7 @@ function AppContent() {
   });
   const [passcodeModalMode, setPasscodeModalMode] = useState<'set' | 'change' | null>(null);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
+  const [isSmartSmsOpen, setIsSmartSmsOpen] = useState<boolean>(false);
 
   // Month-end celebration state
   const [showCelebration, setShowCelebration] = useState<boolean>(false);
@@ -216,7 +218,7 @@ function AppContent() {
           document.body.style.backgroundColor = '#000000';
         } else {
           document.documentElement.classList.remove('dark');
-          document.body.style.backgroundColor = '#F2F2F7';
+          document.body.style.backgroundColor = '#F4FAF7';
         }
       }
       try {
@@ -627,7 +629,10 @@ function AppContent() {
   const unpaidBillsCount = data.bills.filter((b) => !b.isPaid).length;
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col bg-[#F2F2F7] dark:bg-black text-[#1C1C1E] dark:text-white pt-safe pb-safe overflow-hidden select-none relative">
+    <div className="h-[100dvh] w-full flex flex-col bg-[#F4FAF7] dark:bg-black text-[#0B2319] dark:text-white pt-safe overflow-hidden select-none relative">
+      {/* Ambient Luminous Emerald Glow for Light Theme */}
+      <div className="pointer-events-none absolute -top-24 inset-x-0 h-72 bg-gradient-to-b from-emerald-400/20 via-teal-200/10 to-transparent blur-3xl dark:hidden z-0" />
+
       {/* Short Branded Launch Splash */}
       {isSplashActive && (
         <LaunchSplash
@@ -649,7 +654,7 @@ function AppContent() {
 
       {/* App Switcher Multitasking Privacy Cover */}
       {isAppInactive && (
-        <div className="fixed inset-0 z-100 bg-[#F2F2F7] dark:bg-black flex flex-col items-center justify-center p-6 select-none">
+        <div className="fixed inset-0 z-100 bg-[#F4FAF7] dark:bg-black flex flex-col items-center justify-center p-6 select-none">
           <div className="relative mb-3 flex items-center justify-center">
             <HalalaQirshLogo size="lg" isEnglish={isEn} />
             <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-emerald-600 text-white flex items-center justify-center shadow-md">
@@ -753,6 +758,7 @@ function AppContent() {
                     }}
                     onNavigateToTab={handleTabChange}
                     onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
+                    onOpenSmartSms={() => setIsSmartSmsOpen(true)}
                     onUpdateSettings={handleUpdateSettings}
                   />
                 )}
@@ -853,6 +859,24 @@ function AppContent() {
             currency={data.settings.currency}
             onSaveExpense={handleSaveExpense}
             initialExpense={editingExpense}
+            soundEnabled={data.settings.soundEnabled}
+            language={data.settings.language}
+          />
+
+          {/* Smart Bank SMS Parser Bottom Sheet */}
+          <SmartSmsSheet
+            isOpen={isSmartSmsOpen}
+            onClose={() => setIsSmartSmsOpen(false)}
+            categories={data.categories}
+            currency={data.settings.currency}
+            onSaveExpense={(exp) => {
+              handleSaveExpense(exp);
+              showToast(
+                data.settings.language === 'en'
+                  ? 'Expense imported from bank SMS successfully!'
+                  : 'تم استيراد وحفظ العملية البنكية بنجاح!'
+              );
+            }}
             soundEnabled={data.settings.soundEnabled}
             language={data.settings.language}
           />

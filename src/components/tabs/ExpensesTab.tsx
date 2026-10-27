@@ -312,7 +312,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
         {groupedByDate.map((group, groupIdx) => (
           <div key={group.date} className="space-y-1.5">
             {/* Sticky Day Header */}
-            <div className="sticky top-0 z-20 bg-[#F2F2F7] dark:bg-black py-1 px-1 flex items-center justify-between text-xs font-extrabold text-[#8E8E93]">
+            <div className="sticky top-0 z-20 bg-[#F4FAF7] dark:bg-black py-1 px-1 flex items-center justify-between text-xs font-extrabold text-[#5C8271] dark:text-[#8E8E93]">
               <span>{group.displayDate}</span>
               <Amount
                 value={group.items.reduce((s, i) => s + i.amount, 0)}

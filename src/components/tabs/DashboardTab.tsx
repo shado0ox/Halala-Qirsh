@@ -35,6 +35,7 @@ interface DashboardTabProps {
   onOpenAddExpense: () => void;
   onNavigateToTab: (tab: any) => void;
   onOpenCategoryManager: () => void;
+  onOpenSmartSms?: () => void;
   onUpdateSettings?: (newSettings: Partial<BudgetSettings>) => void;
 }
 
@@ -46,6 +47,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   onOpenAddExpense,
   onNavigateToTab,
   onOpenCategoryManager,
+  onOpenSmartSms,
   onUpdateSettings,
 }) => {
   const currentMonth = settings.selectedMonth;
@@ -146,12 +148,35 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
     }
   };
 
+  // Double-tap on dashboard container detection (Requirement: double-tap opens smart SMS parser)
+  const lastTapTimeRef = useRef<number>(0);
+  const handleContainerTap = (e: React.TouchEvent | React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    // Don't trigger if user was tapping a button, link, or input
+    if (target.closest('button') || target.closest('input') || target.closest('select') || target.closest('a')) {
+      return;
+    }
+
+    const now = Date.now();
+    if (now - lastTapTimeRef.current < 350) {
+      nativeHaptics.tap(settings.soundEnabled);
+      if (onOpenSmartSms) {
+        onOpenSmartSms();
+      }
+      lastTapTimeRef.current = 0;
+    } else {
+      lastTapTimeRef.current = now;
+    }
+  };
+
   const variants = isReduced ? reducedCardVariants : cardVariants;
 
   return (
     <div
       ref={containerRef}
       onScroll={handleScroll}
+      onTouchEnd={handleContainerTap}
+      onDoubleClick={() => onOpenSmartSms && onOpenSmartSms()}
       className="flex-1 w-full overflow-y-auto px-4 py-3 space-y-4 no-scrollbar"
     >
       {/* Top Header Row */}
@@ -176,6 +201,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
 
         <div className="flex items-center gap-2">
+          {/* Smart Bank SMS Quick Trigger */}
+          {onOpenSmartSms && (
+            <motion.button
+              whileTap={{ scale: 0.92 }}
+              onClick={() => {
+                nativeHaptics.tap(settings.soundEnabled);
+                onOpenSmartSms();
+              }}
+              className="p-2.5 rounded-xl bg-white dark:bg-[#1C1C1E] border border-emerald-500/25 text-emerald-600 dark:text-emerald-400 text-xs font-bold flex items-center gap-1 shadow-2xs hover:bg-emerald-50/50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              title={isEn ? 'Smart Bank SMS Import (or Double-Tap screen)' : 'استيراد رسالة بنكية ذكي (أو اضغط مرتين على الشاشة)'}
+            >
+              <Sparkles size={15} className="text-emerald-500 animate-pulse" />
+              <span className="hidden xs:inline">{isEn ? 'Bank SMS' : 'رسالة بنكية'}</span>
+            </motion.button>
+          )}
+
           {/* Hide/Show Eye Toggle */}
           <motion.button
             whileTap={{ scale: 0.92 }}
@@ -392,7 +433,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             nativeHaptics.tap(settings.soundEnabled);
             onNavigateToTab('bills_groceries');
           }}
-          className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200/70 dark:border-slate-800 text-slate-800 dark:text-slate-100 flex flex-col items-center justify-center gap-1.5 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+          className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-emerald-500/15 dark:border-slate-800 text-slate-800 dark:text-slate-100 flex flex-col items-center justify-center gap-1.5 shadow-2xs hover:bg-emerald-50/40 dark:hover:bg-slate-800/60 cursor-pointer"
         >
           <div className="w-8 h-8 rounded-full bg-amber-500/15 text-amber-600 dark:text-amber-400 flex items-center justify-center">
             <ShoppingBag size={18} />
@@ -406,7 +447,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
             nativeHaptics.tap(settings.soundEnabled);
             onNavigateToTab('budgets');
           }}
-          className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200/70 dark:border-slate-800 text-slate-800 dark:text-slate-100 flex flex-col items-center justify-center gap-1.5 shadow-2xs hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+          className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-emerald-500/15 dark:border-slate-800 text-slate-800 dark:text-slate-100 flex flex-col items-center justify-center gap-1.5 shadow-2xs hover:bg-emerald-50/40 dark:hover:bg-slate-800/60 cursor-pointer"
         >
           <div className="w-8 h-8 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
             <Wallet size={18} />
@@ -499,14 +540,14 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         variants={variants}
         className="grid grid-cols-2 gap-2.5"
       >
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200/70 dark:border-slate-800 shadow-2xs">
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-emerald-500/15 dark:border-slate-800 shadow-[0_4px_16px_rgba(16,185,129,0.05)] dark:shadow-none">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] text-[#8E8E93] font-medium">
+            <span className="text-[11px] text-[#5C8271] dark:text-[#8E8E93] font-medium">
               {isEn ? "Today's Spent" : 'مصاريف اليوم'}
             </span>
             <TrendingDown size={14} className="text-emerald-500" />
           </div>
-          <div className="text-lg font-extrabold text-[#1C1C1E] dark:text-white tabular-nums">
+          <div className="text-lg font-extrabold text-[#0B2319] dark:text-white tabular-nums">
             <Amount
               value={todaySpent}
               currency={settings.currency}
@@ -514,22 +555,22 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               hideAmounts={isHidden}
             />
           </div>
-          <span className="text-[10px] text-[#8E8E93]">
+          <span className="text-[10px] text-[#5C8271] dark:text-[#8E8E93]">
             {isEn ? `${todayExpenses.length} transactions` : `${todayExpenses.length} عمليات مسجلة`}
           </span>
         </div>
 
-        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-slate-200/70 dark:border-slate-800 shadow-2xs">
+        <div className="p-3.5 rounded-2xl bg-white dark:bg-[#1C1C1E] border border-emerald-500/15 dark:border-slate-800 shadow-[0_4px_16px_rgba(16,185,129,0.05)] dark:shadow-none">
           <div className="flex items-center justify-between mb-1">
-            <span className="text-[11px] text-[#8E8E93] font-medium">
+            <span className="text-[11px] text-[#5C8271] dark:text-[#8E8E93] font-medium">
               {isEn ? 'Unpaid Bills' : 'فواتير متبقية'}
             </span>
             <CheckCircle2 size={14} className="text-amber-500" />
           </div>
-          <div className="text-lg font-extrabold text-[#1C1C1E] dark:text-white tabular-nums">
+          <div className="text-lg font-extrabold text-[#0B2319] dark:text-white tabular-nums">
             {unpaidBills.length} {isEn ? 'bills' : 'فواتير'}
           </div>
-          <span className="text-[10px] text-[#8E8E93]">
+          <span className="text-[10px] text-[#5C8271] dark:text-[#8E8E93]">
             {isEn ? 'Total: ' : 'بإجمالي '}
             <Amount
               value={unpaidBills.reduce((s, b) => s + b.amount, 0)}
@@ -550,7 +591,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         className="space-y-2 pb-4"
       >
         <div className="flex items-center justify-between px-1">
-          <h2 className="text-sm font-bold text-[#1C1C1E] dark:text-white">
+          <h2 className="text-sm font-bold text-[#0B2319] dark:text-white">
             {isEn ? 'Recent Expenses' : 'آخر نفقات المنزل'}
           </h2>
           <button
@@ -562,7 +603,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           </button>
         </div>
 
-        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-slate-200/70 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden shadow-2xs">
+        <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-emerald-500/15 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden shadow-[0_4px_16px_rgba(16,185,129,0.05)] dark:shadow-none">
           {monthlyExpenses.slice(0, 4).map((exp) => {
             const cat = catMap.get(exp.categoryId);
             return (

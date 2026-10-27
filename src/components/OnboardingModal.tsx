@@ -69,10 +69,10 @@ export const OnboardingModal: React.FC<OnboardingModalProps> = ({
           />
         </svg>
       ),
-      title: isEn ? 'Smart Envelopes & Limits' : 'أظرف النفقات ومراقبة الميزانية',
+      title: isEn ? 'Smart Budgets & Limits' : 'تقسيم الميزانية وبنود المصاريف',
       subtitle: isEn
-        ? 'Distribute monthly expenses across customized envelopes, track daily spending allowances, and manage recurring family bills.'
-        : 'وزع دخلك على أظرف نفقات محددة، راقب معدل الصرف اليومي المتاح، وتجنب المفاجآت بنهاية الشهر مع تنبيهات الفواتير الذكية.',
+        ? 'Distribute monthly expenses across customized categories, track daily spending allowances, and manage recurring family bills.'
+        : 'وزع مرتبك ودخلك على بنود مصاريف محددة، راقب معدل الصرف اليومي المتاح، وتجنب المفاجآت بنهاية الشهر مع تنبيهات الفواتير الذكية.',
     },
     {
       icon: (
