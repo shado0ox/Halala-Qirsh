@@ -24,8 +24,9 @@ import { Amount } from '../Amount';
 import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { NotificationPermissionState } from '../../utils/notifications';
-import { AnimatedCounter } from '../AnimatedCounter';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
+import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../../utils/keyboard';
+import { KeyboardDismissButton } from '../KeyboardDismissButton';
 
 interface BillsAndGroceriesTabProps {
   bills: RecurringBill[];
@@ -70,6 +71,7 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
   const isEn = settings.language === 'en';
   const lang = settings.language || 'ar';
   const isHidden = Boolean(settings.hideAmounts);
+  const { isKeyboardOpen } = useKeyboardState();
 
   // Add Bill Modal
   const [showAddBillModal, setShowAddBillModal] = useState<boolean>(false);
@@ -567,27 +569,40 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowAddBillModal(false)}
-              className="absolute inset-0 bg-black/55"
+              onClick={(e) => handleModalBackdropClick(e, () => setShowAddBillModal(false), settings.soundEnabled)}
+              className="absolute inset-0 bg-black/55 cursor-pointer"
             />
             <motion.div
               initial={{ scale: 0.93, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.93, opacity: 0 }}
               transition={springs.smooth}
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                if (!['input', 'button', 'textarea', 'select'].includes(target.tagName.toLowerCase())) {
+                  dismissKeyboard();
+                }
+              }}
               className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4"
             >
               <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
                 <h3 className="text-sm font-black text-[#1C1C1E] dark:text-white">
                   {isEn ? 'Add Recurring Bill' : 'إضافة فاتورة دورية جديدة'}
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowAddBillModal(false)}
-                  className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer"
-                >
-                  <X size={15} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <KeyboardDismissButton
+                    visible={isKeyboardOpen}
+                    isEnglish={isEn}
+                    soundEnabled={settings.soundEnabled}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddBillModal(false)}
+                    className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
 
               <form onSubmit={handleSaveBill} className="space-y-3">
@@ -686,27 +701,40 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              onClick={() => setShowAddGroceryModal(false)}
-              className="absolute inset-0 bg-black/55"
+              onClick={(e) => handleModalBackdropClick(e, () => setShowAddGroceryModal(false), settings.soundEnabled)}
+              className="absolute inset-0 bg-black/55 cursor-pointer"
             />
             <motion.div
               initial={{ scale: 0.93, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.93, opacity: 0 }}
               transition={springs.smooth}
+              onClick={(e) => {
+                const target = e.target as HTMLElement;
+                if (!['input', 'button', 'textarea', 'select'].includes(target.tagName.toLowerCase())) {
+                  dismissKeyboard();
+                }
+              }}
               className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4"
             >
               <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
                 <h3 className="text-sm font-black text-[#1C1C1E] dark:text-white">
                   {isEn ? 'Add Grocery Item' : 'إضافة سلعة لقائمة البيت'}
                 </h3>
-                <button
-                  type="button"
-                  onClick={() => setShowAddGroceryModal(false)}
-                  className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer"
-                >
-                  <X size={15} />
-                </button>
+                <div className="flex items-center gap-2">
+                  <KeyboardDismissButton
+                    visible={isKeyboardOpen}
+                    isEnglish={isEn}
+                    soundEnabled={settings.soundEnabled}
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowAddGroceryModal(false)}
+                    className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer"
+                  >
+                    <X size={15} />
+                  </button>
+                </div>
               </div>
 
               <form onSubmit={handleSaveGrocery} className="space-y-3">

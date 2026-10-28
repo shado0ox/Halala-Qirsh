@@ -517,6 +517,17 @@ function AppContent() {
     }));
   };
 
+  const handleBatchUpdateCategoryLimits = (limits: Record<string, number>) => {
+    nativeHaptics.success(data.settings.soundEnabled);
+    setData((prev) => ({
+      ...prev,
+      categories: prev.categories.map((c) =>
+        limits[c.id] !== undefined ? { ...c, monthlyLimit: limits[c.id] } : c
+      ),
+    }));
+    showToast(data.settings.language === 'en' ? 'Budget updated and distributed' : 'تم تحديث الميزانية وتوزيعها بنجاح');
+  };
+
   const handleToggleBill = (billId: string) => {
     nativeHaptics.success(data.settings.soundEnabled);
     setData((prev) => {
@@ -849,6 +860,7 @@ function AppContent() {
                     settings={data.settings}
                     onUpdateSettings={handleUpdateSettings}
                     onUpdateCategoryLimit={handleUpdateCategoryLimit}
+                    onBatchUpdateCategoryLimits={handleBatchUpdateCategoryLimits}
                     onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                   />
                 )}

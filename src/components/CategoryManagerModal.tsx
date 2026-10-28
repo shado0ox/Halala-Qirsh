@@ -7,6 +7,8 @@ import { sound } from '../utils/audio';
 import { CURRENCY_SYMBOLS } from '../utils/storage';
 import { Amount } from './Amount';
 import { translations } from '../utils/i18n';
+import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../utils/keyboard';
+import { KeyboardDismissButton } from './KeyboardDismissButton';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -35,6 +37,7 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
 }) => {
   const t = translations[language || 'ar'];
   const isEn = language === 'en';
+  const { isKeyboardOpen } = useKeyboardState();
 
   const [editingCategory, setEditingCategory] = useState<Category | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
@@ -122,16 +125,13 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-          {/* Backdrop (no blur to preserve 60fps) */}
+          {/* Backdrop (Dismisses keyboard first if open, or closes modal if keyboard is closed) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={() => {
-              sound.playTap(soundEnabled);
-              onClose();
-            }}
-            className="absolute inset-0 bg-black/55"
+            onClick={(e) => handleModalBackdropClick(e, onClose, soundEnabled)}
+            className="absolute inset-0 bg-black/55 cursor-pointer"
           />
 
           {/* Modal Container */}
@@ -139,20 +139,33 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
             initial={{ scale: 0.95, opacity: 0, y: 10 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 10 }}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              if (!['input', 'button', 'textarea', 'select'].includes(target.tagName.toLowerCase())) {
+                dismissKeyboard();
+              }
+            }}
             className="relative w-full max-w-md max-h-[85vh] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl flex flex-col overflow-hidden z-10 border border-slate-200/50 dark:border-slate-800"
           >
             {/* Header */}
             <div className="flex items-center justify-between px-5 py-3.5 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
-              <button
-                onClick={() => {
-                  sound.playTap(soundEnabled);
-                  onClose();
-                }}
-                className="w-8 h-8 rounded-full bg-[#E5E5EA]/70 dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-[#1C1C1E] dark:hover:text-white transition-colors cursor-pointer"
-                aria-label={t.close}
-              >
-                <X size={18} />
-              </button>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => {
+                    sound.playTap(soundEnabled);
+                    onClose();
+                  }}
+                  className="w-8 h-8 rounded-full bg-[#E5E5EA]/70 dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-[#1C1C1E] dark:hover:text-white transition-colors cursor-pointer"
+                  aria-label={t.close}
+                >
+                  <X size={18} />
+                </button>
+                <KeyboardDismissButton
+                  visible={isKeyboardOpen}
+                  isEnglish={isEn}
+                  soundEnabled={soundEnabled}
+                />
+              </div>
 
               <h2 className="text-sm md:text-base font-bold text-[#1C1C1E] dark:text-white">
                 {isCreatingNew

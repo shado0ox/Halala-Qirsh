@@ -35,6 +35,7 @@ import {
   AppData,
 } from '../../types';
 import { CategoryIcon } from '../CategoryIcon';
+import { CategoryExpensesPieChart } from '../CategoryExpensesPieChart';
 import { Amount } from '../Amount';
 import {
   CURRENCY_SYMBOLS,
@@ -92,41 +93,6 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   const currentMonth = settings.selectedMonth;
   const monthlyExpenses = expenses.filter((e) => e.date.startsWith(currentMonth));
   const totalSpent = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
-
-  // Category breakdown
-  const catSpendMap = new Map<string, number>();
-  monthlyExpenses.forEach((e) => {
-    catSpendMap.set(e.categoryId, (catSpendMap.get(e.categoryId) || 0) + e.amount);
-  });
-
-  const sortedCategoriesBySpend = [...categories]
-    .map((c) => ({
-      ...c,
-      spent: catSpendMap.get(c.id) || 0,
-    }))
-    .filter((c) => c.spent > 0)
-    .sort((a, b) => b.spent - a.spent);
-
-  // Active touched slice in Donut Chart
-  const [activeSliceId, setActiveSliceId] = useState<string | null>(null);
-
-  // Donut SVG Math
-  const donutRadius = 60;
-  const donutCircumference = 2 * Math.PI * donutRadius;
-
-  let accumulatedLength = 0;
-  const donutSlices = sortedCategoriesBySpend.map((cat) => {
-    const ratio = totalSpent > 0 ? cat.spent / totalSpent : 0;
-    const strokeDasharray = `${ratio * donutCircumference} ${donutCircumference}`;
-    const strokeDashoffset = -accumulatedLength;
-    accumulatedLength += ratio * donutCircumference;
-    return {
-      cat,
-      ratio,
-      strokeDasharray,
-      strokeDashoffset,
-    };
-  });
 
   // Payer breakdown
   const payerMap = new Map<string, number>();
@@ -200,167 +166,49 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         <p className="text-xs text-[#8E8E93]">{t.reportsSubtitle}</p>
       </div>
 
-      {/* SECTION 1: VISUAL ANALYTICS & ANIMATED DONUT */}
-      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-4">
-        <div className="flex items-center justify-between">
+      {/* SECTION 1: RECHARTS CATEGORY EXPENSE PIE CHART */}
+      <CategoryExpensesPieChart
+        categories={categories}
+        expenses={expenses}
+        settings={settings}
+        currentMonth={currentMonth}
+        language={lang}
+        hideAmounts={Boolean(settings.hideAmounts)}
+      />
+
+      {/* Family Payer Breakdown */}
+      {monthlyExpenses.length > 0 && (
+        <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-3">
           <span className="text-xs font-bold text-[#8E8E93] flex items-center gap-1.5">
-            <PieChart size={15} className="text-emerald-500" />
-            <span>{t.spendByCategory}</span>
+            <Users size={15} className="text-emerald-500" />
+            <span>{t.familyPaymentShare}</span>
           </span>
-          <span className="text-xs font-black text-[#1C1C1E] dark:text-white tabular-nums">
-            <Amount
-              value={totalSpent}
-              currency={settings.currency}
-              lang={lang}
-              hideAmounts={Boolean(settings.hideAmounts)}
-            />
-          </span>
-        </div>
+          <div className="grid grid-cols-3 gap-2 text-center text-xs">
+            {(['الزوج', 'الزوجة', 'مشترك'] as const).map((p) => {
+              const amount = payerMap.get(p) || 0;
+              const pct = totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0;
+              const payerLabel = isEn ? (p === 'الزوج' ? t.husband : p === 'الزوجة' ? t.wife : t.joint) : p;
 
-        {/* Animated Interactive SVG Donut */}
-        {sortedCategoriesBySpend.length > 0 && (
-          <div className="flex flex-col sm:flex-row items-center justify-center gap-5 pt-1">
-            <div className="relative w-36 h-36 shrink-0 flex items-center justify-center">
-              <svg className="w-full h-full -rotate-90 transform" viewBox="0 0 160 160">
-                <circle
-                  cx="80"
-                  cy="80"
-                  r={donutRadius}
-                  stroke="rgba(0, 0, 0, 0.05)"
-                  className="dark:stroke-white/5"
-                  strokeWidth="16"
-                  fill="transparent"
-                />
-                {donutSlices.map((slice, idx) => {
-                  const isSelected = activeSliceId === slice.cat.id;
-                  return (
-                    <motion.circle
-                      key={slice.cat.id}
-                      cx="80"
-                      cy="80"
-                      r={donutRadius}
-                      stroke={slice.cat.color}
-                      strokeWidth={isSelected ? 20 : 16}
-                      strokeDasharray={slice.strokeDasharray}
-                      strokeDashoffset={slice.strokeDashoffset}
-                      initial={isReduced ? {} : { opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ duration: 0.4, delay: idx * 0.05 }}
-                      fill="transparent"
-                      className="cursor-pointer transition-all duration-200"
-                      onClick={() => {
-                        nativeHaptics.tap(settings.soundEnabled);
-                        setActiveSliceId(isSelected ? null : slice.cat.id);
-                      }}
+              return (
+                <div key={p} className="p-2.5 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
+                  <span className="text-[10px] text-[#8E8E93] block font-semibold">{payerLabel}</span>
+                  <span className="font-bold text-[#1C1C1E] dark:text-white tabular-nums block mt-0.5">
+                    <Amount
+                      value={amount}
+                      currency={settings.currency}
+                      lang={lang}
+                      hideAmounts={Boolean(settings.hideAmounts)}
                     />
-                  );
-                })}
-              </svg>
-
-              <div className="absolute inset-0 flex flex-col items-center justify-center text-center pointer-events-none px-2">
-                {activeSliceId ? (
-                  <>
-                    <span className="text-[10px] font-bold text-[#8E8E93] truncate max-w-24">
-                      {isEn ? (categories.find(c => c.id === activeSliceId)?.nameEn || '') : (categories.find(c => c.id === activeSliceId)?.name || '')}
-                    </span>
-                    <span className="text-sm font-black text-[#1C1C1E] dark:text-white tabular-nums">
-                      {Math.round(((catSpendMap.get(activeSliceId) || 0) / totalSpent) * 100)}%
-                    </span>
-                  </>
-                ) : (
-                  <>
-                    <span className="text-sm font-black text-[#1C1C1E] dark:text-white tabular-nums">
-                      {sortedCategoriesBySpend.length}
-                    </span>
-                    <span className="text-[9px] font-bold text-[#8E8E93] uppercase tracking-wider">
-                      {isEn ? 'Categories' : 'تصنيفات'}
-                    </span>
-                  </>
-                )}
-              </div>
-            </div>
-
-            {/* Top Categories Mini Chips */}
-            <div className="flex-1 w-full space-y-2">
-              {sortedCategoriesBySpend.slice(0, 4).map((cat) => {
-                const pct = totalSpent > 0 ? Math.round((cat.spent / totalSpent) * 100) : 0;
-                const isSelected = activeSliceId === cat.id;
-                return (
-                  <div
-                    key={cat.id}
-                    onClick={() => {
-                      nativeHaptics.tap(settings.soundEnabled);
-                      setActiveSliceId(isSelected ? null : cat.id);
-                    }}
-                    className={`p-2 rounded-xl flex items-center justify-between text-xs cursor-pointer transition-colors ${
-                      isSelected
-                        ? 'bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-300 dark:border-emerald-800'
-                        : 'bg-[#F2F2F7] dark:bg-[#2C2C2E]'
-                    }`}
-                  >
-                    <div className="flex items-center gap-2">
-                      <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: cat.color }} />
-                      <span className="font-semibold text-slate-800 dark:text-slate-200">
-                        {isEn && cat.nameEn ? cat.nameEn : cat.name}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-1.5 tabular-nums">
-                      <Amount
-                        value={cat.spent}
-                        currency={settings.currency}
-                        lang={lang}
-                        hideAmounts={Boolean(settings.hideAmounts)}
-                        className="font-bold text-slate-700 dark:text-slate-300"
-                      />
-                      <span className="text-[10px] text-[#8E8E93]">({pct}%)</span>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
+                  </span>
+                  <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold tabular-nums">
+                    {pct}%
+                  </span>
+                </div>
+              );
+            })}
           </div>
-        )}
-
-        {sortedCategoriesBySpend.length === 0 && (
-          <div className="py-6 text-center text-xs text-[#8E8E93]">
-            {isEn ? 'No expenses recorded for this month yet.' : 'لا توجد مصاريف مسجلة لهذا الشهر بعد.'}
-          </div>
-        )}
-
-        {/* Family Payer Breakdown */}
-        {monthlyExpenses.length > 0 && (
-          <div className="pt-3 border-t border-[#E5E5EA] dark:border-[#2C2C2E] space-y-2">
-            <span className="text-[11px] font-bold text-[#8E8E93] flex items-center gap-1">
-              <Users size={13} />
-              <span>{t.familyPaymentShare}</span>
-            </span>
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              {(['الزوج', 'الزوجة', 'مشترك'] as const).map((p) => {
-                const amount = payerMap.get(p) || 0;
-                const pct = totalSpent > 0 ? Math.round((amount / totalSpent) * 100) : 0;
-                const payerLabel = isEn ? (p === 'الزوج' ? t.husband : p === 'الزوجة' ? t.wife : t.joint) : p;
-
-                return (
-                  <div key={p} className="p-2.5 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E]">
-                    <span className="text-[10px] text-[#8E8E93] block font-semibold">{payerLabel}</span>
-                    <span className="font-bold text-[#1C1C1E] dark:text-white tabular-nums block mt-0.5">
-                      <Amount
-                        value={amount}
-                        currency={settings.currency}
-                        lang={lang}
-                        hideAmounts={Boolean(settings.hideAmounts)}
-                      />
-                    </span>
-                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-bold tabular-nums">
-                      {pct}%
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
-      </div>
+        </div>
+      )}
 
       {/* SECTION 2: APPEARANCE & ANIMATIONS */}
       <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-4">

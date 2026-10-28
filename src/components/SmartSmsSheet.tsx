@@ -28,6 +28,8 @@ import {
   getLocalToday,
   getLocalDateString,
 } from '../utils/smsParser';
+import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../utils/keyboard';
+import { KeyboardDismissButton } from './KeyboardDismissButton';
 
 interface SmartSmsSheetProps {
   isOpen: boolean;
@@ -52,6 +54,7 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
   language = 'ar',
 }) => {
   const isEn = language === 'en';
+  const { isKeyboardOpen } = useKeyboardState();
 
   // Privacy Rule: rawSms is only kept in volatile state during typing/pasting, never saved to storage!
   const [rawSms, setRawSms] = useState<string>('');
@@ -196,14 +199,14 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center select-none">
-          {/* Dimmed Backdrop */}
+          {/* Dimmed Backdrop (Dismisses keyboard first if open, or closes sheet if keyboard is closed) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={fades.fast}
-            onClick={handleResetAndClose}
-            className="absolute inset-0 bg-black/55"
+            onClick={(e) => handleModalBackdropClick(e, handleResetAndClose, soundEnabled)}
+            className="absolute inset-0 bg-black/55 cursor-pointer"
           />
 
           {/* Draggable Bottom Sheet */}
@@ -221,6 +224,12 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={springs.smooth}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              if (!['input', 'button', 'textarea', 'select'].includes(target.tagName.toLowerCase())) {
+                dismissKeyboard();
+              }
+            }}
             className="relative w-full max-w-lg max-h-[92vh] bg-white dark:bg-[#1C1C1E] rounded-t-[32px] shadow-2xl flex flex-col overflow-hidden z-10 border-t border-emerald-500/20"
           >
             {/* Grabber Handle */}
@@ -244,14 +253,21 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                 </div>
               </div>
 
-              <motion.button
-                whileTap={{ scale: 0.92 }}
-                type="button"
-                onClick={handleResetAndClose}
-                className="w-8 h-8 rounded-full bg-[#E5E5EA]/70 dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-[#1C1C1E] dark:hover:text-white transition-colors cursor-pointer"
-              >
-                <X size={18} />
-              </motion.button>
+              <div className="flex items-center gap-2">
+                <KeyboardDismissButton
+                  visible={isKeyboardOpen}
+                  isEnglish={isEn}
+                  soundEnabled={soundEnabled}
+                />
+                <motion.button
+                  whileTap={{ scale: 0.92 }}
+                  type="button"
+                  onClick={handleResetAndClose}
+                  className="w-8 h-8 rounded-full bg-[#E5E5EA]/70 dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-[#1C1C1E] dark:hover:text-white transition-colors cursor-pointer"
+                >
+                  <X size={18} />
+                </motion.button>
+              </div>
             </div>
 
             {/* Sheet Body */}

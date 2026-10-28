@@ -67,6 +67,7 @@ export interface BudgetSettings {
   hideAmounts?: boolean;
   hasCompletedOnboarding?: boolean;
   lastCelebratedMonth?: string;
+  annualBudget?: number;
 }
 
 export interface InAppNotification {

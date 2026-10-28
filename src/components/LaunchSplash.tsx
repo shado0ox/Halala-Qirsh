@@ -42,7 +42,7 @@ export const LaunchSplash: React.FC<LaunchSplashProps> = ({
             transition={springs.bouncy}
             className="mb-5 flex items-center justify-center"
           >
-            <HalalaQirshLogo size="xl" isEnglish={isEnglish} />
+            <HalalaQirshLogo size="2xl" isEnglish={isEnglish} />
           </motion.div>
 
           <motion.div

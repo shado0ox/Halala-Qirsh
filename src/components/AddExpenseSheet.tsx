@@ -8,6 +8,8 @@ import { CURRENCY_SYMBOLS } from '../utils/storage';
 import { springs, fades } from '../utils/motion';
 import { translations } from '../utils/i18n';
 import { getLocalToday } from '../utils/smsParser';
+import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../utils/keyboard';
+import { KeyboardDismissButton } from './KeyboardDismissButton';
 
 interface AddExpenseSheetProps {
   isOpen: boolean;
@@ -35,6 +37,7 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
 }) => {
   const t = translations[language];
   const isEn = language === 'en';
+  const { isKeyboardOpen } = useKeyboardState();
 
   const [title, setTitle] = useState<string>('');
   const [amountStr, setAmountStr] = useState<string>('');
@@ -130,19 +133,18 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
     <AnimatePresence>
       {isOpen && (
         <div className="fixed inset-0 z-50 flex items-end justify-center select-none">
-          {/* iOS Dimmed Backdrop (Plain semi-transparent, NO backdrop-blur to preserve 60fps) */}
+          {/* iOS Dimmed Backdrop (Dismisses keyboard first if open, or closes sheet if keyboard is closed) */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={fades.fast}
-            onClick={() => {
+            onClick={(e) => {
               if (!isSubmitting) {
-                nativeHaptics.tap(soundEnabled);
-                onClose();
+                handleModalBackdropClick(e, onClose, soundEnabled);
               }
             }}
-            className="absolute inset-0 bg-black/55"
+            className="absolute inset-0 bg-black/55 cursor-pointer"
           />
 
           {/* Draggable Bottom Sheet with velocity-based dismiss */}
@@ -160,6 +162,12 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={springs.smooth}
+            onClick={(e) => {
+              const target = e.target as HTMLElement;
+              if (!['input', 'button', 'textarea', 'select'].includes(target.tagName.toLowerCase())) {
+                dismissKeyboard();
+              }
+            }}
             className="relative w-full max-w-lg max-h-[90vh] bg-white dark:bg-[#1C1C1E] rounded-t-[32px] shadow-2xl flex flex-col overflow-hidden z-10 border-t border-slate-200/50 dark:border-slate-800"
           >
             {/* Grabber Handle */}
@@ -186,16 +194,23 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                 {initialExpense ? t.editExpenseModalTitle : t.addExpenseModalTitle}
               </h2>
 
-              <motion.button
-                ref={saveBtnRef}
-                whileTap={{ scale: 0.94 }}
-                type="button"
-                disabled={isSubmitting}
-                onClick={() => handleSubmit()}
-                className="px-4 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 disabled:pointer-events-none transition-opacity"
-              >
-                {t.save}
-              </motion.button>
+              <div className="flex items-center gap-2">
+                <KeyboardDismissButton
+                  visible={isKeyboardOpen}
+                  isEnglish={isEn}
+                  soundEnabled={soundEnabled}
+                />
+                <motion.button
+                  ref={saveBtnRef}
+                  whileTap={{ scale: 0.94 }}
+                  type="button"
+                  disabled={isSubmitting}
+                  onClick={() => handleSubmit()}
+                  className="px-4 py-1.5 rounded-full bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-xs cursor-pointer disabled:opacity-50 disabled:pointer-events-none transition-opacity"
+                >
+                  {t.save}
+                </motion.button>
+              </div>
             </div>
 
             {/* Form Body */}
