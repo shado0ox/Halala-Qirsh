@@ -26,7 +26,6 @@ import {
 import { motion, AnimatePresence } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
 import { AppLauncher } from '@capacitor/app-launcher';
-import { SHORTCUT_ICLOUD_URL } from '../../utils/config';
 import { HalalaQirshLogo } from '../HalalaQirshLogo';
 import {
   Category,
@@ -65,7 +64,6 @@ interface AnalyticsSettingsTabProps {
   onDisablePasscode: () => void;
   onOpenPrivacyPolicy: () => void;
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
-  shortcutICloudUrl?: string;
 }
 
 export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
@@ -83,7 +81,6 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   onDisablePasscode,
   onOpenPrivacyPolicy,
   onShowToast,
-  shortcutICloudUrl,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const motionConfig = useMotionConfig(settings.animations);
@@ -184,21 +181,12 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
     }
   };
 
-  const effectiveShortcutUrl = shortcutICloudUrl ?? SHORTCUT_ICLOUD_URL;
-  const isShortcutConfigured = Boolean(
-    effectiveShortcutUrl && !effectiveShortcutUrl.includes('REPLACE_ME')
-  );
-
-  const handleOpenShortcut = async () => {
+  const handleOpenShortcutsApp = async () => {
     nativeHaptics.tap(settings.soundEnabled);
     try {
-      if (Capacitor.isNativePlatform()) {
-        await AppLauncher.openUrl({ url: effectiveShortcutUrl });
-      } else {
-        window.open(effectiveShortcutUrl, '_blank', 'noopener,noreferrer');
-      }
+      await AppLauncher.openUrl({ url: 'shortcuts://' });
     } catch {
-      window.open(effectiveShortcutUrl, '_blank', 'noopener,noreferrer');
+      // Ignore if cannot open shortcuts
     }
   };
 
@@ -590,13 +578,13 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           </div>
         </div>
 
-        {/* Add Shortcut Action Button - hidden if URL contains REPLACE_ME */}
-        {isShortcutConfigured && (
+        {/* Open Shortcuts App Action Button - visible only on native devices */}
+        {Capacitor.isNativePlatform() && (
           <motion.button
             whileTap={{ scale: 0.96 }}
             type="button"
             data-testid="add-back-tap-shortcut-btn"
-            onClick={handleOpenShortcut}
+            onClick={handleOpenShortcutsApp}
             className="w-full min-h-[44px] p-3 rounded-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-500 text-white font-bold text-xs flex items-center justify-center gap-2 shadow-md shadow-emerald-600/20 cursor-pointer hover:brightness-105 transition-all"
           >
             <Sparkles size={16} />

@@ -4,6 +4,8 @@ import { render, screen, fireEvent } from '@testing-library/react';
 import { AnalyticsSettingsTab } from '../tabs/AnalyticsSettingsTab';
 import { AppData } from '../../types';
 import { AppLauncher } from '@capacitor/app-launcher';
+import { Capacitor } from '@capacitor/core';
+import { getDefaultAppData } from '../../utils/storage';
 
 // Mock native haptics
 vi.mock('../../utils/nativeHaptics', () => ({
@@ -27,21 +29,22 @@ vi.mock('@capacitor/core', async () => {
   return {
     ...actual,
     Capacitor: {
+      ...actual.Capacitor,
       isNativePlatform: vi.fn().mockReturnValue(true),
     },
   };
 });
 
-import { getDefaultAppData } from '../../utils/storage';
-
 const mockData: AppData = getDefaultAppData();
 
-describe('Back Tap Shortcut Settings UI Tests', () => {
+describe('Back Tap App Intents / Shortcuts Settings UI Tests', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
-  it('hides the "Add Shortcut" button when the constant contains REPLACE_ME and shows all setup steps and note', () => {
+  it('on native platform: shows "Open Shortcuts app" button, all 4 steps, and clicking calls AppLauncher.openUrl with shortcuts://', () => {
+    vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
+
     render(
       <AnalyticsSettingsTab
         categories={mockData.categories}
@@ -63,19 +66,28 @@ describe('Back Tap Shortcut Settings UI Tests', () => {
     // Section title must be visible
     expect(screen.getByText('تسجيل بالضغط على ظهر الهاتف')).toBeInTheDocument();
 
-    // Button should NOT be rendered when URL contains REPLACE_ME
-    const addShortcutButton = screen.queryByTestId('add-back-tap-shortcut-btn');
-    expect(addShortcutButton).toBeNull();
+    // Button should be visible on native platform
+    const openShortcutsButton = screen.getByTestId('add-back-tap-shortcut-btn');
+    expect(openShortcutsButton).toBeInTheDocument();
+    expect(openShortcutsButton).toHaveTextContent('فتح تطبيق الاختصارات');
 
-    // All steps must be present
-    expect(screen.getByText(/اضغط "إضافة الاختصار" ثم Add Shortcut/)).toBeInTheDocument();
-    expect(screen.getByText(/الإعدادات ثم تسهيلات الاستخدام ثم اللمس ثم Back Tap/)).toBeInTheDocument();
-    expect(screen.getByText(/اختر Double Tap ثم اختر الاختصار/)).toBeInTheDocument();
-    expect(screen.getByText(/جرّب بالضغط مرتين على ظهر الهاتف/)).toBeInTheDocument();
-    expect(screen.getByText(/Back Tap يعمل على iPhone 8 وأحدث/)).toBeInTheDocument();
+    // Click button
+    fireEvent.click(openShortcutsButton);
+    expect(AppLauncher.openUrl).toHaveBeenCalledWith({
+      url: 'shortcuts://',
+    });
+
+    // All 4 Arabic steps must be present
+    expect(screen.getByText(/افتح تطبيق الاختصارات \(Shortcuts\) وابحث عن اسم التطبيق/)).toBeInTheDocument();
+    expect(screen.getByText(/ثبّته بالضغط عليه مطولاً أو أضفه كاختصار جديد/)).toBeInTheDocument();
+    expect(screen.getByText(/الإعدادات ← تسهيلات الاستخدام ← اللمس ← Back Tap/)).toBeInTheDocument();
+    expect(screen.getByText(/اضغط مرتين على ظهر الآيفون لتسجيل مصروف/)).toBeInTheDocument();
+    expect(screen.getByText(/يحتاج iOS 16 أو أحدث، وBack Tap يعمل على iPhone 8 وأحدث/)).toBeInTheDocument();
   });
 
-  it('shows the "Add Shortcut" button when shortcut URL is updated and calls AppLauncher when clicked', () => {
+  it('on web platform: hides the button but displays all 4 setup steps and note', () => {
+    vi.mocked(Capacitor.isNativePlatform).mockReturnValue(false);
+
     render(
       <AnalyticsSettingsTab
         categories={mockData.categories}
@@ -91,24 +103,25 @@ describe('Back Tap Shortcut Settings UI Tests', () => {
         onOpenPasscodeModal={vi.fn()}
         onDisablePasscode={vi.fn()}
         onOpenPrivacyPolicy={vi.fn()}
-        shortcutICloudUrl="https://www.icloud.com/shortcuts/real_active_shortcut_123"
       />
     );
 
-    // Button SHOULD now be in the document
-    const addShortcutButton = screen.getByTestId('add-back-tap-shortcut-btn');
-    expect(addShortcutButton).toBeInTheDocument();
-    expect(addShortcutButton).toHaveTextContent('إضافة الاختصار');
+    // Button must be hidden on web
+    const openShortcutsButton = screen.queryByTestId('add-back-tap-shortcut-btn');
+    expect(openShortcutsButton).toBeNull();
 
-    // Click button
-    fireEvent.click(addShortcutButton);
-    expect(AppLauncher.openUrl).toHaveBeenCalledWith({
-      url: 'https://www.icloud.com/shortcuts/real_active_shortcut_123',
-    });
+    // All 4 steps and note must remain visible
+    expect(screen.getByText(/افتح تطبيق الاختصارات \(Shortcuts\) وابحث عن اسم التطبيق/)).toBeInTheDocument();
+    expect(screen.getByText(/ثبّته بالضغط عليه مطولاً أو أضفه كاختصار جديد/)).toBeInTheDocument();
+    expect(screen.getByText(/الإعدادات ← تسهيلات الاستخدام ← اللمس ← Back Tap/)).toBeInTheDocument();
+    expect(screen.getByText(/اضغط مرتين على ظهر الآيفون لتسجيل مصروف/)).toBeInTheDocument();
+    expect(screen.getByText(/يحتاج iOS 16 أو أحدث، وBack Tap يعمل على iPhone 8 وأحدث/)).toBeInTheDocument();
   });
 
-  it('supports English interface with translated steps and note', () => {
+  it('supports English interface with translated steps and button on native platform', () => {
+    vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
     const enSettings = { ...mockData.settings, language: 'en' as const };
+
     render(
       <AnalyticsSettingsTab
         categories={mockData.categories}
@@ -124,13 +137,24 @@ describe('Back Tap Shortcut Settings UI Tests', () => {
         onOpenPasscodeModal={vi.fn()}
         onDisablePasscode={vi.fn()}
         onOpenPrivacyPolicy={vi.fn()}
-        shortcutICloudUrl="https://www.icloud.com/shortcuts/en_shortcut_999"
       />
     );
 
     expect(screen.getByText('Log Expense via Back Tap')).toBeInTheDocument();
+
     const btn = screen.getByTestId('add-back-tap-shortcut-btn');
-    expect(btn).toHaveTextContent('Add Shortcut');
-    expect(screen.getByText(/Tap "Add Shortcut" then tap Add Shortcut/)).toBeInTheDocument();
+    expect(btn).toBeInTheDocument();
+    expect(btn).toHaveTextContent('Open Shortcuts app');
+
+    fireEvent.click(btn);
+    expect(AppLauncher.openUrl).toHaveBeenCalledWith({
+      url: 'shortcuts://',
+    });
+
+    expect(screen.getByText(/Open the Shortcuts app and search for the app name/)).toBeInTheDocument();
+    expect(screen.getByText(/Pin it with a long press or add it as a new shortcut/)).toBeInTheDocument();
+    expect(screen.getByText(/Settings → Accessibility → Touch → Back Tap/)).toBeInTheDocument();
+    expect(screen.getByText(/Double-tap the back of your iPhone to log an expense/)).toBeInTheDocument();
+    expect(screen.getByText(/Requires iOS 16 or later\. Back Tap works on iPhone 8 and later/)).toBeInTheDocument();
   });
 });
