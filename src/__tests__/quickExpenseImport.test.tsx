@@ -297,4 +297,46 @@ describe('Quick Expense Import Integration Tests', () => {
     // Crucial check: edit modal is still open and was NOT closed or replaced
     expect(screen.getByText('تعديل المصروف')).toBeInTheDocument();
   });
+
+  it('imports quick expense with payer "الزوج" (not "Husband") even when language is English', async () => {
+    const d = getDefaultAppData();
+    d.settings = {
+      ...d.settings,
+      language: 'en',
+      hasCompletedOnboarding: true,
+      isPasscodeEnabled: false,
+      animations: 'off',
+    } as any;
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    const pendingItem: quickQueue.PendingQuickExpense = {
+      id: 'quick-payer-en-1',
+      amount: 85,
+      categoryId: 'food',
+      date: '2026-10-29',
+      note: 'Grocery store',
+      createdAt: Date.now(),
+    };
+    nativeStore.set(PENDING_KEY, JSON.stringify([pendingItem]));
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/1 expense\(s\) added from Shortcut/)).toBeInTheDocument();
+    });
+
+    // Check stored app data in nativeStore
+    const savedDataJson = nativeStore.get(STORAGE_KEY);
+    expect(savedDataJson).toBeTruthy();
+    const savedData = JSON.parse(savedDataJson!);
+    const importedExpense = savedData.expenses.find((e: any) => e.title === 'Grocery store');
+    expect(importedExpense).toBeDefined();
+    expect(importedExpense.payer).toBe('الزوج');
+    expect(importedExpense.payer).not.toBe('Husband');
+  });
 });

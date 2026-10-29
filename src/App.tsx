@@ -480,12 +480,6 @@ function AppContent() {
       }
 
       const isEnLang = data.settings.language === 'en';
-      const defaultPayer =
-        (data.settings as any).payers && (data.settings as any).payers.length > 0
-          ? (data.settings as any).payers[0]
-          : isEnLang
-          ? 'Husband'
-          : 'الزوج';
 
       const ackIds: string[] = [];
       const newExpensesToAdd: Expense[] = [];
@@ -511,7 +505,7 @@ function AppContent() {
           categoryId: item.categoryId,
           date: item.date || getLocalToday(),
           paymentMethod: 'card',
-          payer: defaultPayer,
+          payer: 'الزوج',
           notes: item.note?.trim() || undefined,
           createdAt: Date.now(),
         };
@@ -760,7 +754,7 @@ function AppContent() {
       categoryId: data.categories[0]?.id || 'food',
       date: getLocalToday(),
       paymentMethod: 'card',
-      payer: isEnLang ? 'Shared' : 'مشترك',
+      payer: 'مشترك',
       notes: `${isEnLang ? 'Purchased items:' : 'أصناف مشتراة:'} ${itemNames}`,
       createdAt: Date.now(),
     };

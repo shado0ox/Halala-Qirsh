@@ -229,4 +229,50 @@ describe('SmartSmsSheet Component Tests', () => {
     const textareaAfter = screen.getByPlaceholderText(/الصق الرسالة هنا/i) as HTMLTextAreaElement;
     expect(textareaAfter.value).toBe('');
   });
+
+  it('saves expense from SMS in English language with payer: "الزوج" (not "Husband")', async () => {
+    const onSaveExpense = vi.fn();
+    const onClose = vi.fn();
+
+    render(
+      <SmartSmsSheet
+        isOpen={true}
+        onClose={onClose}
+        categories={mockCategories}
+        currency="SAR"
+        onSaveExpense={onSaveExpense}
+        soundEnabled={false}
+        language="en"
+      />
+    );
+
+    const smsText = 'Purchase: SAR 50.00 at Starbucks via Mada on 2026-05-10';
+    const textarea = screen.getByPlaceholderText(/Paste SMS here/i);
+    fireEvent.change(textarea, { target: { value: smsText } });
+
+    const parseBtn = screen.getByRole('button', { name: /Parse/i });
+    fireEvent.click(parseBtn);
+
+    // Select a category
+    const foodCategoryBtn = screen.getByRole('button', { name: /Food & Groceries/i });
+    fireEvent.click(foodCategoryBtn);
+
+    const saveButton = screen.getByTestId('save-parsed-expense');
+    expect(saveButton).not.toBeDisabled();
+
+    fireEvent.click(saveButton);
+
+    expect(onSaveExpense).toHaveBeenCalledTimes(1);
+    expect(onSaveExpense).toHaveBeenCalledWith(
+      expect.objectContaining({
+        title: 'Starbucks',
+        amount: 50,
+        payer: 'الزوج',
+      })
+    );
+    const savedPayer = onSaveExpense.mock.calls[0][0].payer;
+    expect(savedPayer).toBe('الزوج');
+    expect(savedPayer).not.toBe('Husband');
+    expect(onClose).toHaveBeenCalled();
+  });
 });

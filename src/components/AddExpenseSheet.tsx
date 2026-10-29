@@ -67,7 +67,7 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
         setCategoryId(categories[0]?.id || '');
         setDate(getLocalToday());
         setPaymentMethod('card');
-        setPayer(isEn ? 'Husband' : 'الزوج');
+        setPayer('الزوج');
         setNotes('');
       }
       setError('');
@@ -400,7 +400,7 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                         type="button"
                         onClick={() => {
                           nativeHaptics.tap(soundEnabled);
-                          setPayer(isEn ? p.label : p.id);
+                          setPayer(p.id);
                         }}
                         className={`py-2 px-3 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
                           isSelected

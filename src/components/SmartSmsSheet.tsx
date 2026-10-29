@@ -68,7 +68,7 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
   const [categoryId, setCategoryId] = useState<string>('');
   const [date, setDate] = useState<string>('');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('card');
-  const [payer, setPayer] = useState<string>(isEn ? 'Husband' : 'الزوج');
+  const [payer, setPayer] = useState<string>('الزوج');
   const [notes, setNotes] = useState<string>('');
   const [isLearnedBadge, setIsLearnedBadge] = useState<boolean>(false);
   const [initialPredictedCategoryId, setInitialPredictedCategoryId] = useState<string>('');
@@ -142,7 +142,7 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
       setDate(d.date || getLocalToday());
       setPaymentMethod(d.paymentMethod);
       setIsLearnedBadge(Boolean(d.isLearned));
-      setPayer(isEn ? 'Husband' : 'الزوج');
+      setPayer('الزوج');
       setNotes('');
     }
   };
@@ -541,7 +541,7 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                             type="button"
                             onClick={() => {
                               nativeHaptics.tap(soundEnabled);
-                              setPayer(isEn ? p.label : p.id);
+                              setPayer(p.id);
                             }}
                             className={`py-2 px-3 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
                               isSelected
