@@ -32,6 +32,7 @@ import {
 import { NativeNotificationService } from './utils/nativeNotifications';
 import { SecurityService } from './utils/security';
 import { isSystemFlowActive } from './utils/systemFlow';
+import { shouldLockOnResume } from './utils/autoLock';
 import { fades, useMotionConfig } from './utils/motion';
 import { translations } from './utils/i18n';
 
@@ -336,32 +337,42 @@ function AppContent() {
 
   // App state changes
   useEffect(() => {
+    // Privacy overlay + housekeeping only. NEVER lock from here: the Face ID sheet and other
+    // system dialogs also fire inactive -> active, which made "lock immediately" loop forever.
     const listenerPromise = CapApp.addListener('appStateChange', (state) => {
       if (!state.isActive) {
-        backgroundTimestampRef.current = Date.now();
         setIsAppInactive(true);
       } else {
         setIsAppInactive(false);
-
-        const isFlowActive = isSystemFlowActive();
-        const elapsedSecs = backgroundTimestampRef.current > 0
-          ? (Date.now() - backgroundTimestampRef.current) / 1000
-          : 0;
-        backgroundTimestampRef.current = 0;
-
-        const timeout = data.settings.autoLockTimeout ?? 30;
-
-        if (!isFlowActive && data.settings.isPasscodeEnabled && elapsedSecs >= timeout) {
-          setIsLocked(true);
-        }
-
         runBillNotificationCheck();
         importQuickExpensesRef.current();
       }
     });
 
+    // Locking is decided only on a real background -> foreground trip (iOS didEnterBackground / willEnterForeground).
+    const pausePromise = CapApp.addListener('pause', () => {
+      backgroundTimestampRef.current = Date.now();
+    });
+    const resumePromise = CapApp.addListener('resume', () => {
+      const backgroundedAt = backgroundTimestampRef.current;
+      backgroundTimestampRef.current = 0;
+      if (
+        shouldLockOnResume({
+          passcodeEnabled: Boolean(data.settings.isPasscodeEnabled),
+          systemFlowActive: isSystemFlowActive(),
+          backgroundedAt,
+          now: Date.now(),
+          timeoutSec: data.settings.autoLockTimeout ?? 30,
+        })
+      ) {
+        setIsLocked(true);
+      }
+    });
+
     return () => {
-      listenerPromise.then((handle) => handle.remove()).catch(() => {});
+      listenerPromise.then((h) => h.remove()).catch(() => {});
+      pausePromise.then((h) => h.remove()).catch(() => {});
+      resumePromise.then((h) => h.remove()).catch(() => {});
     };
   }, [data.settings.isPasscodeEnabled, data.settings.autoLockTimeout, runBillNotificationCheck]);
 
