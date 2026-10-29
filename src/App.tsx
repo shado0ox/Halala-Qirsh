@@ -41,6 +41,11 @@ import { AddExpenseSheet } from './components/AddExpenseSheet';
 import { SmartSmsSheet } from './components/SmartSmsSheet';
 import { getLocalToday } from './utils/smsParser';
 import { isSmartSmsDeepLink } from './utils/deepLink';
+import {
+  syncQuickCategories,
+  readPendingQuickExpenses,
+  ackQuickExpenses,
+} from './utils/quickExpenseQueue';
 import { IOSNotificationBanner } from './components/IOSNotificationBanner';
 import { PasscodeLockModal } from './components/PasscodeLockModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -255,6 +260,10 @@ function AppContent() {
           }));
         }
       }
+
+      // Sync categories to preferences for AppIntent & import any pending quick expenses
+      syncQuickCategories(prefData.categories, prefData.settings.language || 'ar');
+      importQuickExpensesRef.current();
     });
   }, []);
 
@@ -346,6 +355,7 @@ function AppContent() {
         }
 
         runBillNotificationCheck();
+        importQuickExpensesRef.current();
       }
     });
 
@@ -399,7 +409,8 @@ function AppContent() {
 
   const handleSaveExpense = (
     expenseData: Omit<Expense, 'id' | 'createdAt'>,
-    sourceRect?: DOMRect
+    sourceRect?: DOMRect,
+    suppressToast?: boolean
   ) => {
     if (editingExpense) {
       setData((prev) => ({
@@ -411,11 +422,13 @@ function AppContent() {
         ),
       }));
       setEditingExpense(null);
-      showToast(data.settings.language === 'en' ? 'Expense updated' : 'تم تحديث المصروف');
+      if (!suppressToast) {
+        showToast(data.settings.language === 'en' ? 'Expense updated' : 'تم تحديث المصروف');
+      }
     } else {
       const newExp: Expense = {
         ...expenseData,
-        id: `exp-${Date.now()}`,
+        id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
         createdAt: Date.now(),
       };
       setData((prev) => ({
@@ -442,9 +455,115 @@ function AppContent() {
         setTimeout(() => setHighlightedExpenseId(null), 1200);
       }
 
-      showToast(data.settings.language === 'en' ? 'Expense recorded' : 'تم تسجيل المصروف بنجاح');
+      if (!suppressToast) {
+        showToast(data.settings.language === 'en' ? 'Expense recorded' : 'تم تسجيل المصروف بنجاح');
+      }
     }
   };
+
+  // Quick Expense Queue processing (from iOS AppIntent Shortcuts)
+  const processedQuickExpenseIdsRef = useRef<Set<string>>(new Set());
+  const isImportingQuickExpensesRef = useRef<boolean>(false);
+
+  const importQuickExpenses = useCallback(async () => {
+    if (!hasHydratedRef.current || isImportingQuickExpensesRef.current) return;
+    if (!Capacitor.isNativePlatform()) return;
+
+    isImportingQuickExpensesRef.current = true;
+    try {
+      const pending = await readPendingQuickExpenses();
+      if (!pending || pending.length === 0) return;
+
+      const toProcess = pending.filter(
+        (item) => !processedQuickExpenseIdsRef.current.has(item.id)
+      );
+
+      if (toProcess.length === 0) {
+        await ackQuickExpenses(pending.map((p) => p.id));
+        return;
+      }
+
+      const isEnLang = data.settings.language === 'en';
+      const ackIds: string[] = [];
+      let addedCount = 0;
+      let missingCategoryFound = false;
+
+      for (const item of toProcess) {
+        processedQuickExpenseIdsRef.current.add(item.id);
+        ackIds.push(item.id);
+
+        const category = data.categories.find((c) => c.id === item.categoryId);
+        if (!category) {
+          missingCategoryFound = true;
+          continue;
+        }
+
+        const categoryName = isEnLang && category.nameEn ? category.nameEn : category.name;
+        const title = item.note && item.note.trim() ? item.note.trim() : categoryName;
+
+        handleSaveExpense(
+          {
+            title,
+            amount: item.amount,
+            categoryId: item.categoryId,
+            date: item.date || getLocalToday(),
+            paymentMethod: 'card',
+            payer: isEnLang ? 'Husband' : 'الزوج',
+            notes: item.note?.trim() || undefined,
+          },
+          undefined,
+          true
+        );
+        addedCount++;
+      }
+
+      if (ackIds.length > 0) {
+        await ackQuickExpenses(ackIds);
+      }
+
+      if (missingCategoryFound) {
+        showToast(
+          isEnLang
+            ? 'Failed to log expense from shortcut because category was deleted'
+            : 'تعذّر تسجيل مصروف من الاختصار لأن التصنيف محذوف',
+          'error'
+        );
+      }
+
+      if (addedCount > 0) {
+        showToast(
+          isEnLang
+            ? `${addedCount} expense(s) added from Shortcut`
+            : `تم تسجيل ${addedCount} مصروف من الاختصار`,
+          'success'
+        );
+      }
+    } catch {
+      // Fail safely
+    } finally {
+      isImportingQuickExpensesRef.current = false;
+    }
+  }, [data.categories, data.settings.language, handleSaveExpense, showToast]);
+
+  const importQuickExpensesRef = useRef(importQuickExpenses);
+  useEffect(() => {
+    importQuickExpensesRef.current = importQuickExpenses;
+  }, [importQuickExpenses]);
+
+  // Periodic check every 3s while app is active
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+    const interval = setInterval(() => {
+      importQuickExpensesRef.current();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sync quick categories whenever categories or language change
+  useEffect(() => {
+    if (!hasHydratedRef.current) return;
+    syncQuickCategories(data.categories, data.settings.language || 'ar');
+  }, [data.categories, data.settings.language]);
 
   const handleEditExpense = (expense: Expense) => {
     setEditingExpense(expense);

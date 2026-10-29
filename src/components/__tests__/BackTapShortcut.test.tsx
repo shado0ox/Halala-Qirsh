@@ -79,10 +79,12 @@ describe('Back Tap App Intents / Shortcuts Settings UI Tests', () => {
 
     // All 4 Arabic steps must be present
     expect(screen.getByText(/افتح تطبيق الاختصارات \(Shortcuts\) وابحث عن اسم التطبيق/)).toBeInTheDocument();
+    expect(screen.getAllByText(/مصروف سريع/).length).toBeGreaterThan(0);
     expect(screen.getByText(/ثبّته بالضغط عليه مطولاً أو أضفه كاختصار جديد/)).toBeInTheDocument();
     expect(screen.getByText(/الإعدادات ← تسهيلات الاستخدام ← اللمس ← Back Tap/)).toBeInTheDocument();
     expect(screen.getByText(/اضغط مرتين على ظهر الآيفون لتسجيل مصروف/)).toBeInTheDocument();
     expect(screen.getByText(/يحتاج iOS 16 أو أحدث، وBack Tap يعمل على iPhone 8 وأحدث/)).toBeInTheDocument();
+    expect(screen.getByText(/افتح التطبيق مرة واحدة على الأقل ليظهر قايمة التصنيفات في الاختصار/)).toBeInTheDocument();
   });
 
   it('on web platform: hides the button but displays all 4 setup steps and note', () => {

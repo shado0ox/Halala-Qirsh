@@ -300,13 +300,13 @@ export const translations = {
 
     // Back Tap Shortcut
     backTapSectionTitle: 'تسجيل بالضغط على ظهر الهاتف',
-    backTapSectionSubtitle: 'فتح استيراد الرسائل الذكية مباشرة بالضغط مرتين على ظهر الهاتف',
+    backTapSectionSubtitle: 'تسجيل فوري بالضغط مرتين على ظهر الهاتف عبر اختصار «مصروف سريع»',
     backTapAddShortcutBtn: 'فتح تطبيق الاختصارات',
-    backTapStep1: 'افتح تطبيق الاختصارات (Shortcuts) وابحث عن اسم التطبيق، ستجد الإجراء «تسجيل مصروف» جاهزاً.',
-    backTapStep2: 'ثبّته بالضغط عليه مطولاً أو أضفه كاختصار جديد (+ ثم اختر التطبيق ثم «تسجيل مصروف»).',
+    backTapStep1: 'افتح تطبيق الاختصارات (Shortcuts) وابحث عن اسم التطبيق، ستجد الإجراء الموصى به «مصروف سريع» (يسجّل بدون فتح التطبيق)، وإجراء «تسجيل مصروف من رسالة البنك» (يفتح التطبيق للصق الرسالة).',
+    backTapStep2: 'ثبّته بالضغط عليه مطولاً أو أضفه كاختصار جديد (+ ثم اختر التطبيق ثم «مصروف سريع»).',
     backTapStep3: 'الإعدادات ← تسهيلات الاستخدام ← اللمس ← Back Tap ← Double Tap ← اختر الاختصار.',
     backTapStep4: 'اضغط مرتين على ظهر الآيفون لتسجيل مصروف.',
-    backTapNote: 'يحتاج iOS 16 أو أحدث، وBack Tap يعمل على iPhone 8 وأحدث، وقد يقل مع الجراب السميك.',
+    backTapNote: 'يحتاج iOS 16 أو أحدث، وBack Tap يعمل على iPhone 8 وأحدث، وقد يقل مع الجراب السميك. افتح التطبيق مرة واحدة على الأقل ليظهر قايمة التصنيفات في الاختصار.',
 
     // Payer labels
     husband: 'الزوج',
@@ -612,13 +612,13 @@ export const translations = {
 
     // Back Tap Shortcut
     backTapSectionTitle: 'Log Expense via Back Tap',
-    backTapSectionSubtitle: 'Open Smart SMS sheet directly by tapping twice on the back of your phone',
+    backTapSectionSubtitle: 'Quickly log expenses by double-tapping the back of your phone via "Quick Expense"',
     backTapAddShortcutBtn: 'Open Shortcuts app',
-    backTapStep1: 'Open the Shortcuts app and search for the app name; you will find the "Log Expense" action ready.',
-    backTapStep2: 'Pin it with a long press or add it as a new shortcut (+, select the app, then "Log Expense").',
+    backTapStep1: 'Open the Shortcuts app and search for the app name; choose "Quick Expense" (recommended, logs without opening the app) or "Log bank SMS" (opens the app to paste SMS).',
+    backTapStep2: 'Pin it with a long press or add it as a new shortcut (+, select the app, then "Quick Expense").',
     backTapStep3: 'Settings → Accessibility → Touch → Back Tap → Double Tap → select the shortcut.',
     backTapStep4: 'Double-tap the back of your iPhone to log an expense.',
-    backTapNote: 'Requires iOS 16 or later. Back Tap works on iPhone 8 and later, and sensitivity may decrease with thick cases.',
+    backTapNote: 'Requires iOS 16 or later. Back Tap works on iPhone 8 and later, and sensitivity may decrease with thick cases. Open the app at least once so your categories appear in the shortcut.',
 
     // Payer labels
     husband: 'Husband',

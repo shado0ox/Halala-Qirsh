@@ -28,6 +28,7 @@ const sampleExpenses: Expense[] = [
     date: '2026-10-15',
     title: 'سوبرماركت التميمي',
     payer: 'الزوج',
+    paymentMethod: 'card',
     createdAt: Date.now(),
   },
   {
@@ -37,6 +38,7 @@ const sampleExpenses: Expense[] = [
     date: '2026-10-01',
     title: 'إيجار شقة',
     payer: 'مشترك',
+    paymentMethod: 'card',
     createdAt: Date.now(),
   },
   {
@@ -46,6 +48,7 @@ const sampleExpenses: Expense[] = [
     date: '2026-05-10', // Different month in same year
     title: 'أدوات مدرسية',
     payer: 'الزوجة',
+    paymentMethod: 'card',
     createdAt: Date.now(),
   },
 ];
