@@ -208,6 +208,7 @@ function AppContent() {
   const shownBannersRef = useRef<Set<string>>(new Set());
   // Becomes true once data was loaded from Capacitor Preferences. Saving is blocked until then.
   const hasHydratedRef = useRef<boolean>(false);
+  const [isHydrated, setIsHydrated] = useState<boolean>(false);
 
   const motionConfig = useMotionConfig(data.settings.animations);
   const isReduced = motionConfig.isReduced;
@@ -227,6 +228,7 @@ function AppContent() {
     loadAppDataFromPreferences().then(async (prefData) => {
       setData(prefData);
       hasHydratedRef.current = true;
+      setIsHydrated(true);
       await SecurityService.migrateIfNeeded();
       const hasPass = await SecurityService.hasPasscode();
       if (prefData.settings.isPasscodeEnabled && hasPass) {
@@ -261,9 +263,8 @@ function AppContent() {
         }
       }
 
-      // Sync categories to preferences for AppIntent & import any pending quick expenses
+      // Sync categories to preferences for AppIntent
       syncQuickCategories(prefData.categories, prefData.settings.language || 'ar');
-      importQuickExpensesRef.current();
     });
   }, []);
 
@@ -409,8 +410,7 @@ function AppContent() {
 
   const handleSaveExpense = (
     expenseData: Omit<Expense, 'id' | 'createdAt'>,
-    sourceRect?: DOMRect,
-    suppressToast?: boolean
+    sourceRect?: DOMRect
   ) => {
     if (editingExpense) {
       setData((prev) => ({
@@ -422,9 +422,7 @@ function AppContent() {
         ),
       }));
       setEditingExpense(null);
-      if (!suppressToast) {
-        showToast(data.settings.language === 'en' ? 'Expense updated' : 'تم تحديث المصروف');
-      }
+      showToast(data.settings.language === 'en' ? 'Expense updated' : 'تم تحديث المصروف');
     } else {
       const newExp: Expense = {
         ...expenseData,
@@ -455,9 +453,7 @@ function AppContent() {
         setTimeout(() => setHighlightedExpenseId(null), 1200);
       }
 
-      if (!suppressToast) {
-        showToast(data.settings.language === 'en' ? 'Expense recorded' : 'تم تسجيل المصروف بنجاح');
-      }
+      showToast(data.settings.language === 'en' ? 'Expense recorded' : 'تم تسجيل المصروف بنجاح');
     }
   };
 
@@ -484,8 +480,15 @@ function AppContent() {
       }
 
       const isEnLang = data.settings.language === 'en';
+      const defaultPayer =
+        (data.settings as any).payers && (data.settings as any).payers.length > 0
+          ? (data.settings as any).payers[0]
+          : isEnLang
+          ? 'Husband'
+          : 'الزوج';
+
       const ackIds: string[] = [];
-      let addedCount = 0;
+      const newExpensesToAdd: Expense[] = [];
       let missingCategoryFound = false;
 
       for (const item of toProcess) {
@@ -501,20 +504,27 @@ function AppContent() {
         const categoryName = isEnLang && category.nameEn ? category.nameEn : category.name;
         const title = item.note && item.note.trim() ? item.note.trim() : categoryName;
 
-        handleSaveExpense(
-          {
-            title,
-            amount: item.amount,
-            categoryId: item.categoryId,
-            date: item.date || getLocalToday(),
-            paymentMethod: 'card',
-            payer: isEnLang ? 'Husband' : 'الزوج',
-            notes: item.note?.trim() || undefined,
-          },
-          undefined,
-          true
-        );
-        addedCount++;
+        const newExp: Expense = {
+          id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+          title,
+          amount: item.amount,
+          categoryId: item.categoryId,
+          date: item.date || getLocalToday(),
+          paymentMethod: 'card',
+          payer: defaultPayer,
+          notes: item.note?.trim() || undefined,
+          createdAt: Date.now(),
+        };
+
+        newExpensesToAdd.push(newExp);
+      }
+
+      if (newExpensesToAdd.length > 0) {
+        setData((prev) => ({
+          ...prev,
+          expenses: [...newExpensesToAdd, ...prev.expenses],
+        }));
+        nativeHaptics.success(data.settings.soundEnabled);
       }
 
       if (ackIds.length > 0) {
@@ -530,11 +540,11 @@ function AppContent() {
         );
       }
 
-      if (addedCount > 0) {
+      if (newExpensesToAdd.length > 0) {
         showToast(
           isEnLang
-            ? `${addedCount} expense(s) added from Shortcut`
-            : `تم تسجيل ${addedCount} مصروف من الاختصار`,
+            ? `${newExpensesToAdd.length} expense(s) added from Shortcut`
+            : `تم تسجيل ${newExpensesToAdd.length} مصروف من الاختصار`,
           'success'
         );
       }
@@ -543,27 +553,35 @@ function AppContent() {
     } finally {
       isImportingQuickExpensesRef.current = false;
     }
-  }, [data.categories, data.settings.language, handleSaveExpense, showToast]);
+  }, [data.categories, data.settings, showToast]);
 
   const importQuickExpensesRef = useRef(importQuickExpenses);
+  importQuickExpensesRef.current = importQuickExpenses;
   useEffect(() => {
     importQuickExpensesRef.current = importQuickExpenses;
   }, [importQuickExpenses]);
 
+  // Initial import effect after hydration
+  useEffect(() => {
+    if (isHydrated) {
+      importQuickExpensesRef.current();
+    }
+  }, [isHydrated]);
+
   // Periodic check every 3s while app is active
   useEffect(() => {
-    if (!hasHydratedRef.current) return;
+    if (!isHydrated || isAppInactive) return;
     const interval = setInterval(() => {
       importQuickExpensesRef.current();
     }, 3000);
     return () => clearInterval(interval);
-  }, []);
+  }, [isHydrated, isAppInactive]);
 
   // Sync quick categories whenever categories or language change
   useEffect(() => {
-    if (!hasHydratedRef.current) return;
+    if (!isHydrated) return;
     syncQuickCategories(data.categories, data.settings.language || 'ar');
-  }, [data.categories, data.settings.language]);
+  }, [isHydrated, data.categories, data.settings.language]);
 
   const handleEditExpense = (expense: Expense) => {
     setEditingExpense(expense);
