@@ -424,6 +424,16 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
                 </div>
               </div>
 
+              {selectedExpenseForDetails.source === 'apple_pay' && (
+                <div className="flex items-center justify-between px-3 py-2 rounded-xl bg-black text-white dark:bg-white dark:text-black">
+                  <span className="font-bold flex items-center gap-1.5 text-xs">
+                    <span>Pay</span>
+                    <span>{isEn ? 'Auto-Logged via Apple Pay' : 'مسجل تلقائياً عبر Apple Pay'}</span>
+                  </span>
+                  <span className="text-[10px] opacity-80">{isEn ? 'Verified' : 'تلقائي'}</span>
+                </div>
+              )}
+
               <div className="bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-2xl p-3 text-xs space-y-2">
                 <div className="flex items-center justify-between">
                   <span className="text-[#8E8E93]">{isEn ? 'Category' : 'التصنيف'}</span>

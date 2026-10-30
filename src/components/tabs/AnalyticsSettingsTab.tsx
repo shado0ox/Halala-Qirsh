@@ -22,6 +22,8 @@ import {
   Activity,
   Layers,
   ExternalLink,
+  CreditCard,
+  Zap,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
@@ -65,6 +67,7 @@ interface AnalyticsSettingsTabProps {
   onDisablePasscode: () => void;
   onOpenPrivacyPolicy: () => void;
   onShowToast?: (msg: string, type?: 'success' | 'error' | 'info') => void;
+  onOpenApplePaySetup?: () => void;
 }
 
 export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
@@ -82,6 +85,7 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   onDisablePasscode,
   onOpenPrivacyPolicy,
   onShowToast,
+  onOpenApplePaySetup,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const motionConfig = useMotionConfig(settings.animations);
@@ -462,6 +466,46 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         <div className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-[11px] text-[#8E8E93] dark:text-[#AEAEB2] leading-relaxed flex items-start gap-2">
           <ShieldCheck size={14} className="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
           <span>{t.backTapNote}</span>
+        </div>
+      </div>
+
+      {/* SECTION: APPLE PAY AUTO-LOGGING (تسجيل تلقائي عند الدفع بـ Apple Pay) */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-black dark:bg-white text-white dark:text-black font-bold flex items-center justify-center shrink-0 text-xs shadow-sm">
+              Pay
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-[#1C1C1E] dark:text-white">
+                {t.applePaySectionTitle}
+              </h4>
+              <p className="text-[10px] text-[#8E8E93]">
+                {t.applePaySectionSubtitle}
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            iOS 17+
+          </span>
+        </div>
+
+        <motion.button
+          whileTap={{ scale: 0.96 }}
+          type="button"
+          onClick={() => {
+            nativeHaptics.tap(settings.soundEnabled);
+            onOpenApplePaySetup?.();
+          }}
+          className="w-full min-h-[44px] p-3 rounded-2xl bg-gradient-to-r from-slate-900 via-slate-800 to-black dark:from-white dark:via-slate-100 dark:to-slate-200 text-white dark:text-black font-bold text-xs flex items-center justify-center gap-2 shadow-md cursor-pointer hover:opacity-95 transition-all"
+        >
+          <CreditCard size={15} />
+          <span>{t.applePaySetupGuideBtn}</span>
+        </motion.button>
+
+        <div className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-[11px] text-[#8E8E93] dark:text-[#AEAEB2] leading-relaxed flex items-start gap-2">
+          <ShieldCheck size={14} className="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
+          <span>{t.applePayReq1}</span>
         </div>
       </div>
 

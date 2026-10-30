@@ -16,7 +16,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { motion } from 'motion/react';
-import { Category, Expense, RecurringBill, BudgetSettings } from '../../types';
+import { Category, Expense, RecurringBill, BudgetSettings, JamiyyaGroup } from '../../types';
 import { CategoryIcon } from '../CategoryIcon';
 import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
@@ -27,17 +27,20 @@ import { useCoinFlight } from '../../context/CoinFlightContext';
 import { cardVariants, reducedCardVariants, useMotionConfig, springs } from '../../utils/motion';
 import { HalalaQirshLogo } from '../HalalaQirshLogo';
 import { getLocalToday } from '../../utils/smsParser';
+import { JamiyyaDashboardWidget } from '../jamiyya/JamiyyaDashboardWidget';
 
 interface DashboardTabProps {
   categories: Category[];
   expenses: Expense[];
   bills: RecurringBill[];
   settings: BudgetSettings;
+  jamiyyas?: JamiyyaGroup[];
   onOpenAddExpense: () => void;
   onNavigateToTab: (tab: any) => void;
   onOpenCategoryManager: () => void;
   onOpenSmartSms?: () => void;
   onUpdateSettings?: (newSettings: Partial<BudgetSettings>) => void;
+  onOpenJamiyya?: (group: JamiyyaGroup) => void;
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = ({
@@ -45,11 +48,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   expenses,
   bills,
   settings,
+  jamiyyas,
   onOpenAddExpense,
   onNavigateToTab,
   onOpenCategoryManager,
   onOpenSmartSms,
   onUpdateSettings,
+  onOpenJamiyya,
 }) => {
   const currentMonth = settings.selectedMonth;
   const motionConfig = useMotionConfig(settings.animations);
@@ -618,6 +623,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
       </motion.div>
 
+      {/* Jam'iyya Rotating Savings Widget */}
+      <JamiyyaDashboardWidget
+        jamiyyas={jamiyyas || []}
+        currency={settings.currency}
+        lang={lang}
+        onOpenJamiyyas={() => onNavigateToTab('bills_groceries')}
+        onSelectGroup={onOpenJamiyya}
+      />
+
       {/* Recent Household Transactions */}
       <motion.div
         custom={5}
@@ -655,8 +669,13 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
                     size="md"
                   />
                   <div>
-                    <div className="text-xs font-bold text-[#1C1C1E] dark:text-white">
-                      {exp.title}
+                    <div className="text-xs font-bold text-[#1C1C1E] dark:text-white flex items-center gap-1.5">
+                      <span className="truncate">{exp.title}</span>
+                      {exp.source === 'apple_pay' && (
+                        <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black text-white dark:bg-white dark:text-black shadow-xs">
+                          Pay
+                        </span>
+                      )}
                     </div>
                     <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5">
                       <span>{isEn ? (cat?.nameEn || cat?.name || 'General') : (cat?.name || 'تصنيف عام')}</span>

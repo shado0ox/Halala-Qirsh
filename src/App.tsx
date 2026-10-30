@@ -16,6 +16,8 @@ import {
   GroceryItem,
   BudgetSettings,
   InAppNotification,
+  DetectedSubscription,
+  JamiyyaGroup,
 } from './types';
 import {
   loadAppData,
@@ -35,13 +37,30 @@ import { isSystemFlowActive } from './utils/systemFlow';
 import { shouldLockOnResume } from './utils/autoLock';
 import { fades, useMotionConfig } from './utils/motion';
 import { translations } from './utils/i18n';
+import { detectSubscriptionsFromExpenses } from './utils/subscriptionDetector';
+import {
+  getUpcomingSubscriptionRenewals,
+  getSubscriptionPriceAlerts,
+} from './utils/subscriptionReminders';
+import {
+  createJamiyyaGroup,
+  getUpcomingJamiyyaReminders,
+  CreateJamiyyaInput,
+} from './utils/jamiyyaEngine';
 
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
 import { SmartSmsSheet } from './components/SmartSmsSheet';
-import { getLocalToday } from './utils/smsParser';
-import { isSmartSmsDeepLink } from './utils/deepLink';
+import { getLocalToday, categorizeMerchant } from './utils/smsParser';
+import {
+  isSmartSmsDeepLink,
+  isApplePayDeepLink,
+  parseApplePayDeepLink,
+  ApplePayTransactionPayload,
+} from './utils/deepLink';
+import { ApplePaySetupModal } from './components/ApplePaySetupModal';
+import { ApplePayReviewModal } from './components/ApplePayReviewModal';
 import {
   syncQuickCategories,
   readPendingQuickExpenses,
@@ -99,10 +118,26 @@ function AppContent() {
   const [data, setData] = useState<AppData>(() => loadAppData());
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [prevTab, setPrevTab] = useState<TabId>('dashboard');
+  const [billsInitialSubTab, setBillsInitialSubTab] = useState<'bills' | 'subscriptions' | 'jamiyya' | 'groceries'>('bills');
   const [isAddExpenseOpen, setIsAddExpenseOpen] = useState<boolean>(false);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [isCategoryManagerOpen, setIsCategoryManagerOpen] = useState<boolean>(false);
   const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+
+  // App-wide Alert & Toast Dialogs
+  const [confirmDialog, setConfirmDialog] = useState<ConfirmState>({
+    isOpen: false,
+    title: '',
+    message: '',
+    onConfirm: () => {},
+  });
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
+
+  const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'success') => {
+    setToastMessage(msg);
+    setToastType(type);
+  }, []);
 
   // App launch splash
   const [isSplashActive, setIsSplashActive] = useState<boolean>(true);
@@ -115,27 +150,103 @@ function AppContent() {
   const [passcodeModalMode, setPasscodeModalMode] = useState<'set' | 'change' | null>(null);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
   const [isSmartSmsOpen, setIsSmartSmsOpen] = useState<boolean>(false);
+  const [isApplePaySetupOpen, setIsApplePaySetupOpen] = useState<boolean>(false);
+  const [applePayPendingReview, setApplePayPendingReview] = useState<(ApplePayTransactionPayload & { amount: number; merchant: string }) | null>(null);
+
   const isLockedRef = useRef<boolean>(isLocked);
   const pendingSmartSmsOpenRef = useRef<boolean>(false);
+  const pendingApplePayPayloadRef = useRef<ApplePayTransactionPayload | null>(null);
+
+  const processApplePayPayload = useCallback(
+    (payload: ApplePayTransactionPayload) => {
+      if (typeof payload.amount === 'number' && payload.amount > 0) {
+        if (payload.autoLog) {
+          // Direct auto-log without modal prompt
+          const merchant = payload.merchant || '';
+          const { categoryId: predictedCatId } = categorizeMerchant(merchant, data.categories);
+          const targetCatId =
+            payload.categoryId || payload.category || predictedCatId || data.categories[0]?.id || 'cat-other';
+          const targetCat = data.categories.find((c) => c.id === targetCatId);
+          const isEnLang = data.settings.language === 'en';
+          const catName = isEnLang && targetCat?.nameEn ? targetCat.nameEn : (targetCat?.name || 'عام');
+          const title = merchant.trim() || catName;
+
+          const newExp: Expense = {
+            id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            title,
+            amount: payload.amount,
+            categoryId: targetCatId,
+            date: getLocalToday(),
+            paymentMethod: 'digital',
+            payer: 'الزوج',
+            notes: payload.note || merchant || undefined,
+            source: 'apple_pay',
+            isAutoLogged: true,
+            createdAt: Date.now(),
+          };
+
+          setData((prev) => ({
+            ...prev,
+            expenses: [newExp, ...prev.expenses],
+          }));
+          nativeHaptics.success(data.settings.soundEnabled);
+          showToast(
+            isEnLang
+              ? `Pay: ${payload.amount} logged automatically`
+              : `Pay: تم قيد ${payload.amount} تلقائياً`,
+            'success'
+          );
+        } else {
+          // Open review modal for user confirmation / details tweak
+          setApplePayPendingReview({
+            amount: payload.amount,
+            merchant: payload.merchant || (data.settings.language === 'en' ? 'Apple Pay Merchant' : 'متجر عبر Apple Pay'),
+            ...payload,
+          });
+        }
+      } else {
+        // Missing amount or guide trigger: open setup modal
+        setIsApplePaySetupOpen(true);
+      }
+    },
+    [data.categories, data.settings.language, data.settings.soundEnabled, showToast]
+  );
 
   useEffect(() => {
     isLockedRef.current = isLocked;
-    if (!isLocked && pendingSmartSmsOpenRef.current) {
-      pendingSmartSmsOpenRef.current = false;
-      setIsSmartSmsOpen(true);
+    if (!isLocked) {
+      if (pendingSmartSmsOpenRef.current) {
+        pendingSmartSmsOpenRef.current = false;
+        setIsSmartSmsOpen(true);
+      }
+      if (pendingApplePayPayloadRef.current) {
+        const payload = pendingApplePayPayloadRef.current;
+        pendingApplePayPayloadRef.current = null;
+        processApplePayPayload(payload);
+      }
     }
-  }, [isLocked]);
+  }, [isLocked, processApplePayPayload]);
 
-  // Deep Link listener for halalaqirsh://sms (Back Tap iOS Shortcut)
+  // Deep Link listener for halalaqirsh://sms and halalaqirsh://applepay
   useEffect(() => {
     if (!Capacitor.isNativePlatform()) return;
 
     const handleDeepLink = (url?: string | null) => {
+      if (!url) return;
       if (isSmartSmsDeepLink(url)) {
         if (isLockedRef.current) {
           pendingSmartSmsOpenRef.current = true;
         } else {
           setIsSmartSmsOpen(true);
+        }
+      } else if (isApplePayDeepLink(url)) {
+        const payload = parseApplePayDeepLink(url);
+        if (payload) {
+          if (isLockedRef.current) {
+            pendingApplePayPayloadRef.current = payload;
+          } else {
+            processApplePayPayload(payload);
+          }
         }
       }
     };
@@ -176,7 +287,7 @@ function AppContent() {
         listenerHandle.remove();
       }
     };
-  }, []);
+  }, [processApplePayPayload]);
 
   // Month-end celebration state
   const [showCelebration, setShowCelebration] = useState<boolean>(false);
@@ -186,20 +297,6 @@ function AppContent() {
   const [isAppInactive, setIsAppInactive] = useState<boolean>(false);
   const backgroundTimestampRef = useRef<number>(0);
 
-  // App-wide Alert & Toast Dialogs
-  const [confirmDialog, setConfirmDialog] = useState<ConfirmState>({
-    isOpen: false,
-    title: '',
-    message: '',
-    onConfirm: () => {},
-  });
-  const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [toastType, setToastType] = useState<'success' | 'error' | 'info'>('success');
-
-  const showToast = useCallback((msg: string, type: 'success' | 'error' | 'info' = 'success') => {
-    setToastMessage(msg);
-    setToastType(type);
-  }, []);
 
   // Notifications state
   const [notificationPermission, setNotificationPermission] = useState<NotificationPermissionState>(
@@ -318,9 +415,11 @@ function AppContent() {
     }
   }, [data.settings.themeMode]);
 
-  // Bill notification check
+  // Bill & Subscription notification check
   const runBillNotificationCheck = useCallback(async () => {
     if (!data.settings.notificationsEnabled) return;
+
+    // 1. Recurring Bills
     const reminders = await NativeNotificationService.scheduleBillReminders(data.bills, data.settings);
     const unshown = reminders.filter((r) => !shownBannersRef.current.has(r.id));
     if (unshown.length > 0) {
@@ -328,8 +427,78 @@ function AppContent() {
       shownBannersRef.current.add(notifToShow.id);
       await markBannerKeyShown(notifToShow.id);
       setCurrentNotification((prev) => (prev ? prev : notifToShow));
+      return;
     }
-  }, [data.bills, data.settings]);
+
+    // 2. Confirmed Subscription Renewals (within 3 days)
+    const confirmedSubs = (data.subscriptions || []).filter((s) => s.status === 'confirmed');
+    const upcomingSubs = getUpcomingSubscriptionRenewals(confirmedSubs, { leadDays: 3 });
+    const isEnLang = data.settings.language === 'en';
+    for (const subAlert of upcomingSubs) {
+      const notifKey = `sub-renew-${subAlert.subscriptionId}-${subAlert.renewalDate}`;
+      if (!shownBannersRef.current.has(notifKey)) {
+        shownBannersRef.current.add(notifKey);
+        await markBannerKeyShown(notifKey);
+        setCurrentNotification((prev) =>
+          prev
+            ? prev
+            : {
+                id: notifKey,
+                title: isEnLang ? subAlert.titleEn : subAlert.titleAr,
+                body: isEnLang ? subAlert.bodyEn : subAlert.bodyAr,
+                timestamp: Date.now(),
+              }
+        );
+        return;
+      }
+    }
+
+    // 3. Price Increase Alerts
+    const priceAlerts = getSubscriptionPriceAlerts(data.subscriptions || []);
+    for (const alert of priceAlerts) {
+      const alertKey = `sub-price-${alert.subscriptionId}-${alert.newAmount}`;
+      if (!shownBannersRef.current.has(alertKey)) {
+        shownBannersRef.current.add(alertKey);
+        await markBannerKeyShown(alertKey);
+        setCurrentNotification((prev) =>
+          prev
+            ? prev
+            : {
+                id: alertKey,
+                title: isEnLang ? alert.titleEn : alert.titleAr,
+                body: isEnLang ? alert.bodyEn : alert.bodyAr,
+                timestamp: Date.now(),
+              }
+        );
+        return;
+      }
+    }
+
+    // 4. Jam'iyya Installment & Payout Reminders
+    const jamiyyaReminders = getUpcomingJamiyyaReminders(
+      data.jamiyyas || [],
+      3,
+      data.settings.currency
+    );
+    for (const jRem of jamiyyaReminders) {
+      const notifKey = jRem.id;
+      if (!shownBannersRef.current.has(notifKey)) {
+        shownBannersRef.current.add(notifKey);
+        await markBannerKeyShown(notifKey);
+        setCurrentNotification((prev) =>
+          prev
+            ? prev
+            : {
+                id: notifKey,
+                title: isEnLang ? jRem.titleEn : jRem.titleAr,
+                body: isEnLang ? jRem.bodyEn : jRem.bodyAr,
+                timestamp: Date.now(),
+              }
+        );
+        return;
+      }
+    }
+  }, [data.bills, data.settings, data.subscriptions, data.jamiyyas]);
 
   useEffect(() => {
     runBillNotificationCheck();
@@ -423,7 +592,7 @@ function AppContent() {
     expenseData: Omit<Expense, 'id' | 'createdAt'>,
     sourceRect?: DOMRect
   ) => {
-    if (editingExpense) {
+    if (editingExpense && editingExpense.id) {
       setData((prev) => ({
         ...prev,
         expenses: prev.expenses.map((e) =>
@@ -435,6 +604,9 @@ function AppContent() {
       setEditingExpense(null);
       showToast(data.settings.language === 'en' ? 'Expense updated' : 'تم تحديث المصروف');
     } else {
+      if (editingExpense) {
+        setEditingExpense(null);
+      }
       const newExp: Expense = {
         ...expenseData,
         id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
@@ -500,24 +672,44 @@ function AppContent() {
         processedQuickExpenseIdsRef.current.add(item.id);
         ackIds.push(item.id);
 
-        const category = data.categories.find((c) => c.id === item.categoryId);
+        const isApplePay = item.source === 'apple_pay';
+        let category = data.categories.find((c) => c.id === item.categoryId);
+
+        if (isApplePay) {
+          if (!category && item.merchant) {
+            const autoCat = categorizeMerchant(item.merchant, data.categories);
+            if (autoCat.categoryId) {
+              category = data.categories.find((c) => c.id === autoCat.categoryId);
+            }
+          }
+          if (!category) {
+            category = data.categories[0];
+          }
+        }
+
         if (!category) {
           missingCategoryFound = true;
           continue;
         }
 
         const categoryName = isEnLang && category.nameEn ? category.nameEn : category.name;
-        const title = item.note && item.note.trim() ? item.note.trim() : categoryName;
+        const title = item.note && item.note.trim()
+          ? item.note.trim()
+          : item.merchant && item.merchant.trim()
+          ? item.merchant.trim()
+          : categoryName;
 
         const newExp: Expense = {
           id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           title,
           amount: item.amount,
-          categoryId: item.categoryId,
+          categoryId: category.id,
           date: item.date || getLocalToday(),
-          paymentMethod: 'card',
+          paymentMethod: isApplePay ? 'digital' : 'card',
           payer: 'الزوج',
-          notes: item.note?.trim() || undefined,
+          notes: item.note?.trim() || item.merchant?.trim() || undefined,
+          source: isApplePay ? 'apple_pay' : 'quick_intent',
+          isAutoLogged: isApplePay ? true : undefined,
           createdAt: Date.now(),
         };
 
@@ -546,12 +738,22 @@ function AppContent() {
       }
 
       if (newExpensesToAdd.length > 0) {
-        showToast(
-          isEnLang
-            ? `${newExpensesToAdd.length} expense(s) added from Shortcut`
-            : `تم تسجيل ${newExpensesToAdd.length} مصروف من الاختصار`,
-          'success'
-        );
+        const hasApplePay = newExpensesToAdd.some((e) => e.source === 'apple_pay');
+        if (hasApplePay) {
+          showToast(
+            isEnLang
+              ? `Pay: ${newExpensesToAdd.length} expense(s) logged automatically`
+              : `Pay: تم قيد ${newExpensesToAdd.length} عملية تلقائياً`,
+            'success'
+          );
+        } else {
+          showToast(
+            isEnLang
+              ? `${newExpensesToAdd.length} expense(s) added from Shortcut`
+              : `تم تسجيل ${newExpensesToAdd.length} مصروف من الاختصار`,
+            'success'
+          );
+        }
       }
     } catch {
       // Fail safely
@@ -587,6 +789,32 @@ function AppContent() {
     if (!isHydrated) return;
     syncQuickCategories(data.categories, data.settings.language || 'ar');
   }, [isHydrated, data.categories, data.settings.language]);
+
+  // Auto-detect recurring subscriptions whenever expenses change
+  useEffect(() => {
+    if (!isHydrated) return;
+    const currentSubs = data.subscriptions || [];
+    const dismissed = data.dismissedSubscriptionMerchants || [];
+    const updatedSubs = detectSubscriptionsFromExpenses(data.expenses, currentSubs, dismissed);
+
+    // Only update if signature has changed
+    const signature = (list: DetectedSubscription[]) =>
+      list
+        .map(
+          (s) =>
+            `${s.id}:${s.status}:${s.detectedFrequency || s.frequency}:${s.typicalAmount}:${s.nextExpectedRenewalDate}:${
+              s.priceIncrease?.newAmount || 0
+            }`
+        )
+        .join('|');
+
+    if (signature(currentSubs) !== signature(updatedSubs)) {
+      setData((prev) => ({
+        ...prev,
+        subscriptions: updatedSubs,
+      }));
+    }
+  }, [isHydrated, data.expenses]);
 
   const handleEditExpense = (expense: Expense) => {
     setEditingExpense(expense);
@@ -780,6 +1008,180 @@ function AppContent() {
     showToast(data.settings.language === 'en' ? 'Groceries recorded as expense' : 'تم ترحيل المشتريات كمصروف');
   };
 
+  // Subscription Handlers
+  const handleConfirmSubscription = (subId: string) => {
+    nativeHaptics.success(data.settings.soundEnabled);
+    setData((prev) => ({
+      ...prev,
+      subscriptions: (prev.subscriptions || []).map((s) =>
+        s.id === subId ? { ...s, status: 'confirmed' as const } : s
+      ),
+    }));
+    showToast(data.settings.language === 'en' ? 'Subscription confirmed' : 'تم تأكيد الاشتراك وبدء متابعته');
+  };
+
+  const handleDismissSubscription = (subId: string) => {
+    nativeHaptics.impactLight(data.settings.soundEnabled);
+    const subToDismiss = (data.subscriptions || []).find((s) => s.id === subId);
+    const merchantNorm = subToDismiss ? subToDismiss.normalizedMerchant : '';
+
+    setData((prev) => {
+      const existingDismissed = prev.dismissedSubscriptionMerchants || [];
+      const updatedDismissed =
+        merchantNorm && !existingDismissed.includes(merchantNorm)
+          ? [...existingDismissed, merchantNorm]
+          : existingDismissed;
+
+      return {
+        ...prev,
+        dismissedSubscriptionMerchants: updatedDismissed,
+        subscriptions: (prev.subscriptions || []).filter((s) => s.id !== subId),
+      };
+    });
+    showToast(
+      data.settings.language === 'en'
+        ? 'Subscription dismissed'
+        : 'تم تجاهل الاشتراك ولن يتم اقتراحه مجدداً'
+    );
+  };
+
+  const handleSaveSubscription = (savedSub: DetectedSubscription) => {
+    nativeHaptics.success(data.settings.soundEnabled);
+    setData((prev) => {
+      const subs = prev.subscriptions || [];
+      const exists = subs.some((s) => s.id === savedSub.id);
+      const updatedList = exists
+        ? subs.map((s) => (s.id === savedSub.id ? { ...savedSub, isUserEdited: true } : s))
+        : [{ ...savedSub, isUserEdited: true }, ...subs];
+
+      return {
+        ...prev,
+        subscriptions: updatedList,
+      };
+    });
+    showToast(data.settings.language === 'en' ? 'Subscription saved' : 'تم حفظ بيانات الاشتراك');
+  };
+
+  const handleDeleteSubscription = (subId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: data.settings.language === 'en' ? 'Delete Subscription' : 'حذف الاشتراك',
+      message:
+        data.settings.language === 'en'
+          ? 'Are you sure you want to remove this subscription from tracking?'
+          : 'هل أنت متأكد من حذف هذا الاشتراك من المتابعة؟',
+      isDestructive: true,
+      onConfirm: () => {
+        nativeHaptics.impactLight(data.settings.soundEnabled);
+        setData((prev) => ({
+          ...prev,
+          subscriptions: (prev.subscriptions || []).filter((s) => s.id !== subId),
+        }));
+        setConfirmDialog((c) => ({ ...c, isOpen: false }));
+        showToast(data.settings.language === 'en' ? 'Subscription removed' : 'تم حذف الاشتراك');
+      },
+    });
+  };
+
+  // Jam'iyya Handlers
+  const handleCreateJamiyya = (input: CreateJamiyyaInput) => {
+    nativeHaptics.success(data.settings.soundEnabled);
+    const newGroup = createJamiyyaGroup(input);
+    setData((prev) => ({
+      ...prev,
+      jamiyyas: [newGroup, ...(prev.jamiyyas || [])],
+    }));
+    showToast(
+      data.settings.language === 'en'
+        ? 'Jam\'iyya created successfully!'
+        : 'تم إنشاء الجمعية وبدء جدول الأدوار بنجاح!'
+    );
+  };
+
+  const handleUpdateJamiyya = (updatedGroup: JamiyyaGroup) => {
+    nativeHaptics.tap(data.settings.soundEnabled);
+    setData((prev) => ({
+      ...prev,
+      jamiyyas: (prev.jamiyyas || []).map((j) => (j.id === updatedGroup.id ? updatedGroup : j)),
+    }));
+  };
+
+  const handleDeleteJamiyya = (groupId: string) => {
+    setConfirmDialog({
+      isOpen: true,
+      title: data.settings.language === 'en' ? 'Delete Jam\'iyya' : 'حذف الجمعية',
+      message:
+        data.settings.language === 'en'
+          ? 'Are you sure you want to delete this Jam\'iyya and all its cycle payment records?'
+          : 'هل أنت متأكد من حذف هذه الجمعية وسجل الدفعات الخاص بها؟',
+      isDestructive: true,
+      onConfirm: () => {
+        nativeHaptics.impactLight(data.settings.soundEnabled);
+        setData((prev) => ({
+          ...prev,
+          jamiyyas: (prev.jamiyyas || []).filter((j) => j.id !== groupId),
+        }));
+        setConfirmDialog((c) => ({ ...c, isOpen: false }));
+        showToast(data.settings.language === 'en' ? 'Jam\'iyya deleted' : 'تم حذف الجمعية بنجاح');
+      },
+    });
+  };
+
+  const handleLogJamiyyaExpense = (expenseData: Omit<Expense, 'id' | 'createdAt'>): string => {
+    nativeHaptics.success(data.settings.soundEnabled);
+    const newId = `exp-jamiyya-${Date.now()}`;
+    const newExp: Expense = {
+      ...expenseData,
+      id: newId,
+      source: 'jamiyya',
+      type: 'expense',
+      createdAt: Date.now(),
+    };
+    setData((prev) => ({
+      ...prev,
+      expenses: [newExp, ...prev.expenses],
+    }));
+    showToast(
+      data.settings.language === 'en'
+        ? 'Jam\'iyya installment logged as expense'
+        : 'تم تسجيل قسط الجمعية كمصروف في الميزانية'
+    );
+    return newId;
+  };
+
+  const handleLogJamiyyaIncome = (
+    amount: number,
+    title: string,
+    date: string,
+    notes?: string
+  ): string => {
+    nativeHaptics.success(data.settings.soundEnabled);
+    const newId = `inc-jamiyya-${Date.now()}`;
+    const newExp: Expense = {
+      id: newId,
+      title,
+      amount,
+      categoryId: data.categories[0]?.id || 'income',
+      date,
+      paymentMethod: 'transfer',
+      payer: 'مشترك',
+      source: 'jamiyya',
+      type: 'income',
+      notes,
+      createdAt: Date.now(),
+    };
+    setData((prev) => ({
+      ...prev,
+      expenses: [newExp, ...prev.expenses],
+    }));
+    showToast(
+      data.settings.language === 'en'
+        ? 'Jam\'iyya payout logged as income'
+        : 'تم تسجيل استلام الجمعية كدخل إضافي بنجاح'
+    );
+    return newId;
+  };
+
   const handleImportData = (imported: AppData) => {
     setData(imported);
     showToast(data.settings.language === 'en' ? 'Backup restored successfully' : 'تمت استعادة البيانات بنجاح');
@@ -970,6 +1372,7 @@ function AppContent() {
                     expenses={data.expenses}
                     bills={data.bills}
                     settings={data.settings}
+                    jamiyyas={data.jamiyyas || []}
                     onOpenAddExpense={() => {
                       setEditingExpense(null);
                       setIsAddExpenseOpen(true);
@@ -978,6 +1381,10 @@ function AppContent() {
                     onOpenCategoryManager={() => setIsCategoryManagerOpen(true)}
                     onOpenSmartSms={() => setIsSmartSmsOpen(true)}
                     onUpdateSettings={handleUpdateSettings}
+                    onOpenJamiyya={(_group) => {
+                      setBillsInitialSubTab('jamiyya');
+                      handleTabChange('bills_groceries');
+                    }}
                   />
                 )}
 
@@ -1013,6 +1420,8 @@ function AppContent() {
                     groceries={data.groceries}
                     categories={data.categories}
                     settings={data.settings}
+                    subscriptions={data.subscriptions}
+                    jamiyyas={data.jamiyyas || []}
                     onToggleBill={handleToggleBill}
                     onAddBill={handleAddBill}
                     onDeleteBill={handleDeleteBill}
@@ -1025,6 +1434,16 @@ function AppContent() {
                     onSendTestNotification={handleSendTestNotification}
                     notificationPermission={notificationPermission}
                     onUpdateSettings={handleUpdateSettings}
+                    onConfirmSubscription={handleConfirmSubscription}
+                    onDismissSubscription={handleDismissSubscription}
+                    onSaveSubscription={handleSaveSubscription}
+                    onDeleteSubscription={handleDeleteSubscription}
+                    onCreateJamiyya={handleCreateJamiyya}
+                    onUpdateJamiyya={handleUpdateJamiyya}
+                    onDeleteJamiyya={handleDeleteJamiyya}
+                    onLogJamiyyaExpense={handleLogJamiyyaExpense}
+                    onLogJamiyyaIncome={handleLogJamiyyaIncome}
+                    initialSubTab={billsInitialSubTab}
                   />
                 )}
 
@@ -1045,6 +1464,7 @@ function AppContent() {
                       onDisablePasscode={handleDisablePasscode}
                       onOpenPrivacyPolicy={() => setIsPrivacyPolicyOpen(true)}
                       onShowToast={showToast}
+                      onOpenApplePaySetup={() => setIsApplePaySetupOpen(true)}
                     />
                   </Suspense>
                 )}
@@ -1095,6 +1515,73 @@ function AppContent() {
                   ? 'Expense imported from bank SMS successfully!'
                   : 'تم استيراد وحفظ العملية البنكية بنجاح!'
               );
+            }}
+            soundEnabled={data.settings.soundEnabled}
+            language={data.settings.language}
+          />
+
+          {/* Apple Pay Setup & Diagnostics Modal */}
+          <ApplePaySetupModal
+            isOpen={isApplePaySetupOpen}
+            onClose={() => setIsApplePaySetupOpen(false)}
+            onSimulateTest={() => {
+              setIsApplePaySetupOpen(false);
+              const isEnLang = data.settings.language === 'en';
+              setApplePayPendingReview({
+                amount: 42.50,
+                merchant: isEnLang ? 'Starbucks Coffee' : 'ستاربكس كافيه',
+                card: 'mada **4128',
+                note: isEnLang ? 'Apple Pay Auto-Log Test' : 'تجربة تسجيل Apple Pay التلقائي',
+              });
+            }}
+            onOpenManualEntry={() => {
+              setEditingExpense({
+                id: '',
+                title: '',
+                amount: 0,
+                categoryId: data.categories[0]?.id || '',
+                date: getLocalToday(),
+                paymentMethod: 'digital',
+                payer: 'الزوج',
+                createdAt: Date.now(),
+                source: 'apple_pay',
+              });
+              setIsAddExpenseOpen(true);
+            }}
+            soundEnabled={data.settings.soundEnabled}
+            language={data.settings.language}
+          />
+
+          {/* Apple Pay Transaction Review / Confirmation Modal */}
+          <ApplePayReviewModal
+            isOpen={Boolean(applePayPendingReview)}
+            onClose={() => setApplePayPendingReview(null)}
+            transaction={applePayPendingReview}
+            categories={data.categories}
+            currency={data.settings.currency}
+            onSaveExpense={(exp) => {
+              handleSaveExpense(exp);
+              showToast(
+                data.settings.language === 'en'
+                  ? 'Pay: Expense recorded successfully!'
+                  : 'Pay: تم تسجيل العملية بنجاح!'
+              );
+            }}
+            onEditInFullSheet={(prefill) => {
+              setEditingExpense({
+                id: '',
+                title: prefill.merchant,
+                amount: prefill.amount,
+                categoryId: prefill.categoryId,
+                date: getLocalToday(),
+                paymentMethod: 'digital',
+                payer: 'الزوج',
+                notes: prefill.notes,
+                source: 'apple_pay',
+                isAutoLogged: true,
+                createdAt: Date.now(),
+              });
+              setIsAddExpenseOpen(true);
             }}
             soundEnabled={data.settings.soundEnabled}
             language={data.settings.language}

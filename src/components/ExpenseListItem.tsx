@@ -155,8 +155,13 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = React.memo(({
             size="md"
           />
           <div className="min-w-0">
-            <div className="text-xs font-bold text-[#1C1C1E] dark:text-white truncate">
-              {expense.title}
+            <div className="text-xs font-bold text-[#1C1C1E] dark:text-white truncate flex items-center gap-1.5">
+              <span className="truncate">{expense.title}</span>
+              {expense.source === 'apple_pay' && (
+                <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black text-white dark:bg-white dark:text-black tracking-tight shadow-xs">
+                  Pay
+                </span>
+              )}
             </div>
             <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5 mt-0.5 truncate">
               <span>{isEn && category?.nameEn ? category.nameEn : (category?.name || (isEn ? 'General' : 'عام'))}</span>

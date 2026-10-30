@@ -116,6 +116,9 @@ export const getDefaultAppData = (): AppData => ({
   expenses: [],
   bills: [],
   groceries: [],
+  subscriptions: [],
+  dismissedSubscriptionMerchants: [],
+  jamiyyas: [],
   settings: {
     budgetMode: 'sum_categories',
     totalMonthlyBudget: 12000,
@@ -184,6 +187,9 @@ export const loadAppData = (): AppData => {
       expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
       bills: Array.isArray(parsed.bills) ? parsed.bills : [],
       groceries: Array.isArray(parsed.groceries) ? parsed.groceries : [],
+      subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
+      dismissedSubscriptionMerchants: Array.isArray(parsed.dismissedSubscriptionMerchants) ? parsed.dismissedSubscriptionMerchants : [],
+      jamiyyas: Array.isArray(parsed.jamiyyas) ? parsed.jamiyyas : [],
       settings: {
         ...defaultData.settings,
         ...(parsed.settings || {}),
@@ -212,6 +218,9 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
         expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
         bills: Array.isArray(parsed.bills) ? parsed.bills : [],
         groceries: Array.isArray(parsed.groceries) ? parsed.groceries : [],
+        subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
+        dismissedSubscriptionMerchants: Array.isArray(parsed.dismissedSubscriptionMerchants) ? parsed.dismissedSubscriptionMerchants : [],
+        jamiyyas: Array.isArray(parsed.jamiyyas) ? parsed.jamiyyas : [],
         settings: {
           ...defaultData.settings,
           ...(parsed.settings || {}),
@@ -232,6 +241,9 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
         expenses: Array.isArray(parsed.expenses) ? parsed.expenses : [],
         bills: Array.isArray(parsed.bills) ? parsed.bills : [],
         groceries: Array.isArray(parsed.groceries) ? parsed.groceries : [],
+        subscriptions: Array.isArray(parsed.subscriptions) ? parsed.subscriptions : [],
+        dismissedSubscriptionMerchants: Array.isArray(parsed.dismissedSubscriptionMerchants) ? parsed.dismissedSubscriptionMerchants : [],
+        jamiyyas: Array.isArray(parsed.jamiyyas) ? parsed.jamiyyas : [],
         settings: {
           ...defaultData.settings,
           ...(parsed.settings || {}),

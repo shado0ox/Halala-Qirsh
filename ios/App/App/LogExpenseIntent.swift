@@ -9,8 +9,41 @@ enum QuickStore {
 
     struct Cat: Codable { let id: String; let name: String }
     struct Pending: Codable {
-        let id: String; let amount: Double; let categoryId: String
-        let note: String?; let date: String; let createdAt: Double
+        let id: String
+        let amount: Double
+        let categoryId: String
+        let note: String?
+        let date: String
+        let createdAt: Double
+        let merchant: String?
+        let source: String?
+
+        enum CodingKeys: String, CodingKey {
+            case id, amount, categoryId, note, date, createdAt, merchant, source
+        }
+
+        init(id: String, amount: Double, categoryId: String, note: String?, date: String, createdAt: Double, merchant: String? = nil, source: String? = nil) {
+            self.id = id
+            self.amount = amount
+            self.categoryId = categoryId
+            self.note = note
+            self.date = date
+            self.createdAt = createdAt
+            self.merchant = merchant
+            self.source = source
+        }
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.container(keyedBy: CodingKeys.self)
+            id = try container.decode(String.self, forKey: .id)
+            amount = try container.decode(Double.self, forKey: .amount)
+            categoryId = try container.decode(String.self, forKey: .categoryId)
+            note = try container.decodeIfPresent(String.self, forKey: .note)
+            date = try container.decode(String.self, forKey: .date)
+            createdAt = try container.decode(Double.self, forKey: .createdAt)
+            merchant = try container.decodeIfPresent(String.self, forKey: .merchant)
+            source = try container.decodeIfPresent(String.self, forKey: .source)
+        }
     }
 
     // قائمة احتياطية لو لم يفتح المستخدم التطبيق بعد:
@@ -42,14 +75,15 @@ enum QuickStore {
         return f.string(from: Date())
     }
 
-    static func enqueue(amount: Double, categoryId: String, note: String?) {
+    static func enqueue(amount: Double, categoryId: String, note: String?, merchant: String? = nil, source: String? = nil) {
         var items: [Pending] = []
         if let s = UserDefaults.standard.string(forKey: pendingKey),
            let d = s.data(using: .utf8),
            let old = try? JSONDecoder().decode([Pending].self, from: d) { items = old }
         items.append(Pending(id: UUID().uuidString, amount: amount, categoryId: categoryId,
                              note: (note?.isEmpty ?? true) ? nil : note,
-                             date: localDateString(), createdAt: Date().timeIntervalSince1970))
+                             date: localDateString(), createdAt: Date().timeIntervalSince1970,
+                             merchant: merchant, source: source))
         if let d = try? JSONEncoder().encode(items), let s = String(data: d, encoding: .utf8) {
             UserDefaults.standard.set(s, forKey: pendingKey)
         }
@@ -105,6 +139,39 @@ struct QuickAddExpenseIntent: AppIntent {
 }
 
 @available(iOS 16.0, *)
+struct LogApplePayTransactionIntent: AppIntent {
+    static var title: LocalizedStringResource = "تسجيل عملية Apple Pay تلقائياً"
+    static var description = IntentDescription("تسجيل عملية شراء عبر Apple Pay تلقائياً باسم التاجر والمبلغ")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "المبلغ", requestValueDialog: "كم المبلغ؟")
+    var amount: Double
+
+    @Parameter(title: "التاجر", requestValueDialog: "اسم التاجر أو المتجر")
+    var merchant: String
+
+    @Parameter(title: "التصنيف", default: nil)
+    var category: QuickCategory?
+
+    @Parameter(title: "ملاحظة أو البطاقة", default: nil)
+    var note: String?
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("تسجيل عملية Apple Pay بقيمة \(\.$amount) لدى \(\.$merchant)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard amount > 0, amount < 1_000_000 else {
+            throw $amount.needsValueError("اكتب مبلغاً صحيحاً")
+        }
+        let catId = category?.id ?? QuickStore.categories().first?.id ?? "food"
+        QuickStore.enqueue(amount: amount, categoryId: catId, note: note ?? merchant, merchant: merchant, source: "apple_pay")
+        let shown = String(format: "%g", amount)
+        return .result(dialog: "تم تسجيل عملية Apple Pay بقيمة \(shown) في \(merchant)")
+    }
+}
+
+@available(iOS 16.0, *)
 struct LogExpenseIntent: AppIntent {
     static var title: LocalizedStringResource = "تسجيل مصروف من رسالة البنك"
     static var description = IntentDescription("افتح شاشة تسجيل مصروف من رسالة البنك")
@@ -143,6 +210,17 @@ struct HalalaQirshShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "تسجيل مصروف من رسالة البنك",
             systemImageName: "plus.circle.fill"
+        )
+        AppShortcut(
+            intent: LogApplePayTransactionIntent(),
+            phrases: [
+                "Log Apple Pay transaction in \(.applicationName)",
+                "Apple Pay in \(.applicationName)",
+                "عملية Apple Pay في \(.applicationName)",
+                "تسجيل عملية Apple Pay في \(.applicationName)"
+            ],
+            shortTitle: "تسجيل عملية Apple Pay",
+            systemImageName: "creditcard.and.123"
         )
     }
 }

@@ -339,4 +339,49 @@ describe('Quick Expense Import Integration Tests', () => {
     expect(importedExpense.payer).toBe('الزوج');
     expect(importedExpense.payer).not.toBe('Husband');
   });
+
+  it('imports an Apple Pay auto-logged transaction from queue with digital payment method and apple_pay source', async () => {
+    const d = getDefaultAppData();
+    d.settings = {
+      ...d.settings,
+      language: 'ar',
+      hasCompletedOnboarding: true,
+      isPasscodeEnabled: false,
+      animations: 'off',
+    } as any;
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    const pendingApplePay: quickQueue.PendingQuickExpense = {
+      id: 'quick-applepay-1',
+      amount: 150.75,
+      categoryId: 'food',
+      merchant: 'هايبر بنده',
+      source: 'apple_pay',
+      date: '2026-10-30',
+      note: 'مشتريات عائلية',
+      createdAt: Date.now(),
+    };
+    nativeStore.set(PENDING_KEY, JSON.stringify([pendingApplePay]));
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pay:/)).toBeInTheDocument();
+    });
+
+    const savedDataJson = nativeStore.get(STORAGE_KEY);
+    expect(savedDataJson).toBeTruthy();
+    const savedData = JSON.parse(savedDataJson!);
+    const importedExpense = savedData.expenses.find((e: any) => e.amount === 150.75);
+    expect(importedExpense).toBeDefined();
+    expect(importedExpense.source).toBe('apple_pay');
+    expect(importedExpense.paymentMethod).toBe('digital');
+    expect(importedExpense.isAutoLogged).toBe(true);
+    expect(importedExpense.payer).toBe('الزوج');
+  });
 });

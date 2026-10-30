@@ -9,6 +9,8 @@ export interface PendingQuickExpense {
   note?: string;
   date: string;
   createdAt: number;
+  merchant?: string;
+  source?: 'manual' | 'sms' | 'quick_intent' | 'apple_pay';
 }
 
 export interface QuickCategoryItem {
