@@ -88,6 +88,41 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
   const [newMemberName, setNewMemberName] = useState<string>('');
   const [newMemberPhone, setNewMemberPhone] = useState<string>('');
 
+  // Edit member modal state
+  const [editMemberModalOpen, setEditMemberModalOpen] = useState<boolean>(false);
+  const [editingMemberId, setEditingMemberId] = useState<string>('');
+  const [editingMemberName, setEditingMemberName] = useState<string>('');
+  const [editingMemberPhone, setEditingMemberPhone] = useState<string>('');
+  const [editingMemberIsCurrent, setEditingMemberIsCurrent] = useState<boolean>(false);
+  const [editingMemberIsOrganizer, setEditingMemberIsOrganizer] = useState<boolean>(false);
+
+  const handleSaveMemberEdit = () => {
+    if (!editingMemberName.trim() || !editingMemberId) return;
+    nativeHaptics.success(soundEnabled);
+    const updatedMembers = group.members.map((m) => {
+      if (m.id === editingMemberId) {
+        return {
+          ...m,
+          name: editingMemberName.trim(),
+          phone: editingMemberPhone.trim() || undefined,
+          isCurrentUser: editingMemberIsCurrent,
+          isOrganizer: editingMemberIsOrganizer,
+        };
+      }
+      return {
+        ...m,
+        isCurrentUser: editingMemberIsCurrent ? false : m.isCurrentUser,
+        isOrganizer: editingMemberIsOrganizer ? false : m.isOrganizer,
+      };
+    });
+
+    onUpdateGroup({
+      ...group,
+      members: updatedMembers,
+    });
+    setEditMemberModalOpen(false);
+  };
+
   // Optional auto-logging toggles
   const [logAsExpenseChecked, setLogAsExpenseChecked] = useState<boolean>(true);
   const [logAsIncomeChecked, setLogAsIncomeChecked] = useState<boolean>(true);
@@ -619,7 +654,22 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0">
+                          <div className="flex items-center gap-1.5 shrink-0">
+                            <button
+                              onClick={() => {
+                                nativeHaptics.tap(soundEnabled);
+                                setEditingMemberId(mem.id);
+                                setEditingMemberName(mem.name);
+                                setEditingMemberPhone(mem.phone || '');
+                                setEditingMemberIsCurrent(Boolean(mem.isCurrentUser));
+                                setEditingMemberIsOrganizer(Boolean(mem.isOrganizer));
+                                setEditMemberModalOpen(true);
+                              }}
+                              className="px-2 py-1 rounded-lg text-[11px] font-medium text-emerald-600 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 cursor-pointer transition-colors"
+                            >
+                              {isEn ? 'Edit' : 'تعديل'}
+                            </button>
+
                             {cycle?.payoutReceived ? (
                               <span className="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-lg flex items-center gap-1">
                                 <Check size={12} strokeWidth={3} />
@@ -884,6 +934,89 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
                     className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer hover:bg-emerald-700"
                   >
                     {isEn ? 'Confirm' : 'اعتماد البديل'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Edit Member Modal */}
+        {editMemberModalOpen && (
+          <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
+            <div className="absolute inset-0 bg-black/60" onClick={() => setEditMemberModalOpen(false)} />
+            <div className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4">
+              <h4 className="text-sm font-black text-[#1C1C1E] dark:text-white">
+                {isEn ? 'Edit Member Details' : 'تعديل بيانات العضو'}
+              </h4>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-xs font-bold text-[#8E8E93] mb-1">
+                    {isEn ? 'Member Name' : 'اسم العضو'}
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={editingMemberName}
+                    onChange={(e) => setEditingMemberName(e.target.value)}
+                    placeholder={isEn ? 'Full Name' : 'الاسم الكامل'}
+                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#8E8E93] mb-1">
+                    {isEn ? 'Phone (Optional)' : 'رقم الجوال (اختياري للتذكيرات)'}
+                  </label>
+                  <input
+                    type="tel"
+                    value={editingMemberPhone}
+                    onChange={(e) => setEditingMemberPhone(e.target.value)}
+                    placeholder="05..."
+                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
+                  />
+                </div>
+
+                {/* Role Toggles */}
+                <div className="flex items-center gap-2 pt-1">
+                  <button
+                    type="button"
+                    onClick={() => setEditingMemberIsCurrent(!editingMemberIsCurrent)}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                      editingMemberIsCurrent
+                        ? 'bg-emerald-600 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {isEn ? 'Is Me (Current User)' : 'هذا أنا (حسابي)'}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => setEditingMemberIsOrganizer(!editingMemberIsOrganizer)}
+                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                      editingMemberIsOrganizer
+                        ? 'bg-amber-500 text-white shadow-xs'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    {isEn ? 'Is Organizer' : 'منسق الجمعية'}
+                  </button>
+                </div>
+
+                <div className="flex items-center gap-2 pt-2">
+                  <button
+                    onClick={() => setEditMemberModalOpen(false)}
+                    className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                  >
+                    {isEn ? 'Cancel' : 'إلغاء'}
+                  </button>
+                  <button
+                    onClick={handleSaveMemberEdit}
+                    className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer hover:bg-emerald-700"
+                  >
+                    {isEn ? 'Save' : 'حفظ التعديل'}
                   </button>
                 </div>
               </div>
