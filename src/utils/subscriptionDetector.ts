@@ -99,13 +99,12 @@ export function formatDateToYmd(d: Date): string {
 }
 
 /**
- * Checks whether two amounts are within acceptable tolerance
- * (5-10% or absolute difference <= 3.0 for small rounding / taxes / VAT)
+ * Checks whether two amounts are within acceptable tolerance (default 3%)
  */
-export function isAmountSimilar(a: number, b: number, tolerancePct: number = 0.10): boolean {
+export function isAmountSimilar(a: number, b: number, tolerancePct: number = 0.03): boolean {
   if (a <= 0 || b <= 0) return false;
   const absDiff = Math.abs(a - b);
-  if (absDiff <= 3.0) return true; // tax / exchange rounding
+  if (absDiff <= 0.5) return true; // tax / exchange small rounding
   const max = Math.max(a, b);
   return absDiff / max <= tolerancePct;
 }
@@ -126,8 +125,6 @@ const FREQUENCY_TARGETS: Array<{
   maxDays: number;
   missedCycleTolerance: number;
 }> = [
-  { frequency: 'weekly', targetDays: 7, minDays: 5, maxDays: 9, missedCycleTolerance: 3 },
-  { frequency: 'biweekly', targetDays: 14, minDays: 11, maxDays: 17, missedCycleTolerance: 4 },
   { frequency: 'monthly', targetDays: 30, minDays: 25, maxDays: 35, missedCycleTolerance: 7 },
   { frequency: 'quarterly', targetDays: 90, minDays: 80, maxDays: 102, missedCycleTolerance: 14 },
   { frequency: 'yearly', targetDays: 365, minDays: 345, maxDays: 385, missedCycleTolerance: 25 },
@@ -305,7 +302,7 @@ export function detectSubscriptionsFromExpenses(
   const {
     currentDate = formatDateToYmd(new Date()),
     minOccurrences = 2,
-    amountTolerancePct = 0.12,
+    amountTolerancePct = 0.03,
     dismissedMerchants = [],
     existingSubscriptions = [],
   } = options;
@@ -329,6 +326,8 @@ export function detectSubscriptionsFromExpenses(
   for (const exp of expenses) {
     // Ignore invalid, zero, or transfer-like expenses
     if (typeof exp.amount !== 'number' || exp.amount <= 0) continue;
+    // Ignore food & groceries category
+    if (exp.categoryId === 'food') continue;
 
     const rawMerchant = exp.title || exp.notes || '';
     const norm = normalizeSubscriptionMerchant(rawMerchant);
@@ -415,21 +414,15 @@ export function detectSubscriptionsFromExpenses(
     }
 
     // Amount Consistency check
-    // Ensure this is not a noisy merchant with high random variance (like supermarket Panda)
+    // Ensure all amounts are consistent within tolerance (or a valid price increase occurred)
     const amounts = collapsedEntries.map((e) => e.amount);
-    const meanAmount = amounts.reduce((s, a) => s + a, 0) / amounts.length;
-    const variance =
-      amounts.reduce((sum, a) => sum + Math.pow(a - meanAmount, 2), 0) / amounts.length;
-    const stdDev = Math.sqrt(variance);
-
-    // If coefficient of variation is high (> 25%) and amounts aren't in a step/price increase
+    const minAmount = Math.min(...amounts);
+    const maxAmount = Math.max(...amounts);
     const priceIncrease = detectPriceIncrease(collapsedEntries);
-    const hasConsistentAmounts = amounts.every((amt) =>
-      isAmountSimilar(amt, meanAmount, amountTolerancePct)
-    );
+    const hasConsistentAmounts = isAmountSimilar(minAmount, maxAmount, amountTolerancePct);
 
-    if (!hasConsistentAmounts && !priceIncrease && stdDev / meanAmount > 0.22) {
-      // Discard noisy merchant
+    if (!hasConsistentAmounts && !priceIncrease) {
+      // Discard noisy merchant with fluctuating amounts
       continue;
     }
 

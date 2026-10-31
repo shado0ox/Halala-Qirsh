@@ -164,7 +164,7 @@ struct LogApplePayTransactionIntent: AppIntent {
         guard amount > 0, amount < 1_000_000 else {
             throw $amount.needsValueError("اكتب مبلغاً صحيحاً")
         }
-        let catId = category?.id ?? QuickStore.categories().first?.id ?? "food"
+        let catId = category?.id ?? ""
         QuickStore.enqueue(amount: amount, categoryId: catId, note: note ?? merchant, merchant: merchant, source: "apple_pay")
         let shown = String(format: "%g", amount)
         return .result(dialog: "تم تسجيل عملية Apple Pay بقيمة \(shown) في \(merchant)")

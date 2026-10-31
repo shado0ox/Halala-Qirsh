@@ -66,16 +66,16 @@ export function parseApplePayDeepLink(url?: string | null): ApplePayTransactionP
     }
 
     const merchantRaw = params.get('merchant') || params.get('store') || params.get('title') || '';
-    const merchant = decodeURIComponent(merchantRaw).trim() || undefined;
+    const merchant = merchantRaw.trim() || undefined;
 
     const categoryIdRaw = params.get('category') || params.get('categoryId') || '';
-    const categoryId = decodeURIComponent(categoryIdRaw).trim() || undefined;
+    const categoryId = categoryIdRaw.trim() || undefined;
 
     const cardRaw = params.get('card') || params.get('cardName') || '';
-    const card = decodeURIComponent(cardRaw).trim() || undefined;
+    const card = cardRaw.trim() || undefined;
 
     const noteRaw = params.get('note') || params.get('notes') || '';
-    const note = decodeURIComponent(noteRaw).trim() || undefined;
+    const note = noteRaw.trim() || undefined;
 
     const autoLogParam = params.get('autolog') || params.get('auto') || params.get('silent');
     const autoLog = autoLogParam === 'true' || autoLogParam === '1';

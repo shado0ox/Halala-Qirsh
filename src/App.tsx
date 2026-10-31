@@ -164,9 +164,11 @@ function AppContent() {
           // Direct auto-log without modal prompt
           const merchant = payload.merchant || '';
           const { categoryId: predictedCatId } = categorizeMerchant(merchant, data.categories);
-          const targetCatId =
-            payload.categoryId || payload.category || predictedCatId || data.categories[0]?.id || 'cat-other';
-          const targetCat = data.categories.find((c) => c.id === targetCatId);
+          const rawCatId = payload.categoryId || payload.category || '';
+          const explicitCat = rawCatId ? data.categories.find((c) => c.id === rawCatId) : undefined;
+          const predictedCat = predictedCatId ? data.categories.find((c) => c.id === predictedCatId) : undefined;
+          const targetCat = explicitCat || predictedCat || data.categories[0];
+          const targetCatId = targetCat?.id || 'food';
           const isEnLang = data.settings.language === 'en';
           const catName = isEnLang && targetCat?.nameEn ? targetCat.nameEn : (targetCat?.name || 'عام');
           const title = merchant.trim() || catName;

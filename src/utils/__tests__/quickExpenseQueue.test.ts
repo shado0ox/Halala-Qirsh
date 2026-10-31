@@ -172,6 +172,42 @@ describe('quickExpenseQueue Unit Tests', () => {
       expect(result[0].amount).toBe(150.5);
       expect(result[0].categoryId).toBe('food');
     });
+
+    it('accepts empty categoryId only when source is apple_pay, and rejects empty categoryId otherwise', async () => {
+      vi.mocked(Capacitor.isNativePlatform).mockReturnValue(true);
+      const queue = [
+        {
+          id: 'ap-1',
+          amount: 45,
+          categoryId: '',
+          merchant: 'ستاربكس',
+          source: 'apple_pay',
+          date: '2026-10-31',
+        },
+        {
+          id: 'manual-empty-cat',
+          amount: 60,
+          categoryId: '',
+          date: '2026-10-31',
+        },
+        {
+          id: 'intent-empty-cat',
+          amount: 80,
+          categoryId: '   ',
+          source: 'quick_intent',
+          date: '2026-10-31',
+        },
+      ];
+
+      vi.mocked(Preferences.get).mockResolvedValue({ value: JSON.stringify(queue) });
+
+      const result = await readPendingQuickExpenses();
+
+      expect(result).toHaveLength(1);
+      expect(result[0].id).toBe('ap-1');
+      expect(result[0].source).toBe('apple_pay');
+      expect(result[0].categoryId).toBe('');
+    });
   });
 
   describe('ackQuickExpenses', () => {

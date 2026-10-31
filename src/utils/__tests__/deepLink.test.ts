@@ -63,4 +63,25 @@ describe('Apple Pay deep link unit tests', () => {
     });
     expect(parseApplePayDeepLink('invalid://url')).toBeNull();
   });
+
+  it('correctly parses merchants with % sign, encoded Arabic, and + without losing amount', () => {
+    // 1. merchant=50%25%20Off gives "50% Off" and retains amount
+    const percentRes = parseApplePayDeepLink('halalaqirsh://applepay?amount=49.99&merchant=50%25%20Off');
+    expect(percentRes?.amount).toBe(49.99);
+    expect(percentRes?.merchant).toBe('50% Off');
+
+    // 2. Arabic merchant percent-encoded
+    const arabicRes = parseApplePayDeepLink('halalaqirsh://applepay?amount=35&merchant=%D8%B3%D8%AA%D8%A7%D8%B1%D8%A8%D9%83%D8%B3');
+    expect(arabicRes?.amount).toBe(35);
+    expect(arabicRes?.merchant).toBe('ستاربكس');
+
+    // 3. Value containing +
+    const plusRes = parseApplePayDeepLink('halalaqirsh://applepay?amount=15&card=Mada%2BApple&note=Coffee%2BDonut');
+    expect(plusRes?.amount).toBe(15);
+    expect(plusRes?.card).toBe('Mada+Apple');
+    expect(plusRes?.note).toBe('Coffee+Donut');
+
+    // 4. Link without query returns {}
+    expect(parseApplePayDeepLink('halalaqirsh://applepay')).toEqual({});
+  });
 });

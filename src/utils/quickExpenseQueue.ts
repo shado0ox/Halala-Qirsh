@@ -81,7 +81,8 @@ export async function readPendingQuickExpenses(): Promise<PendingQuickExpense[]>
         item.amount > 0 &&
         item.amount < 1_000_000;
       const hasValidCategoryId =
-        typeof item.categoryId === 'string' && item.categoryId.trim().length > 0;
+        typeof item.categoryId === 'string' &&
+        (item.source === 'apple_pay' || item.categoryId.trim().length > 0);
       const hasValidDate = typeof item.date === 'string' && DATE_REGEX.test(item.date);
 
       return Boolean(hasValidId && hasValidAmount && hasValidCategoryId && hasValidDate);

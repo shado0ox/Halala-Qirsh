@@ -39,7 +39,9 @@ describe('Subscription Detection Engine', () => {
     it('accurately identifies similar amounts within tax/rounding tolerance', () => {
       expect(isAmountSimilar(40, 40)).toBe(true);
       expect(isAmountSimilar(39.99, 40.00)).toBe(true);
-      expect(isAmountSimilar(45, 47)).toBe(true); // <= 3.0 absolute difference
+      expect(isAmountSimilar(45, 46)).toBe(true); // within 3% tolerance
+      expect(isAmountSimilar(45, 47, 0.10)).toBe(true); // with explicit 10% tolerance
+      expect(isAmountSimilar(45, 47)).toBe(false); // exceeds default 3% tolerance
       expect(isAmountSimilar(20, 200)).toBe(false);
     });
 
@@ -147,6 +149,94 @@ describe('Subscription Detection Engine', () => {
         createExpense('exp-2', 'Starbucks Coffee', 42, '2026-08-04'),
         createExpense('exp-3', 'Starbucks', 26, '2026-08-05'),
         createExpense('exp-4', 'Starbucks', 65, '2026-08-12'),
+      ];
+
+      const detected = detectSubscriptionsFromExpenses(expenses);
+      expect(detected).toHaveLength(0);
+    });
+
+    it('does not detect weekly repeated purchases like Starbucks 22 four times', () => {
+      const expenses: Expense[] = [
+        createExpense('exp-1', 'Starbucks', 22, '2026-08-01'),
+        createExpense('exp-2', 'Starbucks', 22, '2026-08-08'),
+        createExpense('exp-3', 'Starbucks', 22, '2026-08-15'),
+        createExpense('exp-4', 'Starbucks', 22, '2026-08-22'),
+      ];
+
+      const detected = detectSubscriptionsFromExpenses(expenses);
+      expect(detected).toHaveLength(0);
+    });
+
+    it('does not detect monthly fluctuating purchases like Panda 310/305/298', () => {
+      const expenses: Expense[] = [
+        {
+          id: 'exp-1',
+          title: 'Hyper Panda',
+          amount: 310,
+          categoryId: 'groceries',
+          date: '2026-06-01',
+          paymentMethod: 'card',
+          payer: 'الزوج',
+          createdAt: Date.now(),
+        },
+        {
+          id: 'exp-2',
+          title: 'Panda',
+          amount: 305,
+          categoryId: 'groceries',
+          date: '2026-07-01',
+          paymentMethod: 'card',
+          payer: 'الزوج',
+          createdAt: Date.now(),
+        },
+        {
+          id: 'exp-3',
+          title: 'Panda Market',
+          amount: 298,
+          categoryId: 'groceries',
+          date: '2026-08-01',
+          paymentMethod: 'card',
+          payer: 'الزوج',
+          createdAt: Date.now(),
+        },
+      ];
+
+      const detected = detectSubscriptionsFromExpenses(expenses);
+      expect(detected).toHaveLength(0);
+    });
+
+    it('does not detect recurring expenses with categoryId "food"', () => {
+      const expenses: Expense[] = [
+        {
+          id: 'exp-1',
+          title: 'Monthly Food Supply',
+          amount: 400,
+          categoryId: 'food',
+          date: '2026-06-01',
+          paymentMethod: 'card',
+          payer: 'الزوج',
+          createdAt: Date.now(),
+        },
+        {
+          id: 'exp-2',
+          title: 'Monthly Food Supply',
+          amount: 400,
+          categoryId: 'food',
+          date: '2026-07-01',
+          paymentMethod: 'card',
+          payer: 'الزوج',
+          createdAt: Date.now(),
+        },
+        {
+          id: 'exp-3',
+          title: 'Monthly Food Supply',
+          amount: 400,
+          categoryId: 'food',
+          date: '2026-08-01',
+          paymentMethod: 'card',
+          payer: 'الزوج',
+          createdAt: Date.now(),
+        },
       ];
 
       const detected = detectSubscriptionsFromExpenses(expenses);

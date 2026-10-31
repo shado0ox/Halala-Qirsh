@@ -3,6 +3,23 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { render, screen, act, waitFor, fireEvent } from '@testing-library/react';
 
 const nativeStore = new Map<string, string>();
+const appListeners: Record<string, (arg?: any) => void> = {};
+let launchUrlToReturn: { url: string } | undefined = undefined;
+
+vi.mock('@capacitor/app', () => ({
+  App: {
+    addListener: vi.fn((name: string, cb: (arg?: any) => void) => {
+      appListeners[name] = cb;
+      return Promise.resolve({
+        remove: () => {
+          if (appListeners[name] === cb) delete appListeners[name];
+          return Promise.resolve();
+        },
+      });
+    }),
+    getLaunchUrl: vi.fn(() => Promise.resolve(launchUrlToReturn)),
+  },
+}));
 
 vi.mock('@capacitor/preferences', () => ({
   Preferences: {
@@ -59,6 +76,7 @@ describe('Quick Expense Import Integration Tests', () => {
   beforeEach(() => {
     nativeStore.clear();
     localStorage.clear();
+    launchUrlToReturn = undefined;
     const d = getDefaultAppData();
     d.settings = {
       ...d.settings,
@@ -383,5 +401,165 @@ describe('Quick Expense Import Integration Tests', () => {
     expect(importedExpense.paymentMethod).toBe('digital');
     expect(importedExpense.isAutoLogged).toBe(true);
     expect(importedExpense.payer).toBe('الزوج');
+  });
+
+  // (أ) عنصر apple_pay بتصنيف فارغ وتاجر «ستاربكس» يُحفظ تحت تصنيف المطاعم/الترفيه المتوقع وليس أول تصنيف
+  it('imports apple_pay item with empty categoryId and merchant "ستاربكس" into entertainment category rather than first category', async () => {
+    const d = getDefaultAppData();
+    d.settings = {
+      ...d.settings,
+      language: 'ar',
+      hasCompletedOnboarding: true,
+      isPasscodeEnabled: false,
+      animations: 'off',
+    } as any;
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    const pendingApplePay: quickQueue.PendingQuickExpense = {
+      id: 'quick-applepay-starbucks-empty-cat',
+      amount: 28,
+      categoryId: '',
+      merchant: 'ستاربكس',
+      source: 'apple_pay',
+      date: '2026-10-31',
+      note: 'ستاربكس كافيه',
+      createdAt: Date.now(),
+    };
+    nativeStore.set(PENDING_KEY, JSON.stringify([pendingApplePay]));
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pay:/)).toBeInTheDocument();
+    });
+
+    const savedDataJson = nativeStore.get(STORAGE_KEY);
+    expect(savedDataJson).toBeTruthy();
+    const savedData = JSON.parse(savedDataJson!);
+    const imported = savedData.expenses.find((e: any) => e.amount === 28);
+    expect(imported).toBeDefined();
+    expect(imported.categoryId).toBe('entertainment');
+    expect(imported.categoryId).not.toBe('food');
+  });
+
+  // (ب) تاجر مجهول يرجع لأول تصنيف
+  it('imports apple_pay item with empty categoryId and unknown merchant defaulting to first category', async () => {
+    const d = getDefaultAppData();
+    d.settings = {
+      ...d.settings,
+      language: 'ar',
+      hasCompletedOnboarding: true,
+      isPasscodeEnabled: false,
+      animations: 'off',
+    } as any;
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    const pendingApplePay: quickQueue.PendingQuickExpense = {
+      id: 'quick-applepay-unknown-merchant',
+      amount: 42,
+      categoryId: '',
+      merchant: 'SomeRandomUnknownStoreXYZ',
+      source: 'apple_pay',
+      date: '2026-10-31',
+      createdAt: Date.now(),
+    };
+    nativeStore.set(PENDING_KEY, JSON.stringify([pendingApplePay]));
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pay:/)).toBeInTheDocument();
+    });
+
+    const savedDataJson = nativeStore.get(STORAGE_KEY);
+    expect(savedDataJson).toBeTruthy();
+    const savedData = JSON.parse(savedDataJson!);
+    const imported = savedData.expenses.find((e: any) => e.amount === 42);
+    expect(imported).toBeDefined();
+    expect(imported.categoryId).toBe(d.categories[0].id);
+  });
+
+  // (ج) عنصر غير apple_pay بتصنيف فارغ ما زال مرفوضاً
+  it('rejects non-apple_pay item with empty categoryId and does not import it', async () => {
+    const d = getDefaultAppData();
+    d.settings = {
+      ...d.settings,
+      language: 'ar',
+      hasCompletedOnboarding: true,
+      isPasscodeEnabled: false,
+      animations: 'off',
+    } as any;
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    const invalidItem = {
+      id: 'quick-invalid-empty-cat-non-applepay',
+      amount: 90,
+      categoryId: '',
+      date: '2026-10-31',
+      source: 'quick_intent',
+      createdAt: Date.now(),
+    };
+    nativeStore.set(PENDING_KEY, JSON.stringify([invalidItem]));
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    expect(screen.queryByText(/تم تسجيل.*مصروف/)).toBeNull();
+
+    const savedDataJson = nativeStore.get(STORAGE_KEY);
+    const savedData = JSON.parse(savedDataJson!);
+    expect(savedData.expenses).toHaveLength(0);
+  });
+
+  it('registers applepay deep link with autolog=1 and invalid category=zzz under an existing category', async () => {
+    const d = getDefaultAppData();
+    d.settings = {
+      ...d.settings,
+      language: 'ar',
+      hasCompletedOnboarding: true,
+      isPasscodeEnabled: false,
+      animations: 'off',
+    } as any;
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    launchUrlToReturn = {
+      url: 'halalaqirsh://applepay?amount=85&autolog=1&category=zzz&merchant=UnknownStoreXYZ',
+    };
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pay: تم قيد 85 تلقائياً/)).toBeInTheDocument();
+    });
+
+    const savedDataJson = nativeStore.get(STORAGE_KEY);
+    expect(savedDataJson).toBeTruthy();
+    const savedData = JSON.parse(savedDataJson!);
+    const imported = savedData.expenses.find((e: any) => e.amount === 85);
+    expect(imported).toBeDefined();
+    // categoryId must be a valid category from d.categories (e.g. food), NOT 'zzz'
+    expect(imported.categoryId).not.toBe('zzz');
+    expect(d.categories.some((c: any) => c.id === imported.categoryId)).toBe(true);
+    expect(imported.source).toBe('apple_pay');
+    expect(imported.isAutoLogged).toBe(true);
   });
 });
