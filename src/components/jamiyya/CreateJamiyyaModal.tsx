@@ -20,6 +20,13 @@ import { nativeHaptics } from '../../utils/nativeHaptics';
 import { springs } from '../../utils/motion';
 import { formatDateToYmd } from '../../utils/jamiyyaEngine';
 import { handleModalBackdropClick, dismissKeyboard } from '../../utils/keyboard';
+import {
+  FormField,
+  TextInput,
+  AmountInput,
+  SelectDropdown,
+  FormButton,
+} from '../ui/FormComponents';
 
 export interface CustomMemberInput {
   id: string;
@@ -259,7 +266,7 @@ export const CreateJamiyyaModal: React.FC<CreateJamiyyaModalProps> = ({
               dismissKeyboard();
             }
           }}
-          className="relative w-full max-w-lg max-h-[92vh] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 flex flex-col overflow-hidden"
+          className="relative w-full max-w-lg max-h-[88dvh] sm:max-h-[85dvh] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 flex flex-col overflow-hidden box-border"
         >
           {/* Header */}
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
@@ -287,21 +294,21 @@ export const CreateJamiyyaModal: React.FC<CreateJamiyyaModalProps> = ({
           </div>
 
           {/* Form Content */}
-          <form onSubmit={handleSubmit} className="p-4 overflow-y-auto space-y-4 no-scrollbar flex-1">
+          <form
+            onSubmit={handleSubmit}
+            style={{ paddingBottom: 'calc(var(--sab) + 24px)' }}
+            className="p-4 sm:p-5 overflow-y-auto space-y-4 no-scrollbar flex-1 box-border"
+          >
             {/* Group Name */}
-            <div>
-              <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                {isEn ? 'Group Name' : 'اسم الجمعية'}
-              </label>
-              <input
+            <FormField label={isEn ? 'Group Name' : 'اسم الجمعية'} required>
+              <TextInput
                 type="text"
                 required
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 placeholder={isEn ? 'e.g. Family Savings, Work Jam\'iyya' : 'مثال: جمعية الأهل، جمعية الزملاء، جمعية الصيف'}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
               />
-            </div>
+            </FormField>
 
             {/* Members Count Customizer (Editable & Stepper) */}
             <div className="p-3 rounded-2xl bg-emerald-500/5 dark:bg-emerald-950/20 border border-emerald-500/20 space-y-2.5">
@@ -372,90 +379,70 @@ export const CreateJamiyyaModal: React.FC<CreateJamiyyaModalProps> = ({
             </div>
 
             {/* Financial Numbers: Payout Pot & Installment */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                  {isEn ? `Total Pot (${currencySymbol})` : `مبلغ القبضة الكامل (${currencySymbol})`}
-                </label>
-                <input
-                  type="number"
-                  step="any"
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField
+                label={isEn ? `Total Pot (${currencySymbol})` : `مبلغ القبضة الكامل (${currencySymbol})`}
+                hint={isEn ? `= ${membersCount} × ${installment} ${currencySymbol}` : `= ${membersCount} أعضاء × ${installment} ${currencySymbol}`}
+                required
+              >
+                <AmountInput
+                  currencySymbol={currencySymbol}
                   required
                   min={100}
                   value={totalPayoutStr}
                   onChange={(e) => handleTotalPayoutChange(e.target.value)}
                   placeholder="50000"
-                  className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
                 />
-                <span className="text-[10px] text-[#8E8E93] mt-0.5 block">
-                  {isEn ? `= ${membersCount} × ${installment} ${currencySymbol}` : `= ${membersCount} أعضاء × ${installment} ${currencySymbol}`}
-                </span>
-              </div>
+              </FormField>
 
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                  {isEn ? `Installment per Member (${currencySymbol})` : `سهم القسط للعضو (${currencySymbol})`}
-                </label>
-                <input
-                  type="number"
-                  step="any"
+              <FormField
+                label={isEn ? `Installment per Member (${currencySymbol})` : `سهم القسط للعضو (${currencySymbol})`}
+                hint={isEn ? 'Monthly/cycle share' : 'قسط الدورة الواحدة'}
+                required
+              >
+                <AmountInput
+                  currencySymbol={currencySymbol}
                   required
                   min={50}
                   value={installmentStr}
                   onChange={(e) => handleInstallmentChange(e.target.value)}
                   placeholder="5000"
-                  className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
                 />
-                <span className="text-[10px] text-[#8E8E93] mt-0.5 block">
-                  {isEn ? 'Monthly/cycle share' : 'قسط الدورة الواحدة'}
-                </span>
-              </div>
+              </FormField>
             </div>
 
             {/* Frequency & Start Date */}
-            <div className="grid grid-cols-2 gap-2.5">
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                  {isEn ? 'Cycle Frequency' : 'دورية السداد'}
-                </label>
-                <select
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <FormField label={isEn ? 'Cycle Frequency' : 'دورية السداد'}>
+                <SelectDropdown
                   value={frequency}
                   onChange={(e) => setFrequency(e.target.value as JamiyyaFrequency)}
-                  className="w-full px-3 py-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                 >
                   <option value="monthly">{isEn ? 'Monthly' : 'شهرياً'}</option>
                   <option value="biweekly">{isEn ? 'Every 2 Weeks' : 'كل أسبوعين'}</option>
                   <option value="weekly">{isEn ? 'Weekly' : 'أسبوعياً'}</option>
-                </select>
-              </div>
+                </SelectDropdown>
+              </FormField>
 
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                  {isEn ? 'Start Date' : 'تاريخ الانطلاق'}
-                </label>
-                <input
+              <FormField label={isEn ? 'Start Date' : 'تاريخ الانطلاق'} required>
+                <TextInput
                   type="date"
                   required
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
                 />
-              </div>
+              </FormField>
             </div>
 
             {/* Bank / Transfer Info (Optional for WhatsApp sharing) */}
-            <div>
-              <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                {isEn ? 'Payment Destination / IBAN (Optional for WhatsApp share)' : 'بيانات الحساب أو وسيلة التحويل (اختياري للواتساب)'}
-              </label>
-              <input
+            <FormField label={isEn ? 'Payment Destination / IBAN (Optional)' : 'بيانات الحساب أو وسيلة التحويل (اختياري)'}>
+              <TextInput
                 type="text"
                 value={bankAccountInfo}
                 onChange={(e) => setBankAccountInfo(e.target.value)}
                 placeholder={isEn ? 'e.g. IBAN: SA..., STC Pay: 05...' : 'مثال: آيبان الراجحي: SA... أو رقم STC Pay'}
-                className="w-full px-3 py-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-medium text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
               />
-            </div>
+            </FormField>
 
             {/* Members Customizer List */}
             <div className="space-y-2 pt-1 border-t border-slate-100 dark:border-slate-800">
@@ -557,13 +544,14 @@ export const CreateJamiyyaModal: React.FC<CreateJamiyyaModalProps> = ({
 
             {/* Submit Button */}
             <div className="pt-2">
-              <button
+              <FormButton
                 type="submit"
-                className="w-full py-3 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-md shadow-emerald-600/25 flex items-center justify-center gap-2 transition-all"
+                variant="primary"
+                startIcon={<Plus size={16} strokeWidth={2.5} />}
+                className="w-full text-xs font-bold"
               >
-                <Plus size={16} strokeWidth={2.5} />
-                <span>{isEn ? 'Create Jam\'iyya Group' : 'بدء الجمعية واعتماد الأدوار'}</span>
-              </button>
+                {isEn ? 'Create Jam\'iyya Group' : 'بدء الجمعية واعتماد الأدوار'}
+              </FormButton>
             </div>
           </form>
         </motion.div>

@@ -1,13 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { X, Check, Trash2, Calendar, CreditCard, Bell, Sparkles } from 'lucide-react';
+import { Trash2, CreditCard, Bell } from 'lucide-react';
 import { DetectedSubscription, SubscriptionFrequency, CurrencyCode } from '../types';
 import { CURRENCY_SYMBOLS } from '../utils/storage';
 import { nativeHaptics } from '../utils/nativeHaptics';
-import { springs, fades } from '../utils/motion';
 import { useTranslation } from '../utils/i18n';
 import { getFrequencyLabel } from '../utils/subscriptionReminders';
 import { formatDateToYmd, calculateNextRenewalDate } from '../utils/subscriptionDetector';
+import {
+  FormModalWrapper,
+  FormField,
+  TextInput,
+  AmountInput,
+  FormButton,
+  FormFooter,
+} from './ui/FormComponents';
 
 interface SubscriptionEditModalProps {
   isOpen: boolean;
@@ -78,7 +84,6 @@ export const SubscriptionEditModal: React.FC<SubscriptionEditModalProps> = ({
   const handleFrequencyChange = (newFreq: SubscriptionFrequency) => {
     nativeHaptics.tap(soundEnabled);
     setFrequency(newFreq);
-    // Auto-update next renewal date if not manually customized
     const baseDate = subscription?.lastChargeDate || formatDateToYmd(new Date());
     setNextRenewalDate(calculateNextRenewalDate(baseDate, newFreq));
   };
@@ -98,13 +103,10 @@ export const SubscriptionEditModal: React.FC<SubscriptionEditModalProps> = ({
       detectedFrequency: frequency,
       lastChargeDate: subscription?.lastChargeDate || today,
       nextExpectedRenewalDate: nextRenewalDate || calculateNextRenewalDate(today, frequency),
-      status: 'confirmed',
-      detectedAt: subscription?.detectedAt || Date.now(),
-      chargeCount: subscription?.chargeCount || 1,
-      priceHistory: subscription?.priceHistory || [{ date: today, amount: parsedAmount }],
       reminderDaysBefore: leadDays,
+      status: 'confirmed',
       notes: notes.trim() || undefined,
-      categoryId: subscription?.categoryId,
+      isUserEdited: true,
     };
 
     nativeHaptics.success(soundEnabled);
@@ -113,184 +115,146 @@ export const SubscriptionEditModal: React.FC<SubscriptionEditModalProps> = ({
   };
 
   return (
-    <AnimatePresence>
-      <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
-        <motion.div
-          initial={{ y: '100%' }}
-          animate={{ y: 0 }}
-          exit={{ y: '100%' }}
-          transition={springs.smooth}
-          className="w-full max-w-lg bg-surface dark:bg-dark-surface rounded-t-3xl sm:rounded-3xl border border-border dark:border-dark-border shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
-        >
-          {/* Header */}
-          <div className="px-6 pt-5 pb-4 border-b border-border/50 dark:border-dark-border flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
-              <div className="w-8 h-8 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold">
-                <CreditCard size={18} />
-              </div>
-              <h3 className="font-bold text-base text-text-primary dark:text-dark-text-primary">
-                {subscription ? t.editSubscriptionModalTitle : t.newSubscriptionModalTitle}
-              </h3>
-            </div>
-            <button
-              type="button"
-              onClick={onClose}
-              className="w-8 h-8 rounded-full bg-surface-raised dark:bg-dark-surface-raised flex items-center justify-center text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
-            >
-              <X size={15} />
-            </button>
+    <FormModalWrapper
+      isOpen={isOpen}
+      onClose={onClose}
+      title={subscription ? t.editSubscriptionModalTitle : t.newSubscriptionModalTitle}
+      icon={<CreditCard size={18} />}
+      soundEnabled={soundEnabled}
+      isEnglish={isEn}
+    >
+      <form onSubmit={handleFormSubmit} className="space-y-4">
+        {/* Merchant Name */}
+        <FormField label={t.merchantNameLabel} required>
+          <TextInput
+            type="text"
+            required
+            value={merchant}
+            onChange={(e) => setMerchant(e.target.value)}
+            placeholder={t.merchantNamePlaceholder}
+          />
+        </FormField>
+
+        {/* Typical Amount */}
+        <FormField label={t.typicalAmountLabel} required>
+          <AmountInput
+            required
+            value={amountStr}
+            onChange={(e) => setAmountStr(e.target.value)}
+            placeholder="0.00"
+            currencySymbol={currencySymbol}
+          />
+        </FormField>
+
+        {/* Frequency Selector */}
+        <FormField label={t.frequencyLabel}>
+          <div className="grid grid-cols-3 sm:grid-cols-5 gap-2">
+            {FREQUENCIES.map((freq) => (
+              <button
+                key={freq}
+                type="button"
+                onClick={() => handleFrequencyChange(freq)}
+                className={`min-h-[44px] py-2 px-2 text-xs font-bold rounded-2xl border transition-all cursor-pointer ${
+                  frequency === freq
+                    ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
+                    : 'border-transparent bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {getFrequencyLabel(freq, language)}
+              </button>
+            ))}
           </div>
+        </FormField>
 
-          {/* Form Body */}
-          <form onSubmit={handleFormSubmit} className="p-6 overflow-y-auto space-y-4 text-sm flex-1">
-            {/* Merchant Name */}
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary dark:text-dark-text-secondary mb-1">
-                {t.merchantNameLabel}
-              </label>
-              <input
-                type="text"
-                required
-                value={merchant}
-                onChange={(e) => setMerchant(e.target.value)}
-                placeholder={t.merchantNamePlaceholder}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary font-medium focus:outline-hidden focus:ring-2 focus:ring-primary/40 text-sm"
-              />
-            </div>
+        {/* Next Renewal Date */}
+        <FormField label={t.nextRenewalDateLabel} required>
+          <TextInput
+            type="date"
+            required
+            value={nextRenewalDate}
+            onChange={(e) => setNextRenewalDate(e.target.value)}
+          />
+        </FormField>
 
-            {/* Typical Amount */}
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary dark:text-dark-text-secondary mb-1">
-                {t.typicalAmountLabel} ({currencySymbol})
-              </label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                value={amountStr}
-                onChange={(e) => setAmountStr(e.target.value)}
-                placeholder="0.00"
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary font-medium focus:outline-hidden focus:ring-2 focus:ring-primary/40 text-sm tabular-nums"
-              />
-            </div>
+        {/* Reminder Lead Days */}
+        <FormField
+          label={t.renewalLeadDaysLabel}
+          badge={<Bell size={13} className="text-amber-500" />}
+        >
+          <div className="grid grid-cols-4 gap-2">
+            {[1, 2, 3, 7].map((days) => (
+              <button
+                key={days}
+                type="button"
+                onClick={() => {
+                  nativeHaptics.tap(soundEnabled);
+                  setLeadDays(days);
+                }}
+                className={`min-h-[44px] py-2 px-2 text-xs font-bold rounded-2xl border transition-all cursor-pointer ${
+                  leadDays === days
+                    ? 'border-emerald-600 bg-emerald-600 text-white shadow-xs'
+                    : 'border-transparent bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-200 hover:bg-slate-200 dark:hover:bg-slate-700'
+                }`}
+              >
+                {days} {isEn ? 'days' : 'أيام'}
+              </button>
+            ))}
+          </div>
+        </FormField>
 
-            {/* Frequency Selector */}
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary dark:text-dark-text-secondary mb-1.5">
-                {t.frequencyLabel}
-              </label>
-              <div className="grid grid-cols-3 sm:grid-cols-5 gap-1.5">
-                {FREQUENCIES.map((freq) => (
-                  <button
-                    key={freq}
-                    type="button"
-                    onClick={() => handleFrequencyChange(freq)}
-                    className={`py-2 px-2 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                      frequency === freq
-                        ? 'border-primary bg-primary text-white shadow-xs'
-                        : 'border-border dark:border-dark-border bg-surface-raised dark:bg-dark-surface-raised text-text-secondary dark:text-dark-text-secondary hover:text-text-primary'
-                    }`}
-                  >
-                    {getFrequencyLabel(freq, language)}
-                  </button>
-                ))}
-              </div>
-            </div>
+        {/* Notes */}
+        <FormField label={isEn ? 'Notes (Optional)' : 'ملاحظات إضافية (اختياري)'}>
+          <TextInput
+            type="text"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            placeholder={
+              isEn
+                ? 'e.g. Shared with family, cancel before trial ends'
+                : 'مثال: مشترك مع العائلة، تجربة مجانية تنتهي قريباً...'
+            }
+          />
+        </FormField>
 
-            {/* Next Renewal Date */}
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary dark:text-dark-text-secondary mb-1">
-                {t.nextRenewalDateLabel}
-              </label>
-              <input
-                type="date"
-                required
-                value={nextRenewalDate}
-                onChange={(e) => setNextRenewalDate(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary font-medium focus:outline-hidden focus:ring-2 focus:ring-primary/40 text-sm"
-              />
-            </div>
+        {/* Actions Footer */}
+        <FormFooter className="justify-between">
+          {subscription && onDelete ? (
+            <FormButton
+              type="button"
+              variant="destructive"
+              onClick={() => {
+                nativeHaptics.warning(soundEnabled);
+                onDelete(subscription.id);
+                onClose();
+              }}
+              startIcon={<Trash2 size={16} />}
+              className="w-full sm:w-auto"
+            >
+              {t.deleteSubscriptionBtn}
+            </FormButton>
+          ) : (
+            <div className="hidden sm:block" />
+          )}
 
-            {/* Reminder Lead Days */}
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary dark:text-dark-text-secondary mb-1.5 flex items-center gap-1.5">
-                <Bell size={13} className="text-amber-500" />
-                <span>{t.renewalLeadDaysLabel}</span>
-              </label>
-              <div className="flex items-center gap-2">
-                {[1, 3, 5, 7].map((days) => (
-                  <button
-                    key={days}
-                    type="button"
-                    onClick={() => {
-                      nativeHaptics.tap(soundEnabled);
-                      setLeadDays(days);
-                    }}
-                    className={`flex-1 py-1.5 text-xs font-bold rounded-xl border transition-all cursor-pointer ${
-                      leadDays === days
-                        ? 'border-amber-500 bg-amber-500/15 text-amber-700 dark:text-amber-300'
-                        : 'border-border dark:border-dark-border bg-surface-raised dark:bg-dark-surface-raised text-text-secondary dark:text-dark-text-secondary'
-                    }`}
-                  >
-                    {days} {t.daysBeforeLabel}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label className="block text-xs font-semibold text-text-secondary dark:text-dark-text-secondary mb-1">
-                {isEn ? 'Notes (Optional)' : 'ملاحظات إضافية (اختياري)'}
-              </label>
-              <input
-                type="text"
-                value={notes}
-                onChange={(e) => setNotes(e.target.value)}
-                placeholder={isEn ? 'e.g. Shared with family, cancel before trial ends' : 'مثال: مشترك مع العائلة، تجربة مجانية تنتهي قريباً...'}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-border dark:border-dark-border bg-surface dark:bg-dark-surface text-text-primary dark:text-dark-text-primary font-medium focus:outline-hidden focus:ring-2 focus:ring-primary/40 text-sm"
-              />
-            </div>
-
-            {/* Actions Footer */}
-            <div className="pt-3 border-t border-border/50 dark:border-dark-border flex items-center justify-between gap-2">
-              {subscription && onDelete ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    nativeHaptics.warning(soundEnabled);
-                    onDelete(subscription.id);
-                    onClose();
-                  }}
-                  className="px-3 py-2 text-xs font-bold text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-colors cursor-pointer flex items-center gap-1"
-                >
-                  <Trash2 size={14} />
-                  <span>{t.deleteSubscriptionBtn}</span>
-                </button>
-              ) : (
-                <div />
-              )}
-
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="px-4 py-2 rounded-xl text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
-                >
-                  {t.cancel}
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 rounded-xl bg-primary hover:bg-primary-hover text-white text-xs font-bold shadow-md shadow-primary/20 flex items-center gap-1.5 cursor-pointer active:scale-95 transition-all"
-                >
-                  <Check size={14} />
-                  <span>{t.save}</span>
-                </button>
-              </div>
-            </div>
-          </form>
-        </motion.div>
-      </div>
-    </AnimatePresence>
+          <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            <FormButton
+              type="button"
+              variant="secondary"
+              onClick={onClose}
+              className="flex-1 sm:flex-initial"
+            >
+              {t.cancel}
+            </FormButton>
+            <FormButton
+              type="submit"
+              variant="primary"
+              className="flex-1 sm:flex-initial"
+            >
+              {t.save}
+            </FormButton>
+          </div>
+        </FormFooter>
+      </form>
+    </FormModalWrapper>
   );
 };

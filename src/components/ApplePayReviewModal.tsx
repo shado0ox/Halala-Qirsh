@@ -9,6 +9,7 @@ import { nativeHaptics } from '../utils/nativeHaptics';
 import { springs, fades } from '../utils/motion';
 import { useTranslation } from '../utils/i18n';
 import { ApplePayTransactionPayload } from '../utils/deepLink';
+import { FormButton } from './ui/FormComponents';
 
 interface ApplePayReviewModalProps {
   isOpen: boolean;
@@ -122,7 +123,7 @@ export const ApplePayReviewModal: React.FC<ApplePayReviewModalProps> = ({
             animate={{ y: 0 }}
             exit={{ y: '100%' }}
             transition={springs.smooth}
-            className="w-full max-w-md bg-surface dark:bg-dark-surface rounded-t-3xl sm:rounded-3xl border border-border dark:border-dark-border shadow-2xl overflow-hidden"
+            className="w-full max-w-md max-h-[88dvh] sm:max-h-[85dvh] bg-surface dark:bg-dark-surface rounded-t-3xl sm:rounded-3xl border border-border dark:border-dark-border shadow-2xl flex flex-col overflow-hidden box-border"
           >
             {/* Header */}
             <div className="px-6 pt-6 pb-4 border-b border-border/50 dark:border-dark-border flex items-center justify-between bg-gradient-to-b from-primary/10 to-transparent">
@@ -149,7 +150,10 @@ export const ApplePayReviewModal: React.FC<ApplePayReviewModalProps> = ({
             </div>
 
             {/* Body */}
-            <div className="p-6 space-y-4">
+            <div
+              style={{ paddingBottom: 'calc(var(--sab) + 20px)' }}
+              className="p-5 sm:p-6 space-y-4 overflow-y-auto flex-1 no-scrollbar box-border"
+            >
               {/* Amount Display */}
               <div className="text-center py-4 bg-surface-raised dark:bg-dark-surface-raised rounded-2xl border border-border/50 dark:border-dark-border">
                 <span className="text-xs uppercase tracking-wider text-text-secondary dark:text-dark-text-secondary font-medium">
@@ -182,7 +186,7 @@ export const ApplePayReviewModal: React.FC<ApplePayReviewModalProps> = ({
                   )}
                 </div>
 
-                <div className="grid grid-cols-3 gap-2 max-h-36 overflow-y-auto p-1">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-36 overflow-y-auto p-1">
                   {categories.map((cat) => {
                     const isSelected = cat.id === selectedCategoryId;
                     return (
@@ -193,7 +197,7 @@ export const ApplePayReviewModal: React.FC<ApplePayReviewModalProps> = ({
                           nativeHaptics.tap(soundEnabled);
                           setSelectedCategoryId(cat.id);
                         }}
-                        className={`p-2.5 rounded-xl border text-xs font-medium flex items-center gap-2 transition-all ${
+                        className={`min-h-[44px] p-2.5 rounded-xl border text-xs font-medium flex items-center gap-2 transition-all cursor-pointer ${
                           isSelected
                             ? 'border-primary bg-primary/10 text-primary font-bold shadow-sm'
                             : 'border-border/60 dark:border-dark-border bg-surface-raised dark:bg-dark-surface-raised text-text-primary dark:text-dark-text-primary hover:border-primary/50'
@@ -217,32 +221,35 @@ export const ApplePayReviewModal: React.FC<ApplePayReviewModalProps> = ({
             </div>
 
             {/* Actions */}
-            <div className="p-4 border-t border-border/50 dark:border-dark-border bg-surface-raised/40 dark:bg-dark-surface-raised/40 flex flex-col gap-2">
-              <button
+            <div className="p-4 border-t border-border/50 dark:border-dark-border bg-surface-raised/40 dark:bg-dark-surface-raised/40 flex flex-col gap-2 shrink-0">
+              <FormButton
                 type="button"
+                variant="primary"
                 onClick={handleConfirmSave}
-                className="w-full py-3 px-4 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-2xl shadow-lg shadow-emerald-600/20 active:scale-[0.98] transition-all flex items-center justify-center gap-2 text-sm"
+                startIcon={<Check className="w-4 h-4" />}
+                className="w-full text-sm font-semibold"
               >
-                <Check className="w-4 h-4" />
                 {t.applePayConfirmSaveBtn}
-              </button>
+              </FormButton>
 
               <div className="flex gap-2">
-                <button
+                <FormButton
                   type="button"
+                  variant="secondary"
                   onClick={handleFullEdit}
-                  className="flex-1 py-2.5 px-3 border border-border dark:border-dark-border text-text-primary dark:text-dark-text-primary font-medium rounded-xl hover:bg-surface-raised dark:hover:bg-dark-surface-raised text-xs flex items-center justify-center gap-1.5 transition-colors"
+                  startIcon={<Edit3 className="w-3.5 h-3.5" />}
+                  className="flex-1 text-xs"
                 >
-                  <Edit3 className="w-3.5 h-3.5" />
                   {t.applePayEditDetailsBtn}
-                </button>
-                <button
+                </FormButton>
+                <FormButton
                   type="button"
+                  variant="ghost"
                   onClick={onClose}
-                  className="py-2.5 px-4 text-text-secondary dark:text-dark-text-secondary hover:text-text-primary text-xs font-medium transition-colors"
+                  className="text-xs"
                 >
                   {t.cancel}
-                </button>
+                </FormButton>
               </div>
             </div>
           </motion.div>

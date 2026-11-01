@@ -562,4 +562,41 @@ describe('Quick Expense Import Integration Tests', () => {
     expect(imported.source).toBe('apple_pay');
     expect(imported.isAutoLogged).toBe(true);
   });
+
+  it('records an Apple Pay amount of 3.45 exactly without rounding to 3.50 or 3.5', async () => {
+    const d = getDefaultAppData();
+    d.settings = {
+      ...d.settings,
+      language: 'ar',
+      hasCompletedOnboarding: true,
+      isPasscodeEnabled: false,
+      animations: 'off',
+    } as any;
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    launchUrlToReturn = {
+      url: 'halalaqirsh://applepay?amount=3.45&autolog=1&merchant=CoffeeCorner',
+    };
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText(/Pay: تم قيد 3.45 تلقائياً/)).toBeInTheDocument();
+    });
+
+    const savedDataJson = nativeStore.get(STORAGE_KEY);
+    expect(savedDataJson).toBeTruthy();
+    const savedData = JSON.parse(savedDataJson!);
+    const imported = savedData.expenses.find((e: any) => e.title === 'CoffeeCorner');
+    expect(imported).toBeDefined();
+    expect(imported.amount).toBe(3.45);
+    expect(imported.amount).not.toBe(3.5);
+    expect(imported.amount).not.toBe(3.50);
+  });
 });
+

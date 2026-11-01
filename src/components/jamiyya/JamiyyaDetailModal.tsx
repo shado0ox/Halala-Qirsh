@@ -42,6 +42,13 @@ import { handleModalBackdropClick, dismissKeyboard } from '../../utils/keyboard'
 import { Amount } from '../Amount';
 import { Share } from '@capacitor/share';
 import { Clipboard } from '@capacitor/clipboard';
+import {
+  FormField,
+  TextInput,
+  SelectDropdown,
+  FormButton,
+  FormFooter,
+} from '../ui/FormComponents';
 
 interface JamiyyaDetailModalProps {
   isOpen: boolean;
@@ -280,7 +287,7 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
               dismissKeyboard();
             }
           }}
-          className="relative w-full max-w-lg h-[92vh] max-h-[850px] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 flex flex-col overflow-hidden"
+          className="relative w-full max-w-lg max-h-[88dvh] sm:max-h-[85dvh] bg-white dark:bg-[#1C1C1E] rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 z-10 flex flex-col overflow-hidden box-border"
         >
           {/* Top Bar */}
           <div className="p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between shrink-0">
@@ -832,54 +839,50 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
               </h4>
 
               <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#8E8E93] mb-1">
-                    {isEn ? 'First Member' : 'العضو الأول'}
-                  </label>
-                  <select
+                <FormField label={isEn ? 'First Member' : 'العضو الأول'}>
+                  <SelectDropdown
                     value={swapSourceMemberId}
                     onChange={(e) => setSwapSourceMemberId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden"
                   >
                     {group.members.map((m) => (
                       <option key={`m1-${m.id}`} value={m.id}>
                         {m.name} (دور رقم {m.payoutTurn})
                       </option>
                     ))}
-                  </select>
-                </div>
+                  </SelectDropdown>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#8E8E93] mb-1">
-                    {isEn ? 'Second Member to Swap With' : 'العضو المراد التبديل معه'}
-                  </label>
-                  <select
+                <FormField label={isEn ? 'Second Member to Swap With' : 'العضو المراد التبديل معه'}>
+                  <SelectDropdown
                     value={swapTargetMemberId}
                     onChange={(e) => setSwapTargetMemberId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden"
                   >
                     {group.members.map((m) => (
                       <option key={`m2-${m.id}`} value={m.id}>
                         {m.name} (دور رقم {m.payoutTurn})
                       </option>
                     ))}
-                  </select>
-                </div>
+                  </SelectDropdown>
+                </FormField>
 
-                <div className="flex items-center gap-2 pt-2">
-                  <button
+                <FormFooter className="pt-2">
+                  <FormButton
+                    type="button"
+                    variant="secondary"
                     onClick={() => setSwapModalOpen(false)}
-                    className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                    className="flex-1 text-xs"
                   >
                     {isEn ? 'Cancel' : 'إلغاء'}
-                  </button>
-                  <button
+                  </FormButton>
+                  <FormButton
+                    type="button"
+                    variant="primary"
                     onClick={handleConfirmSwap}
-                    className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer hover:bg-emerald-700"
+                    className="flex-1 text-xs"
                   >
                     {isEn ? 'Confirm Swap' : 'تأكيد التبديل'}
-                  </button>
-                </div>
+                  </FormButton>
+                </FormFooter>
               </div>
             </div>
           </div>
@@ -888,54 +891,50 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
         {/* Replace Member Modal */}
         {replaceModalOpen && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setReplaceModalOpen(false)} />
-            <div className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4">
+            <div className="absolute inset-0 bg-black/60 cursor-pointer" onClick={() => setReplaceModalOpen(false)} />
+            <div className="relative w-full max-w-sm max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4 box-border">
               <h4 className="text-sm font-black text-[#1C1C1E] dark:text-white">
                 {isEn ? 'Replace Member' : 'استبدال عضو في الجمعية'}
               </h4>
 
               <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#8E8E93] mb-1">
-                    {isEn ? 'New Member Name' : 'اسم العضو الجديد البديل'}
-                  </label>
-                  <input
+                <FormField label={isEn ? 'New Member Name' : 'اسم العضو الجديد البديل'} required>
+                  <TextInput
                     type="text"
                     required
                     value={newMemberName}
                     onChange={(e) => setNewMemberName(e.target.value)}
                     placeholder={isEn ? 'Full Name' : 'الاسم الكامل'}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#8E8E93] mb-1">
-                    {isEn ? 'Phone (Optional)' : 'رقم الجوال (اختياري للتذكيرات)'}
-                  </label>
-                  <input
+                <FormField label={isEn ? 'Phone (Optional)' : 'رقم الجوال (اختياري للتذكيرات)'}>
+                  <TextInput
                     type="tel"
                     value={newMemberPhone}
                     onChange={(e) => setNewMemberPhone(e.target.value)}
                     placeholder="05..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                   />
-                </div>
+                </FormField>
 
-                <div className="flex items-center gap-2 pt-2">
-                  <button
+                <FormFooter className="pt-2">
+                  <FormButton
+                    type="button"
+                    variant="secondary"
                     onClick={() => setReplaceModalOpen(false)}
-                    className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                    className="flex-1 text-xs"
                   >
                     {isEn ? 'Cancel' : 'إلغاء'}
-                  </button>
-                  <button
+                  </FormButton>
+                  <FormButton
+                    type="button"
+                    variant="primary"
                     onClick={handleConfirmReplace}
-                    className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer hover:bg-emerald-700"
+                    className="flex-1 text-xs"
                   >
                     {isEn ? 'Confirm' : 'اعتماد البديل'}
-                  </button>
-                </div>
+                  </FormButton>
+                </FormFooter>
               </div>
             </div>
           </div>
@@ -944,46 +943,38 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
         {/* Edit Member Modal */}
         {editMemberModalOpen && (
           <div className="fixed inset-0 z-60 flex items-center justify-center p-4">
-            <div className="absolute inset-0 bg-black/60" onClick={() => setEditMemberModalOpen(false)} />
-            <div className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4">
+            <div className="absolute inset-0 bg-black/60 cursor-pointer" onClick={() => setEditMemberModalOpen(false)} />
+            <div className="relative w-full max-w-sm max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4 box-border">
               <h4 className="text-sm font-black text-[#1C1C1E] dark:text-white">
                 {isEn ? 'Edit Member Details' : 'تعديل بيانات العضو'}
               </h4>
 
               <div className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#8E8E93] mb-1">
-                    {isEn ? 'Member Name' : 'اسم العضو'}
-                  </label>
-                  <input
+                <FormField label={isEn ? 'Member Name' : 'اسم العضو'} required>
+                  <TextInput
                     type="text"
                     required
                     value={editingMemberName}
                     onChange={(e) => setEditingMemberName(e.target.value)}
                     placeholder={isEn ? 'Full Name' : 'الاسم الكامل'}
-                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#8E8E93] mb-1">
-                    {isEn ? 'Phone (Optional)' : 'رقم الجوال (اختياري للتذكيرات)'}
-                  </label>
-                  <input
+                <FormField label={isEn ? 'Phone (Optional)' : 'رقم الجوال (اختياري للتذكيرات)'}>
+                  <TextInput
                     type="tel"
                     value={editingMemberPhone}
                     onChange={(e) => setEditingMemberPhone(e.target.value)}
                     placeholder="05..."
-                    className="w-full px-3 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                   />
-                </div>
+                </FormField>
 
                 {/* Role Toggles */}
                 <div className="flex items-center gap-2 pt-1">
                   <button
                     type="button"
                     onClick={() => setEditingMemberIsCurrent(!editingMemberIsCurrent)}
-                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                    className={`min-h-[40px] flex-1 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition-all ${
                       editingMemberIsCurrent
                         ? 'bg-emerald-600 text-white shadow-xs'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
@@ -995,7 +986,7 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
                   <button
                     type="button"
                     onClick={() => setEditingMemberIsOrganizer(!editingMemberIsOrganizer)}
-                    className={`flex-1 py-1.5 rounded-xl text-xs font-bold cursor-pointer transition-all ${
+                    className={`min-h-[40px] flex-1 py-2 px-3 rounded-xl text-xs font-bold cursor-pointer transition-all ${
                       editingMemberIsOrganizer
                         ? 'bg-amber-500 text-white shadow-xs'
                         : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
@@ -1005,20 +996,24 @@ export const JamiyyaDetailModal: React.FC<JamiyyaDetailModalProps> = ({
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2 pt-2">
-                  <button
+                <FormFooter className="pt-2">
+                  <FormButton
+                    type="button"
+                    variant="secondary"
                     onClick={() => setEditMemberModalOpen(false)}
-                    className="flex-1 py-2 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs font-bold text-slate-700 dark:text-slate-300 cursor-pointer"
+                    className="flex-1 text-xs"
                   >
                     {isEn ? 'Cancel' : 'إلغاء'}
-                  </button>
-                  <button
+                  </FormButton>
+                  <FormButton
+                    type="button"
+                    variant="primary"
                     onClick={handleSaveMemberEdit}
-                    className="flex-1 py-2 rounded-xl bg-emerald-600 text-white text-xs font-bold cursor-pointer hover:bg-emerald-700"
+                    className="flex-1 text-xs"
                   >
                     {isEn ? 'Save' : 'حفظ التعديل'}
-                  </button>
-                </div>
+                  </FormButton>
+                </FormFooter>
               </div>
             </div>
           </div>

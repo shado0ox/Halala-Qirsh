@@ -40,7 +40,11 @@ export const AnimatedCounter: React.FC<AnimatedCounterProps> = ({
       const progress = Math.min((timestamp - startTimeRef.current) / durationMs, 1);
       // Ease out cubic: 1 - pow(1 - progress, 3)
       const ease = 1 - Math.pow(1 - progress, 3);
-      const current = Math.round(startValRef.current + (targetValRef.current - startValRef.current) * ease);
+      const hasFractions = targetValRef.current % 1 !== 0 || startValRef.current % 1 !== 0;
+      const rawCurrent = startValRef.current + (targetValRef.current - startValRef.current) * ease;
+      const current = hasFractions
+        ? Math.round((rawCurrent + Number.EPSILON) * 100) / 100
+        : Math.round(rawCurrent);
 
       setDisplayValue(current);
 

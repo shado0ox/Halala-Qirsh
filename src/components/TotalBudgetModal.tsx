@@ -20,6 +20,7 @@ import { nativeHaptics } from '../utils/nativeHaptics';
 import { springs, fades } from '../utils/motion';
 import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../utils/keyboard';
 import { KeyboardDismissButton } from './KeyboardDismissButton';
+import { FormButton, FormFooter } from './ui/FormComponents';
 
 interface TotalBudgetModalProps {
   isOpen: boolean;
@@ -169,7 +170,7 @@ export const TotalBudgetModal: React.FC<TotalBudgetModalProps> = ({
               dismissKeyboard();
             }
           }}
-          className="relative w-full max-w-lg max-h-[92vh] bg-white dark:bg-[#1C1C1E] rounded-t-[32px] sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden z-10 border-t sm:border border-slate-200/50 dark:border-slate-800"
+          className="relative w-full max-w-lg max-h-[88dvh] sm:max-h-[85dvh] bg-white dark:bg-[#1C1C1E] rounded-t-[32px] sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden z-10 border-t sm:border border-slate-200/50 dark:border-slate-800 box-border"
         >
           {/* Header Grabber (mobile sheet) */}
           <div className="w-full flex sm:hidden justify-center pt-3 pb-1 cursor-grab">
@@ -212,14 +213,17 @@ export const TotalBudgetModal: React.FC<TotalBudgetModalProps> = ({
           </div>
 
           {/* Body */}
-          <div className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar pb-[max(env(safe-area-inset-bottom),24px)]">
+          <div
+            style={{ paddingBottom: 'calc(var(--sab) + 24px)' }}
+            className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 no-scrollbar box-border"
+          >
             {/* Amount Input Card */}
             <div className="bg-[#F2F2F7] dark:bg-[#2C2C2E] p-4 rounded-3xl flex flex-col items-center justify-center text-center relative">
               <span className="text-xs text-[#8E8E93] font-semibold mb-1">
                 {isEn ? 'Total Monthly Budget Target' : 'المبلغ الإجمالي للميزانية الشهرية'}
               </span>
 
-              <div className="flex items-center justify-center gap-2 relative">
+              <div className="flex items-center justify-center gap-2 relative w-full max-w-xs">
                 <input
                   type="number"
                   step="any"
@@ -228,9 +232,9 @@ export const TotalBudgetModal: React.FC<TotalBudgetModalProps> = ({
                   value={amountStr}
                   onChange={(e) => setAmountStr(e.target.value)}
                   placeholder="0"
-                  className="text-3xl font-black text-[#1C1C1E] dark:text-white bg-transparent text-center outline-hidden border-b-2 border-emerald-500/40 focus:border-emerald-500 transition-colors py-1 tabular-nums max-w-[220px]"
+                  className="text-3xl font-black text-[#1C1C1E] dark:text-white bg-transparent text-center outline-hidden border-b-2 border-emerald-500/40 focus:border-emerald-500 transition-colors py-1 tabular-nums w-full max-w-[200px]"
                 />
-                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 shrink-0">
                   {currencySymbol}
                 </span>
               </div>
@@ -416,28 +420,30 @@ export const TotalBudgetModal: React.FC<TotalBudgetModalProps> = ({
             )}
 
             {/* Action Buttons */}
-            <div className="pt-2 flex items-center gap-3">
-              <button
+            <FormFooter className="pt-2">
+              <FormButton
                 type="button"
+                variant="secondary"
                 onClick={() => {
                   nativeHaptics.tap(soundEnabled);
                   onClose();
                 }}
-                className="flex-1 py-3 rounded-2xl bg-[#E5E5EA] dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-300 font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer"
+                className="w-full sm:flex-1"
               >
                 {isEn ? 'Cancel' : 'إلغاء'}
-              </button>
+              </FormButton>
 
-              <button
+              <FormButton
                 type="button"
+                variant="primary"
                 disabled={parsedTotal <= 0}
                 onClick={handleSave}
-                className="flex-[2] py-3 rounded-2xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs shadow-lg shadow-emerald-600/25 disabled:opacity-50 disabled:pointer-events-none transition-all cursor-pointer flex items-center justify-center gap-2"
+                startIcon={<Check size={16} />}
+                className="w-full sm:flex-[2]"
               >
-                <Check size={16} />
-                <span>{isEn ? 'Apply & Save Budget' : 'حفظ وتطبيق الميزانية'}</span>
-              </button>
-            </div>
+                {isEn ? 'Apply & Save Budget' : 'حفظ وتطبيق الميزانية'}
+              </FormButton>
+            </FormFooter>
           </div>
         </motion.div>
       </div>

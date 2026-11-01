@@ -19,7 +19,7 @@ import { Category, Expense, BudgetSettings, PaymentMethod } from '../../types';
 import { CategoryIcon } from '../CategoryIcon';
 import { ExpenseListItem } from '../ExpenseListItem';
 import { Amount } from '../Amount';
-import { formatMoney } from '../../utils/storage';
+import { formatMoney, sumMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
 import { useCoinFlight } from '../../context/CoinFlightContext';
@@ -115,7 +115,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
   }, [expenses, searchQuery, selectedCategoryId, selectedPayer, timeFilter, settings.selectedMonth, catMap]);
 
   const totalFilteredAmount = useMemo(
-    () => filteredExpenses.reduce((sum, e) => sum + e.amount, 0),
+    () => sumMoney(filteredExpenses.map((e) => e.amount)),
     [filteredExpenses]
   );
 
@@ -316,7 +316,7 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
             <div className="sticky top-0 z-20 bg-[#F4FAF7] dark:bg-black py-1 px-1 flex items-center justify-between text-xs font-extrabold text-[#5C8271] dark:text-[#8E8E93]">
               <span>{group.displayDate}</span>
               <Amount
-                value={group.items.reduce((s, i) => s + i.amount, 0)}
+                value={sumMoney(group.items.map((i) => i.amount))}
                 currency={settings.currency}
                 lang={lang}
                 hideAmounts={isHidden}

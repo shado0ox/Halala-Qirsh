@@ -38,6 +38,15 @@ import { NotificationPermissionState } from '../../utils/notifications';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
 import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../../utils/keyboard';
 import { KeyboardDismissButton } from '../KeyboardDismissButton';
+import {
+  FormField,
+  TextInput,
+  AmountInput,
+  SelectDropdown,
+  ToggleSwitch,
+  FormButton,
+  FormFooter,
+} from '../ui/FormComponents';
 import { SubscriptionCard } from '../SubscriptionCard';
 import { SubscriptionEditModal } from '../SubscriptionEditModal';
 import {
@@ -1092,7 +1101,7 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
                   dismissKeyboard();
                 }
               }}
-              className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4"
+              className="relative w-full max-w-sm max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4 box-border no-scrollbar"
             >
               <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
                 <h3 className="text-sm font-black text-[#1C1C1E] dark:text-white">
@@ -1107,95 +1116,74 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowAddBillModal(false)}
-                    className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer"
+                    className="w-8 h-8 rounded-full bg-[#E5E5EA]/70 dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer transition-colors"
                   >
                     <X size={15} />
                   </button>
                 </div>
               </div>
 
-              <form onSubmit={handleSaveBill} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                    {isEn ? 'Bill Title' : 'اسم أو بيان الفاتورة'}
-                  </label>
-                  <input
+              <form onSubmit={handleSaveBill} className="space-y-3.5">
+                <FormField label={isEn ? 'Bill Title' : 'اسم أو بيان الفاتورة'} required>
+                  <TextInput
                     type="text"
                     required
                     value={billTitle}
                     onChange={(e) => setBillTitle(e.target.value)}
                     placeholder={isEn ? 'e.g. Electricity, Rent, Fiber' : 'مثال: فاتورة الكهرباء، إيجار البيت، إنترنت ألياف'}
-                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-semibold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                   />
-                </div>
+                </FormField>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      {isEn ? 'Amount' : 'المبلغ التقديري'}
-                    </label>
-                    <input
-                      type="number"
-                      step="any"
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <FormField label={isEn ? 'Amount' : 'المبلغ التقديري'} required>
+                    <AmountInput
+                      currencySymbol={CURRENCY_SYMBOLS[settings.currency]?.symbol || 'ر.س'}
                       required
                       value={billAmount}
                       onChange={(e) => setBillAmount(e.target.value)}
                       placeholder="0.00"
-                      className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      {isEn ? 'Due Day (1-31)' : 'يوم الاستحقاق'}
-                    </label>
-                    <input
+                  <FormField label={isEn ? 'Due Day (1-31)' : 'يوم الاستحقاق'} required>
+                    <TextInput
                       type="number"
                       min={1}
                       max={31}
                       required
                       value={billDueDay}
                       onChange={(e) => setBillDueDay(parseInt(e.target.value, 10) || 1)}
-                      className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
                     />
-                  </div>
+                  </FormField>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                    {isEn ? 'Category' : 'التصنيف التابع له'}
-                  </label>
-                  <select
+                <FormField label={isEn ? 'Category' : 'التصنيف التابع له'}>
+                  <SelectDropdown
                     value={billCategoryId}
                     onChange={(e) => setBillCategoryId(e.target.value)}
-                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden cursor-pointer"
                   >
                     {categories.map((c) => (
                       <option key={c.id} value={c.id}>
                         {isEn ? (c.nameEn || c.name) : c.name}
                       </option>
                     ))}
-                  </select>
-                </div>
+                  </SelectDropdown>
+                </FormField>
 
-                <div className="flex items-center justify-between p-2.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs">
-                  <span className="font-semibold text-slate-800 dark:text-slate-200">
-                    {isEn ? 'Send Notification Reminder' : 'إرسال تنبيه قبل الموعد'}
-                  </span>
-                  <input
-                    type="checkbox"
-                    checked={billReminderEnabled}
-                    onChange={(e) => setBillReminderEnabled(e.target.checked)}
-                    className="w-4 h-4 accent-emerald-600 rounded cursor-pointer"
-                  />
-                </div>
+                <ToggleSwitch
+                  id="bill-reminder-toggle"
+                  label={isEn ? 'Send Notification Reminder' : 'إرسال تنبيه قبل الموعد'}
+                  checked={billReminderEnabled}
+                  onChange={(checked) => setBillReminderEnabled(checked)}
+                />
 
-                <button
+                <FormButton
                   type="submit"
-                  className="w-full py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors"
+                  variant="primary"
+                  className="w-full text-xs font-bold"
                 >
                   {isEn ? 'Save Bill' : 'حفظ الفاتورة'}
-                </button>
+                </FormButton>
               </form>
             </motion.div>
           </div>
@@ -1224,7 +1212,7 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
                   dismissKeyboard();
                 }
               }}
-              className="relative w-full max-w-sm bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4"
+              className="relative w-full max-w-sm max-h-[88dvh] sm:max-h-[85dvh] overflow-y-auto bg-white dark:bg-[#1C1C1E] rounded-3xl p-5 shadow-2xl border border-slate-200 dark:border-slate-800 z-10 space-y-4 box-border no-scrollbar"
             >
               <div className="flex items-center justify-between pb-2 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
                 <h3 className="text-sm font-black text-[#1C1C1E] dark:text-white">
@@ -1239,76 +1227,60 @@ export const BillsAndGroceriesTab: React.FC<BillsAndGroceriesTabProps> = ({
                   <button
                     type="button"
                     onClick={() => setShowAddGroceryModal(false)}
-                    className="w-7 h-7 rounded-full bg-[#E5E5EA] dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer"
+                    className="w-8 h-8 rounded-full bg-[#E5E5EA]/70 dark:bg-[#2C2C2E] flex items-center justify-center text-[#8E8E93] hover:text-black dark:hover:text-white cursor-pointer transition-colors"
                   >
                     <X size={15} />
                   </button>
                 </div>
               </div>
 
-              <form onSubmit={handleSaveGrocery} className="space-y-3">
-                <div>
-                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                    {isEn ? 'Item Name' : 'اسم السلعة المطلوبة'}
-                  </label>
-                  <input
+              <form onSubmit={handleSaveGrocery} className="space-y-3.5">
+                <FormField label={isEn ? 'Item Name' : 'اسم السلعة المطلوبة'} required>
+                  <TextInput
                     type="text"
                     required
                     value={grocName}
                     onChange={(e) => setGrocName(e.target.value)}
                     placeholder={isEn ? 'e.g. Milk, Apples, Bread' : 'مثال: حليب، بيض، أرز بسمتي، منظفات'}
-                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-semibold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                   />
-                </div>
+                </FormField>
 
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      {isEn ? 'Quantity' : 'الكمية'}
-                    </label>
-                    <input
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <FormField label={isEn ? 'Quantity' : 'الكمية'} required>
+                    <TextInput
                       type="number"
                       min={1}
                       value={grocQuantity}
                       onChange={(e) => setGrocQuantity(parseInt(e.target.value, 10) || 1)}
-                      className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
                     />
-                  </div>
+                  </FormField>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      {isEn ? 'Unit' : 'الوحدة'}
-                    </label>
-                    <input
+                  <FormField label={isEn ? 'Unit' : 'الوحدة'}>
+                    <TextInput
                       type="text"
                       value={grocUnit}
                       onChange={(e) => setGrocUnit(e.target.value)}
                       placeholder={isEn ? 'pcs / kg' : 'حبة / كجم / كرتون'}
-                      className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                     />
-                  </div>
+                  </FormField>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                    {isEn ? 'Est. Price (Optional)' : 'السعر التقريبي للقطعة (اختياري)'}
-                  </label>
-                  <input
-                    type="number"
-                    step="any"
+                <FormField label={isEn ? 'Est. Price (Optional)' : 'السعر التقريبي للقطعة (اختياري)'}>
+                  <AmountInput
+                    currencySymbol={CURRENCY_SYMBOLS[settings.currency]?.symbol || 'ر.س'}
                     value={grocEstimatedPrice}
                     onChange={(e) => setGrocEstimatedPrice(e.target.value)}
-                    placeholder="0"
-                    className="w-full px-3 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50 tabular-nums"
+                    placeholder="0.00"
                   />
-                </div>
+                </FormField>
 
-                <button
+                <FormButton
                   type="submit"
-                  className="w-full py-2.5 rounded-2xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs cursor-pointer shadow-xs transition-colors"
+                  variant="primary"
+                  className="w-full text-xs font-bold"
                 >
                   {isEn ? 'Add to List' : 'إضافة للقائمة'}
-                </button>
+                </FormButton>
               </form>
             </motion.div>
           </div>

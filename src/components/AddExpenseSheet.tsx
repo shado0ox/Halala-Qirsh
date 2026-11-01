@@ -10,6 +10,7 @@ import { translations } from '../utils/i18n';
 import { getLocalToday } from '../utils/smsParser';
 import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../utils/keyboard';
 import { KeyboardDismissButton } from './KeyboardDismissButton';
+import { FormField, TextInput, SelectDropdown } from './ui/FormComponents';
 
 interface AddExpenseSheetProps {
   isOpen: boolean;
@@ -214,7 +215,11 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
             </div>
 
             {/* Form Body */}
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-5 pb-[max(env(safe-area-inset-bottom),24px)] space-y-4 no-scrollbar">
+            <form
+              onSubmit={handleSubmit}
+              style={{ paddingBottom: 'calc(var(--sab) + 24px)' }}
+              className="flex-1 overflow-y-auto p-5 space-y-4 no-scrollbar"
+            >
               {error && (
                 <motion.div
                   initial={{ opacity: 0, y: -6 }}
@@ -277,11 +282,8 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
               </div>
 
               {/* Title & Quick Suggestions */}
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                  {t.expenseTitleLabel}
-                </label>
-                <input
+              <FormField label={t.expenseTitleLabel} required>
+                <TextInput
                   type="text"
                   value={title}
                   onChange={(e) => {
@@ -289,7 +291,6 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                     setError('');
                   }}
                   placeholder={t.descPlaceholder}
-                  className="w-full px-3.5 py-2.5 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-sm text-[#1C1C1E] dark:text-white placeholder:text-[#8E8E93] outline-hidden focus:ring-2 focus:ring-emerald-500/50 transition-all font-medium"
                 />
 
                 {/* Quick Title Tags */}
@@ -309,13 +310,10 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                     </motion.button>
                   ))}
                 </div>
-              </div>
+              </FormField>
 
               {/* Category Picker */}
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                  {t.categorySelectLabel}
-                </label>
+              <FormField label={t.categorySelectLabel} required>
                 <div className="grid grid-cols-3 gap-2">
                   {categories.map((cat) => {
                     const isSelected = categoryId === cat.id;
@@ -331,7 +329,7 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                           nativeHaptics.tap(soundEnabled);
                           setCategoryId(cat.id);
                         }}
-                        className={`p-2 rounded-2xl flex items-center gap-2 border text-right transition-all cursor-pointer ${
+                        className={`p-2 min-h-[44px] rounded-2xl flex items-center gap-2 border text-right transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-500 text-emerald-900 dark:text-emerald-100 shadow-2xs font-bold ring-2 ring-emerald-500/30'
                             : 'bg-white dark:bg-[#2C2C2E] border-slate-200/60 dark:border-slate-800 text-slate-700 dark:text-slate-200 hover:bg-slate-50'
@@ -348,44 +346,33 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                     );
                   })}
                 </div>
-              </div>
+              </FormField>
 
               {/* Date & Payment Method */}
-              <div className="grid grid-cols-2 gap-2.5">
-                <div>
-                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                    {t.dateSelectLabel}
-                  </label>
-                  <input
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <FormField label={t.dateSelectLabel}>
+                  <TextInput
                     type="date"
                     value={date}
                     onChange={(e) => setDate(e.target.value)}
-                    className="w-full px-3 py-2 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                   />
-                </div>
+                </FormField>
 
-                <div>
-                  <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                    {t.paymentMethodSelectLabel}
-                  </label>
-                  <select
+                <FormField label={t.paymentMethodSelectLabel}>
+                  <SelectDropdown
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                    className="w-full px-3 py-2 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                   >
                     <option value="card">{t.paymentMethodCard}</option>
                     <option value="cash">{t.paymentMethodCash}</option>
                     <option value="transfer">{t.paymentMethodTransfer}</option>
                     <option value="digital">{t.paymentMethodDigital}</option>
-                  </select>
-                </div>
+                  </SelectDropdown>
+                </FormField>
               </div>
 
               {/* Payer Selector */}
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                  {t.payerSelectLabel}
-                </label>
+              <FormField label={t.payerSelectLabel}>
                 <div className="grid grid-cols-3 gap-2">
                   {[
                     { id: 'الزوج', label: t.husband },
@@ -402,7 +389,7 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                           nativeHaptics.tap(soundEnabled);
                           setPayer(p.id);
                         }}
-                        className={`py-2 px-3 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
+                        className={`min-h-[44px] py-2 px-3 rounded-2xl text-xs font-bold border transition-all cursor-pointer ${
                           isSelected
                             ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
                             : 'bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-300 border-transparent hover:bg-slate-200 dark:hover:bg-slate-700'
@@ -413,21 +400,17 @@ export const AddExpenseSheet: React.FC<AddExpenseSheetProps> = ({
                     );
                   })}
                 </div>
-              </div>
+              </FormField>
 
               {/* Notes */}
-              <div>
-                <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                  {t.notesInputLabel}
-                </label>
-                <input
+              <FormField label={t.notesInputLabel}>
+                <TextInput
                   type="text"
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   placeholder={t.notesPlaceholder}
-                  className="w-full px-3.5 py-2 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs text-[#1C1C1E] dark:text-white placeholder:text-[#8E8E93] outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                 />
-              </div>
+              </FormField>
             </form>
           </motion.div>
         </div>

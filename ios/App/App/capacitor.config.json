@@ -12,9 +12,9 @@
 		}
 	},
 	"ios": {
-		"contentInset": "automatic",
+		"contentInset": "never",
 		"preferredContentMode": "mobile",
-		"backgroundColor": "#000000"
+		"backgroundColor": "#F4FAF7"
 	},
 	"packageClassList": [
 		"BiometricAuthNative",

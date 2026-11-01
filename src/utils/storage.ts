@@ -348,12 +348,27 @@ export const exportExpensesToCSV = async (
   return await NativeShareService.shareFile(fileName, csvContent, 'text/csv');
 };
 
+export const cleanMoneyAmount = (amount: number): number => {
+  if (typeof amount !== 'number' || isNaN(amount)) return 0;
+  return Math.round((amount + Number.EPSILON) * 100) / 100;
+};
+
+export const sumMoney = (amounts: (number | undefined | null)[]): number => {
+  const totalCents = amounts.reduce<number>((acc, curr) => {
+    if (typeof curr !== 'number' || isNaN(curr)) return acc;
+    return acc + Math.round((curr + Number.EPSILON) * 100);
+  }, 0);
+  return totalCents / 100;
+};
+
 export const formatMoney = (amount: number, currency: CurrencyCode, lang: 'ar' | 'en' = 'ar'): string => {
   const sym = CURRENCY_SYMBOLS[currency]?.symbol || 'ر.س';
-  const formattedNum = amount.toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US', {
+  const clean = cleanMoneyAmount(amount);
+  const formattedNum = clean.toLocaleString(lang === 'ar' ? 'ar-SA' : 'en-US', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 1,
+    maximumFractionDigits: 2,
   });
 
   return lang === 'ar' ? `${formattedNum} ${sym}` : `${sym} ${formattedNum}`;
 };
+

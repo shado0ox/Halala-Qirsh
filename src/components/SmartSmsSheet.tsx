@@ -30,6 +30,14 @@ import {
 } from '../utils/smsParser';
 import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../utils/keyboard';
 import { KeyboardDismissButton } from './KeyboardDismissButton';
+import {
+  FormField,
+  TextInput,
+  SelectDropdown,
+  TextAreaInput,
+  FormButton,
+  FormFooter,
+} from './ui/FormComponents';
 
 interface SmartSmsSheetProps {
   isOpen: boolean;
@@ -230,15 +238,15 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                 dismissKeyboard();
               }
             }}
-            className="relative w-full max-w-lg max-h-[92vh] bg-white dark:bg-[#1C1C1E] rounded-t-[32px] shadow-2xl flex flex-col overflow-hidden z-10 border-t border-emerald-500/20"
+            className="relative w-full max-w-lg max-h-[88dvh] sm:max-h-[85dvh] bg-white dark:bg-[#1C1C1E] rounded-t-[32px] sm:rounded-3xl shadow-2xl flex flex-col overflow-hidden z-10 border-t sm:border border-emerald-500/20 box-border"
           >
             {/* Grabber Handle */}
-            <div className="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing">
+            <div className="w-full flex justify-center pt-3 pb-1 cursor-grab active:cursor-grabbing sm:hidden">
               <div className="w-11 h-1.5 bg-[#C7C7CC] dark:bg-[#48484A] rounded-full" />
             </div>
 
             {/* Header */}
-            <div className="flex items-center justify-between px-5 py-3 border-b border-[#E5E5EA] dark:border-[#2C2C2E]">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-[#E5E5EA] dark:border-[#2C2C2E] shrink-0">
               <div className="flex items-center gap-2">
                 <div className="w-7 h-7 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
                   <Sparkles size={16} />
@@ -271,7 +279,10 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
             </div>
 
             {/* Sheet Body */}
-            <div className="flex-1 overflow-y-auto p-5 pb-[max(env(safe-area-inset-bottom),24px)] space-y-4 no-scrollbar">
+            <div
+              style={{ paddingBottom: 'calc(var(--sab) + 24px)' }}
+              className="flex-1 overflow-y-auto p-4 sm:p-5 space-y-4 no-scrollbar box-border"
+            >
               {/* STEP 1: Input & Paste Area (if not yet in preview, or user wants to re-paste) */}
               {!previewData ? (
                 <div className="space-y-3">
@@ -287,11 +298,8 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                     </p>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                      {isEn ? 'Bank SMS Text' : 'نص رسالة البنك'}
-                    </label>
-                    <textarea
+                  <FormField label={isEn ? 'Bank SMS Text' : 'نص رسالة البنك'}>
+                    <TextAreaInput
                       rows={3}
                       value={rawSms}
                       onChange={(e) => {
@@ -304,9 +312,9 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                           ? 'Paste SMS here: e.g. "Purchase: SAR 85.00 at Starbucks via Mada on 2026-05-10"'
                           : 'الصق الرسالة هنا: مثال "شراء بـ 150.00 رس من بطاقة مدى لدى أسواق بنده..."'
                       }
-                      className="w-full p-3 rounded-2xl bg-[#EAF6F0]/60 dark:bg-[#2C2C2E] border border-emerald-500/15 text-xs text-[#0B2319] dark:text-white placeholder:text-[#8E8E93] outline-hidden focus:ring-2 focus:ring-emerald-500/50 resize-none font-medium"
+                      className="resize-none text-xs"
                     />
-                  </div>
+                  </FormField>
 
                   {/* Actions Bar */}
                   <div className="flex items-center gap-2">
@@ -385,36 +393,35 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                     <span className="text-[11px] text-[#5C8271] dark:text-[#8E8E93] font-semibold mb-1">
                       {isEn ? 'Amount (SAR)' : 'المبلغ المستخرج (ريال)'}
                     </span>
-                    <div className="flex items-center justify-center gap-2">
+                    <div className="flex items-center justify-center gap-2 w-full max-w-xs">
                       <input
                         type="number"
                         step="any"
                         value={amountStr}
                         onChange={(e) => setAmountStr(e.target.value)}
-                        className="w-44 text-center text-3xl font-black text-[#0B2319] dark:text-white bg-transparent border-none outline-hidden tabular-nums"
+                        className="w-full max-w-[180px] text-center text-3xl font-black text-[#0B2319] dark:text-white bg-transparent border-none outline-hidden tabular-nums"
                         required
                       />
-                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400">
+                      <span className="text-xs font-bold text-emerald-700 dark:text-emerald-400 shrink-0">
                         {currency}
                       </span>
                     </div>
                   </div>
 
                   {/* Merchant / Description */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5 flex items-center gap-1.5">
-                      <Store size={14} />
-                      <span>{isEn ? 'Merchant / Store' : 'التاجر / المتجر'}</span>
-                    </label>
-                    <input
+                  <FormField
+                    label={isEn ? 'Merchant / Store' : 'التاجر / المتجر'}
+                    required
+                  >
+                    <TextInput
                       type="text"
                       value={title}
                       onChange={(e) => setTitle(e.target.value)}
                       placeholder={isEn ? 'Store name' : 'اسم المتجر أو الوصف'}
-                      className="w-full px-3.5 py-2.5 rounded-2xl bg-[#EAF6F0]/60 dark:bg-[#2C2C2E] border border-emerald-500/15 text-xs font-bold text-[#0B2319] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
+                      startIcon={<Store size={15} />}
                       required
                     />
-                  </div>
+                  </FormField>
 
                   {/* Category Selection with Instant Learning Indicator & Visual Warning */}
                   <div
@@ -490,36 +497,27 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                   </div>
 
                   {/* Date & Payment Method */}
-                  <div className="grid grid-cols-2 gap-3">
-                    <div>
-                      <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5 flex items-center gap-1.5">
-                        <Calendar size={14} />
-                        <span>{isEn ? 'Date' : 'التاريخ'}</span>
-                      </label>
-                      <input
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <FormField label={isEn ? 'Date' : 'التاريخ'}>
+                      <TextInput
                         type="date"
                         value={date}
                         onChange={(e) => setDate(e.target.value)}
-                        className="w-full px-3 py-2 rounded-2xl bg-[#EAF6F0]/60 dark:bg-[#2C2C2E] border border-emerald-500/15 text-xs font-bold text-[#0B2319] dark:text-white outline-hidden focus:ring-2 focus:ring-emerald-500/50"
                       />
-                    </div>
+                    </FormField>
 
-                    <div>
-                      <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                        {isEn ? 'Payment Method' : 'طريقة الدفع'}
-                      </label>
-                      <select
+                    <FormField label={isEn ? 'Payment Method' : 'طريقة الدفع'}>
+                      <SelectDropdown
                         value={paymentMethod}
                         onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                        className="w-full px-3 py-2 rounded-2xl bg-[#EAF6F0]/60 dark:bg-[#2C2C2E] border border-emerald-500/15 text-xs font-bold text-[#0B2319] dark:text-white outline-hidden cursor-pointer"
                       >
                         {paymentOptions.map((opt) => (
                           <option key={opt.id} value={opt.id}>
                             {opt.label}
                           </option>
                         ))}
-                      </select>
-                    </div>
+                      </SelectDropdown>
+                    </FormField>
                   </div>
 
                   {/* Payer */}

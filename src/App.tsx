@@ -25,6 +25,8 @@ import {
   saveAppData,
   getShownBannerKeys,
   markBannerKeyShown,
+  cleanMoneyAmount,
+  sumMoney,
 } from './utils/storage';
 import { nativeHaptics } from './utils/nativeHaptics';
 import {
@@ -173,10 +175,11 @@ function AppContent() {
           const catName = isEnLang && targetCat?.nameEn ? targetCat.nameEn : (targetCat?.name || 'عام');
           const title = merchant.trim() || catName;
 
+          const safeAmount = cleanMoneyAmount(payload.amount);
           const newExp: Expense = {
             id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             title,
-            amount: payload.amount,
+            amount: safeAmount,
             categoryId: targetCatId,
             date: getLocalToday(),
             paymentMethod: 'digital',
@@ -194,8 +197,8 @@ function AppContent() {
           nativeHaptics.success(data.settings.soundEnabled);
           showToast(
             isEnLang
-              ? `Pay: ${payload.amount} logged automatically`
-              : `Pay: تم قيد ${payload.amount} تلقائياً`,
+              ? `Pay: ${safeAmount} logged automatically`
+              : `Pay: تم قيد ${safeAmount} تلقائياً`,
             'success'
           );
         } else {
@@ -704,7 +707,7 @@ function AppContent() {
         const newExp: Expense = {
           id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           title,
-          amount: item.amount,
+          amount: cleanMoneyAmount(item.amount),
           categoryId: category.id,
           date: item.date || getLocalToday(),
           paymentMethod: isApplePay ? 'digital' : 'card',
@@ -1251,7 +1254,7 @@ function AppContent() {
   const unpaidBillsCount = data.bills.filter((b) => !b.isPaid).length;
 
   return (
-    <div className="h-[100dvh] w-full flex flex-col bg-[#F4FAF7] dark:bg-black text-[#0B2319] dark:text-white pt-safe overflow-hidden select-none relative">
+    <div className="min-h-screen h-[100dvh] w-full flex flex-col bg-[#F4FAF7] dark:bg-black text-[#0B2319] dark:text-white pt-safe pl-safe pr-safe overflow-hidden select-none relative">
       {/* Ambient Luminous Emerald Glow for Light Theme */}
       <div className="pointer-events-none absolute -top-24 inset-x-0 h-72 bg-gradient-to-b from-emerald-400/20 via-teal-200/10 to-transparent blur-3xl dark:hidden z-0" />
 

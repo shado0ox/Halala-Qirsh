@@ -1,6 +1,12 @@
 @import "tailwindcss";
 
 :root {
+  /* Safe Area Insets Custom Properties with 0px fallbacks */
+  --sat: env(safe-area-inset-top, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+
   /* Brand Emerald & Mint System */
   --color-primary-950: #022c22;
   --color-primary-900: #064E3B;
@@ -62,10 +68,20 @@
     overscroll-behavior-x: none;
     height: 100%;
     width: 100%;
+    min-height: 100%;
     margin: 0;
     padding: 0;
     background-color: var(--bg-app);
     color: var(--text-primary);
+  }
+
+  #root {
+    height: 100%;
+    width: 100%;
+    min-height: 100%;
+    display: flex;
+    flex-direction: column;
+    background-color: var(--bg-app);
   }
 
   /* Prevent iOS WebKit from auto-zooming on input focus */
@@ -128,17 +144,24 @@
 }
 
 /* iOS Safe areas */
-.pb-safe {
-  padding-bottom: env(safe-area-inset-bottom, 20px);
-}
 .pt-safe {
-  padding-top: env(safe-area-inset-top, 44px);
+  padding-top: var(--sat);
+}
+.pb-safe {
+  padding-bottom: var(--sab);
 }
 .pl-safe {
-  padding-left: env(safe-area-inset-left, 0px);
+  padding-left: var(--sal);
 }
 .pr-safe {
-  padding-right: env(safe-area-inset-right, 0px);
+  padding-right: var(--sar);
+}
+
+.mt-safe {
+  margin-top: var(--sat);
+}
+.mb-safe {
+  margin-bottom: var(--sab);
 }
 
 /* Pressable feedback animation utility */

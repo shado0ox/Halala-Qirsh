@@ -95,7 +95,10 @@ export const TabBar: React.FC<TabBarProps> = ({
       </div>
 
       {/* iOS Blur Glass Tab Bar Surface */}
-      <div className="w-full bg-white/92 dark:bg-[#161618]/90 backdrop-blur-xl border-t border-emerald-500/15 dark:border-[#2C2C2E] px-2 pt-1.5 pb-[max(env(safe-area-inset-bottom),10px)] transition-colors shadow-[0_-4px_24px_rgba(16,185,129,0.06)] dark:shadow-none">
+      <div
+        style={{ paddingBottom: 'calc(var(--sab) + 8px)' }}
+        className="w-full bg-white/92 dark:bg-[#161618]/90 backdrop-blur-xl border-t border-emerald-500/15 dark:border-[#2C2C2E] px-2 pt-1.5 transition-colors shadow-[0_-4px_24px_rgba(16,185,129,0.06)] dark:shadow-none"
+      >
         <div className="grid grid-cols-5 items-center max-w-md mx-auto">
           {tabs.map((tab) => {
             const Icon = tab.icon;

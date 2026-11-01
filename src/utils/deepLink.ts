@@ -59,9 +59,15 @@ export function parseApplePayDeepLink(url?: string | null): ApplePayTransactionP
     const amountStr = params.get('amount') || params.get('value') || params.get('price');
     let amount: number | undefined;
     if (amountStr) {
-      const parsed = parseFloat(amountStr.replace(/,/g, '').trim());
+      const normalizedStr = amountStr
+        .replace(/[٠-٩]/g, (d) => String(d.charCodeAt(0) - 0x0660))
+        .replace(/[۰-۹]/g, (d) => String(d.charCodeAt(0) - 0x06f0))
+        .replace(/٫/g, '.')
+        .replace(/,/g, '')
+        .trim();
+      const parsed = parseFloat(normalizedStr);
       if (!isNaN(parsed) && parsed > 0 && parsed < 1_000_000) {
-        amount = parsed;
+        amount = Math.round((parsed + Number.EPSILON) * 100) / 100;
       }
     }
 

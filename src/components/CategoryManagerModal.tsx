@@ -9,6 +9,13 @@ import { Amount } from './Amount';
 import { translations } from '../utils/i18n';
 import { handleModalBackdropClick, dismissKeyboard, useKeyboardState } from '../utils/keyboard';
 import { KeyboardDismissButton } from './KeyboardDismissButton';
+import {
+  FormField,
+  TextInput,
+  AmountInput,
+  FormButton,
+  FormFooter,
+} from './ui/FormComponents';
 
 interface CategoryManagerModalProps {
   isOpen: boolean;
@@ -229,11 +236,8 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                   </div>
 
                   {/* Name Input */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      {t.categoryNameLabel}
-                    </label>
-                    <input
+                  <FormField label={t.categoryNameLabel} required>
+                    <TextInput
                       type="text"
                       value={name}
                       onChange={(e) => {
@@ -241,40 +245,26 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                         setError('');
                       }}
                       placeholder={t.categoryNamePlaceholder}
-                      className="w-full px-3.5 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-medium text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-blue-500/50"
                       autoFocus
                     />
-                  </div>
+                  </FormField>
 
                   {/* Monthly Budget Limit */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1">
-                      {t.monthlyLimitLabel} ({currencySymbol})
-                    </label>
-                    <div className="flex items-center gap-2">
-                      <input
-                        type="number"
-                        step="any"
-                        value={monthlyLimit}
-                        onChange={(e) => {
-                          setMonthlyLimit(e.target.value);
-                          setError('');
-                        }}
-                        placeholder="0"
-                        className="w-full px-3.5 py-2 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-xs font-bold text-[#1C1C1E] dark:text-white outline-hidden focus:ring-2 focus:ring-blue-500/50 tabular-nums"
-                      />
-                      <span className="text-xs font-bold text-slate-500 shrink-0">
-                        {currencySymbol} {isEn ? '/ mo' : 'شهرياً'}
-                      </span>
-                    </div>
-                  </div>
+                  <FormField label={`${t.monthlyLimitLabel} (${currencySymbol})`} required>
+                    <AmountInput
+                      value={monthlyLimit}
+                      onChange={(e) => {
+                        setMonthlyLimit(e.target.value);
+                        setError('');
+                      }}
+                      placeholder="0"
+                      currencySymbol={currencySymbol}
+                    />
+                  </FormField>
 
                   {/* Color Palette */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                      {t.categoryColorLabel}
-                    </label>
-                    <div className="flex flex-wrap gap-2">
+                  <FormField label={t.categoryColorLabel}>
+                    <div className="flex flex-wrap gap-2.5">
                       {COLOR_PALETTE.map((pal) => (
                         <button
                           key={pal.color}
@@ -284,8 +274,8 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                             setColor(pal.color);
                             setBgColor(pal.bgColor);
                           }}
-                          className={`w-7 h-7 rounded-full flex items-center justify-center transition-transform cursor-pointer ${
-                            color === pal.color ? 'scale-110 ring-2 ring-offset-2 ring-blue-500' : 'hover:scale-105'
+                          className={`w-8 h-8 rounded-full flex items-center justify-center transition-transform cursor-pointer ${
+                            color === pal.color ? 'scale-110 ring-2 ring-offset-2 ring-emerald-500' : 'hover:scale-105'
                           }`}
                           style={{ backgroundColor: pal.color }}
                         >
@@ -293,14 +283,11 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                         </button>
                       ))}
                     </div>
-                  </div>
+                  </FormField>
 
                   {/* Icon Selector */}
-                  <div>
-                    <label className="block text-xs font-bold text-[#636366] dark:text-[#AEAEB2] mb-1.5">
-                      {t.categoryIconLabel}
-                    </label>
-                    <div className="grid grid-cols-6 gap-2 max-h-36 overflow-y-auto p-1 bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-xl no-scrollbar">
+                  <FormField label={t.categoryIconLabel}>
+                    <div className="grid grid-cols-6 gap-2 max-h-36 overflow-y-auto p-1.5 bg-[#F2F2F7] dark:bg-[#2C2C2E] rounded-2xl no-scrollbar">
                       {iconKeys.map((k) => {
                         const isCurrent = iconName === k;
                         return (
@@ -311,9 +298,9 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                               sound.playTap(soundEnabled);
                               setIconName(k);
                             }}
-                            className={`p-2 rounded-lg flex items-center justify-center transition-colors cursor-pointer ${
+                            className={`min-h-[44px] p-2 rounded-xl flex items-center justify-center transition-colors cursor-pointer ${
                               isCurrent
-                                ? 'bg-blue-600 text-white shadow-xs'
+                                ? 'bg-emerald-600 text-white shadow-xs'
                                 : 'text-slate-700 dark:text-slate-200 hover:bg-slate-300/50 dark:hover:bg-slate-700'
                             }`}
                           >
@@ -322,25 +309,27 @@ export const CategoryManagerModal: React.FC<CategoryManagerModalProps> = ({
                         );
                       })}
                     </div>
-                  </div>
+                  </FormField>
 
                   {/* Form Actions */}
-                  <div className="flex items-center gap-2 pt-2">
-                    <button
+                  <FormFooter>
+                    <FormButton
                       type="submit"
-                      className="flex-1 h-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center justify-center gap-1.5 shadow-md shadow-blue-500/25 cursor-pointer"
+                      variant="primary"
+                      className="flex-1"
+                      startIcon={<Check size={16} strokeWidth={2.5} />}
                     >
-                      <Check size={16} strokeWidth={2.5} />
-                      <span>{editingCategory ? t.save : t.addNewCategoryBtn}</span>
-                    </button>
-                    <button
+                      {editingCategory ? t.save : t.addNewCategoryBtn}
+                    </FormButton>
+                    <FormButton
                       type="button"
+                      variant="secondary"
                       onClick={cancelEdit}
-                      className="px-4 h-11 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-700 dark:text-slate-300 font-semibold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer"
+                      className="w-full sm:w-auto"
                     >
                       {t.cancel}
-                    </button>
-                  </div>
+                    </FormButton>
+                  </FormFooter>
                 </form>
               ) : (
                 /* List of All Categories with Edit/Delete */

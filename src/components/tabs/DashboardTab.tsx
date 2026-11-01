@@ -18,7 +18,7 @@ import {
 import { motion } from 'motion/react';
 import { Category, Expense, RecurringBill, BudgetSettings, JamiyyaGroup } from '../../types';
 import { CategoryIcon } from '../CategoryIcon';
-import { formatMoney } from '../../utils/storage';
+import { formatMoney, sumMoney, cleanMoneyAmount } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { translations } from '../../utils/i18n';
 import { AnimatedCounter } from '../AnimatedCounter';
@@ -63,15 +63,15 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
   // Filter expenses for selected month
   const monthlyExpenses = expenses.filter((e) => e.date.startsWith(currentMonth));
-  const totalSpent = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const totalSpent = sumMoney(monthlyExpenses.map((e) => e.amount));
 
   // Total budget calculation
   const totalBudget =
     settings.budgetMode === 'custom_total'
       ? settings.totalMonthlyBudget
-      : categories.reduce((sum, c) => sum + c.monthlyLimit, 0);
+      : sumMoney(categories.map((c) => c.monthlyLimit));
 
-  const remainingBudget = totalBudget - totalSpent;
+  const remainingBudget = cleanMoneyAmount(totalBudget - totalSpent);
   const percentageSpent = totalBudget > 0 ? Math.min(Math.round((totalSpent / totalBudget) * 100), 999) : 0;
   const progressRatio = Math.min(percentageSpent, 100) / 100;
 
@@ -87,7 +87,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   // Today's expenses
   const todayStr = getLocalToday(now);
   const todayExpenses = expenses.filter((e) => e.date === todayStr);
-  const todaySpent = todayExpenses.reduce((sum, e) => sum + e.amount, 0);
+  const todaySpent = sumMoney(todayExpenses.map((e) => e.amount));
 
   // Unpaid bills due this month
   const unpaidBills = bills.filter((b) => !b.isPaid);

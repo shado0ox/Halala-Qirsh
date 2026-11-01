@@ -83,5 +83,14 @@ describe('Apple Pay deep link unit tests', () => {
 
     // 4. Link without query returns {}
     expect(parseApplePayDeepLink('halalaqirsh://applepay')).toEqual({});
+
+    // 5. Exact 3.45 SAR Apple Pay transaction is preserved without rounding
+    const exactDecimalRes = parseApplePayDeepLink('halalaqirsh://applepay?amount=3.45&merchant=Bakery');
+    expect(exactDecimalRes?.amount).toBe(3.45);
+    expect(exactDecimalRes?.merchant).toBe('Bakery');
+
+    // 6. Arabic digits 3.45
+    const arabicDigitsRes = parseApplePayDeepLink('halalaqirsh://applepay?amount=٣.٤٥&merchant=Bakery');
+    expect(arabicDigitsRes?.amount).toBe(3.45);
   });
 });

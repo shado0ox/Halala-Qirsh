@@ -18,12 +18,16 @@ export const LaunchSplash: React.FC<LaunchSplashProps> = ({
   const [isVisible, setIsVisible] = useState(true);
 
   useEffect(() => {
+    let innerTimer: ReturnType<typeof setTimeout> | null = null;
     const timer = setTimeout(() => {
       setIsVisible(false);
-      setTimeout(onFinish, 200);
+      innerTimer = setTimeout(onFinish, 200);
     }, isReduced ? 200 : 950);
 
-    return () => clearTimeout(timer);
+    return () => {
+      clearTimeout(timer);
+      if (innerTimer) clearTimeout(innerTimer);
+    };
   }, [onFinish, isReduced]);
 
   return (
