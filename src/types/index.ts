@@ -23,6 +23,7 @@ export interface Expense {
   createdAt: number;
   source?: 'manual' | 'sms' | 'quick_intent' | 'apple_pay' | 'jamiyya';
   isAutoLogged?: boolean;
+  crossMatched?: boolean;
   type?: 'expense' | 'income';
   jamiyyaId?: string;
   jamiyyaCycleNumber?: number;
@@ -73,6 +74,7 @@ export interface BudgetSettings {
   hasCompletedOnboarding?: boolean;
   lastCelebratedMonth?: string;
   annualBudget?: number;
+  autoCaptureMode: 'apple_pay' | 'bank_sms' | 'both';
 }
 
 export interface InAppNotification {

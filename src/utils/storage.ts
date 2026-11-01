@@ -138,8 +138,16 @@ export const getDefaultAppData = (): AppData => ({
     animations: 'full',
     hideAmounts: false,
     hasCompletedOnboarding: false,
+    autoCaptureMode: 'apple_pay',
   },
 });
+
+const normalizeAutoCaptureMode = (mode: unknown): 'apple_pay' | 'bank_sms' | 'both' => {
+  if (mode === 'apple_pay' || mode === 'bank_sms' || mode === 'both') {
+    return mode;
+  }
+  return 'apple_pay';
+};
 
 /**
  * Validates the structure of imported JSON backup
@@ -194,6 +202,7 @@ export const loadAppData = (): AppData => {
         ...defaultData.settings,
         ...(parsed.settings || {}),
         autoLockTimeout: parsed.settings?.autoLockTimeout ?? 30,
+        autoCaptureMode: normalizeAutoCaptureMode(parsed.settings?.autoCaptureMode),
       },
     };
   } catch (err) {
@@ -225,6 +234,7 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
           ...defaultData.settings,
           ...(parsed.settings || {}),
           autoLockTimeout: parsed.settings?.autoLockTimeout ?? 30,
+          autoCaptureMode: normalizeAutoCaptureMode(parsed.settings?.autoCaptureMode),
         },
       };
       localStorage.setItem(STORAGE_KEY, JSON.stringify(merged));
@@ -248,6 +258,7 @@ export const loadAppDataFromPreferences = async (): Promise<AppData> => {
           ...defaultData.settings,
           ...(parsed.settings || {}),
           autoLockTimeout: parsed.settings?.autoLockTimeout ?? 30,
+          autoCaptureMode: normalizeAutoCaptureMode(parsed.settings?.autoCaptureMode),
         },
       };
       await Preferences.set({ key: STORAGE_KEY, value: JSON.stringify(merged) });

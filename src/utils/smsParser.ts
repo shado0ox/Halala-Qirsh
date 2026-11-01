@@ -368,6 +368,10 @@ export function categorizeMerchant(
     }
   }
 
+const CATEGORY_ID_ALIASES: Record<string, string[]> = {
+  groceries: ['groceries', 'food'],
+};
+
   const tokens = normalized.split(' ');
   for (const mapping of DEFAULT_KEYWORD_MAP) {
     for (const kw of mapping.keywords) {
@@ -376,7 +380,8 @@ export function categorizeMerchant(
       // Short keywords (sec, stc, ماك, سار...) must match a whole word, not a substring
       const hit = nk.length <= 3 ? tokens.includes(nk) : normalized.includes(nk);
       if (hit) {
-        const found = categories.find((c) => c.id === mapping.categoryId);
+        const wanted = CATEGORY_ID_ALIASES[mapping.categoryId] || [mapping.categoryId];
+        const found = categories.find((c) => wanted.includes(c.id));
         if (found) return { categoryId: found.id, isLearned: false, needsCategory: false };
       }
     }

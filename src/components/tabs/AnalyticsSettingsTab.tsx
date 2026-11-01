@@ -27,8 +27,10 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 import { AppLauncher } from '@capacitor/app-launcher';
 import { HalalaQirshLogo } from '../HalalaQirshLogo';
+import { AutoCaptureCard } from '../settings/AutoCaptureCard';
 import {
   Category,
   Expense,
@@ -157,6 +159,14 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
       await AppLauncher.openUrl({ url: 'shortcuts://' });
     } catch {
       // Ignore if cannot open shortcuts
+    }
+  };
+
+  const handleAutoCaptureModeChange = (mode: 'apple_pay' | 'bank_sms' | 'both') => {
+    nativeHaptics.tap(settings.soundEnabled);
+    onUpdateSettings({ autoCaptureMode: mode });
+    if (Capacitor.isNativePlatform()) {
+      Preferences.set({ key: 'autoCaptureMode', value: mode }).catch(() => {});
     }
   };
 
@@ -467,6 +477,87 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           <ShieldCheck size={14} className="shrink-0 mt-0.5 text-emerald-600 dark:text-emerald-400" />
           <span>{t.backTapNote}</span>
         </div>
+      </div>
+
+      {/* SECTION: AUTO CAPTURE SETTINGS (التسجيل التلقائي) */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-9 h-9 rounded-2xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+              <Zap size={18} />
+            </div>
+            <div>
+              <h4 className="text-xs font-bold text-[#1C1C1E] dark:text-white">
+                {isEn ? 'Automatic Expense Capture' : 'التسجيل التلقائي'}
+              </h4>
+              <p className="text-[10px] text-[#8E8E93]">
+                {isEn ? 'Choose source for automatic transaction tracking' : 'تحديد مصدر التسجيل الفوري للمصاريف'}
+              </p>
+            </div>
+          </div>
+          <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+            {isEn ? 'Source' : 'المصدر'}
+          </span>
+        </div>
+
+        {/* 3-way Segmented Control */}
+        <div className="flex items-center gap-1 bg-[#F2F2F7] dark:bg-[#2C2C2E] p-1 rounded-2xl">
+          {[
+            { id: 'apple_pay' as const, label: isEn ? 'Apple Pay Only' : 'Apple Pay فقط' },
+            { id: 'bank_sms' as const, label: isEn ? 'Bank SMS Only' : 'رسائل البنك فقط' },
+            { id: 'both' as const, label: isEn ? 'Both' : 'الاثنان معاً' },
+          ].map((modeOpt) => {
+            const currentMode = settings.autoCaptureMode || 'apple_pay';
+            const isActive = currentMode === modeOpt.id;
+            return (
+              <button
+                key={modeOpt.id}
+                type="button"
+                onClick={() => handleAutoCaptureModeChange(modeOpt.id)}
+                className={`flex-1 py-2 px-2 rounded-xl font-bold text-[11px] transition-all cursor-pointer text-center truncate ${
+                  isActive
+                    ? 'bg-emerald-600 text-white shadow-2xs'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white'
+                }`}
+              >
+                {modeOpt.label}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Explanatory description below the selector */}
+        <div className="text-[11px] text-[#5C8271] dark:text-[#AEAEB2] leading-relaxed p-2.5 rounded-2xl bg-[#EAF6F0]/60 dark:bg-emerald-950/20 border border-emerald-500/15">
+          {(settings.autoCaptureMode || 'apple_pay') === 'both' ? (
+            <p>
+              {isEn
+                ? 'When both are enabled, duplicate expenses between Apple Pay and bank SMS are merged automatically.'
+                : 'عند تفعيل «الاثنان معاً»، يتم دمج المصاريف المكررة تلقائياً بين Apple Pay ورسائل البنك لنفس العملية لمنع التسجيل المزدوج.'}
+            </p>
+          ) : (settings.autoCaptureMode || 'apple_pay') === 'apple_pay' ? (
+            <p>
+              {isEn
+                ? 'Only Apple Pay transactions are captured automatically; incoming bank SMS messages are ignored.'
+                : 'يتم تسجيل عمليات Apple Pay فقط تلقائياً، وتُهمل رسائل البنك الواردة.'}
+            </p>
+          ) : (
+            <p>
+              {isEn
+                ? 'Only bank SMS notifications are captured automatically; Apple Pay transactions are ignored.'
+                : 'يتم تسجيل رسائل البنك فقط تلقائياً، وتُهمل عمليات Apple Pay.'}
+            </p>
+          )}
+        </div>
+
+        {/* Shortcuts Setup Guide Card for Bank SMS when bank_sms or both */}
+        {((settings.autoCaptureMode || 'apple_pay') === 'bank_sms' ||
+          (settings.autoCaptureMode || 'apple_pay') === 'both') && (
+          <AutoCaptureCard
+            language={lang}
+            soundEnabled={settings.soundEnabled}
+            onShowToast={onShowToast}
+          />
+        )}
       </div>
 
       {/* SECTION: APPLE PAY AUTO-LOGGING (تسجيل تلقائي عند الدفع بـ Apple Pay) */}

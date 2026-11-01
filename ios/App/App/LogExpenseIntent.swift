@@ -88,6 +88,35 @@ enum QuickStore {
             UserDefaults.standard.set(s, forKey: pendingKey)
         }
     }
+
+    static let modeKey = prefix + "autoCaptureMode"
+    static let pendingSmsKey = prefix + "pendingSms"
+
+    /// source: "apple_pay" or "bank_sms". Default mode when the app never wrote it: "apple_pay".
+    static func isEnabled(_ source: String) -> Bool {
+        let mode = UserDefaults.standard.string(forKey: modeKey) ?? "apple_pay"
+        switch source {
+        case "apple_pay": return mode == "apple_pay" || mode == "both"
+        case "bank_sms":  return mode == "bank_sms" || mode == "both"
+        default: return true
+        }
+    }
+
+    struct PendingSms: Codable { let id: String; let text: String; let createdAt: Double }
+
+    static func enqueueSms(_ text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 4000 else { return }
+        var items: [PendingSms] = []
+        if let s = UserDefaults.standard.string(forKey: pendingSmsKey),
+           let d = s.data(using: .utf8),
+           let old = try? JSONDecoder().decode([PendingSms].self, from: d) { items = old }
+        if items.count >= 50 { items.removeFirst(items.count - 49) }
+        items.append(PendingSms(id: UUID().uuidString, text: trimmed, createdAt: Date().timeIntervalSince1970))
+        if let d = try? JSONEncoder().encode(items), let s = String(data: d, encoding: .utf8) {
+            UserDefaults.standard.set(s, forKey: pendingSmsKey)
+        }
+    }
 }
 
 @available(iOS 16.0, *)
@@ -161,6 +190,9 @@ struct LogApplePayTransactionIntent: AppIntent {
     }
 
     func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard QuickStore.isEnabled("apple_pay") else {
+            return .result(dialog: "التسجيل التلقائي لـ Apple Pay غير مفعّل في الإعدادات")
+        }
         guard amount > 0, amount < 1_000_000 else {
             throw $amount.needsValueError("اكتب مبلغاً صحيحاً")
         }
@@ -168,6 +200,32 @@ struct LogApplePayTransactionIntent: AppIntent {
         QuickStore.enqueue(amount: amount, categoryId: catId, note: note ?? merchant, merchant: merchant, source: "apple_pay")
         let shown = String(format: "%g", amount)
         return .result(dialog: "تم تسجيل عملية Apple Pay بقيمة \(shown) في \(merchant)")
+    }
+}
+
+@available(iOS 16.0, *)
+struct ImportBankSmsIntent: AppIntent {
+    static var title: LocalizedStringResource = "تسجيل مصروف من رسالة البنك تلقائياً"
+    static var description = IntentDescription("استلام نص رسالة البنك وتسجيل المصروف تلقائياً")
+    static var openAppWhenRun: Bool = false
+
+    @Parameter(title: "نص الرسالة", requestValueDialog: "أدخل أو الصق نص رسالة البنك")
+    var text: String
+
+    static var parameterSummary: some ParameterSummary {
+        Summary("تسجيل مصروف من رسالة البنك: \(\.$text)")
+    }
+
+    func perform() async throws -> some IntentResult & ProvidesDialog {
+        guard QuickStore.isEnabled("bank_sms") else {
+            return .result(dialog: "التسجيل التلقائي من رسائل البنك غير مفعّل في الإعدادات")
+        }
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw $text.needsValueError("أدخل نص رسالة البنك")
+        }
+        QuickStore.enqueueSms(trimmed)
+        return .result(dialog: "تم استلام رسالة البنك وستُسجَّل عند فتح التطبيق")
     }
 }
 
@@ -221,6 +279,17 @@ struct HalalaQirshShortcuts: AppShortcutsProvider {
             ],
             shortTitle: "تسجيل عملية Apple Pay",
             systemImageName: "creditcard.and.123"
+        )
+        AppShortcut(
+            intent: ImportBankSmsIntent(),
+            phrases: [
+                "Import bank SMS in \(.applicationName)",
+                "Log bank SMS text in \(.applicationName)",
+                "استيراد رسالة بنك في \(.applicationName)",
+                "تسجيل رسالة البنك تلقائياً في \(.applicationName)"
+            ],
+            shortTitle: "تسجيل رسالة البنك تلقائياً",
+            systemImageName: "bubble.left.and.bubble.right.fill"
         )
     }
 }

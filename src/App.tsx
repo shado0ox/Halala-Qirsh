@@ -51,10 +51,11 @@ import {
 } from './utils/jamiyyaEngine';
 
 import { Capacitor, PluginListenerHandle } from '@capacitor/core';
+import { Preferences } from '@capacitor/preferences';
 import { TabBar, TabId } from './components/TabBar';
 import { AddExpenseSheet } from './components/AddExpenseSheet';
 import { SmartSmsSheet } from './components/SmartSmsSheet';
-import { getLocalToday, categorizeMerchant } from './utils/smsParser';
+import { getLocalToday, categorizeMerchant, getLearnedRules } from './utils/smsParser';
 import {
   isSmartSmsDeepLink,
   isApplePayDeepLink,
@@ -68,6 +69,8 @@ import {
   readPendingQuickExpenses,
   ackQuickExpenses,
 } from './utils/quickExpenseQueue';
+import { readPendingSms, ackPendingSms, processPendingSms } from './utils/smsInbox';
+import { findCrossSourceMatch, applyCrossMatch } from './utils/crossSourceDedupe';
 import { IOSNotificationBanner } from './components/IOSNotificationBanner';
 import { PasscodeLockModal } from './components/PasscodeLockModal';
 import { ConfirmModal } from './components/ConfirmModal';
@@ -152,17 +155,65 @@ function AppContent() {
   const [passcodeModalMode, setPasscodeModalMode] = useState<'set' | 'change' | null>(null);
   const [isPrivacyPolicyOpen, setIsPrivacyPolicyOpen] = useState<boolean>(false);
   const [isSmartSmsOpen, setIsSmartSmsOpen] = useState<boolean>(false);
+  const [currentReviewSmsText, setCurrentReviewSmsText] = useState<string | undefined>(undefined);
   const [isApplePaySetupOpen, setIsApplePaySetupOpen] = useState<boolean>(false);
   const [applePayPendingReview, setApplePayPendingReview] = useState<(ApplePayTransactionPayload & { amount: number; merchant: string }) | null>(null);
 
   const isLockedRef = useRef<boolean>(isLocked);
   const pendingSmartSmsOpenRef = useRef<boolean>(false);
   const pendingApplePayPayloadRef = useRef<ApplePayTransactionPayload | null>(null);
+  const pendingSmsReviewQueueRef = useRef<Array<{ id: string; text: string; createdAt: number }>>([]);
+  const hasHandledLaunchUrlRef = useRef<boolean>(false);
+  const dataExpensesRef = useRef(data.expenses);
+  dataExpensesRef.current = data.expenses;
+  const dataSettingsRef = useRef(data.settings);
+  dataSettingsRef.current = data.settings;
+
+  const advanceSmsReviewQueue = useCallback(() => {
+    if (pendingSmsReviewQueueRef.current.length > 0) {
+      const nextItem = pendingSmsReviewQueueRef.current.shift()!;
+      setCurrentReviewSmsText(nextItem.text);
+      setIsSmartSmsOpen(true);
+    } else {
+      setCurrentReviewSmsText(undefined);
+    }
+  }, []);
+
+  const handleCloseSmartSms = useCallback(() => {
+    setIsSmartSmsOpen(false);
+    setCurrentReviewSmsText(undefined);
+    if (pendingSmsReviewQueueRef.current.length > 0) {
+      setTimeout(() => {
+        advanceSmsReviewQueue();
+      }, 300);
+    }
+  }, [advanceSmsReviewQueue]);
+
+  const handleCrossMatchExisting = useCallback((matchedExpenseId: string) => {
+    setData((prev) => ({
+      ...prev,
+      expenses: prev.expenses.map((e) =>
+        e.id === matchedExpenseId ? { ...e, crossMatched: true } : e
+      ),
+    }));
+    nativeHaptics.success(data.settings.soundEnabled);
+    showToast(
+      data.settings.language === 'en'
+        ? 'Duplicate expense merged with existing record'
+        : 'تم دمج المصروف مع العملية المسجلة مسبقاً',
+      'success'
+    );
+  }, [data.settings.soundEnabled, data.settings.language, showToast]);
 
   const processApplePayPayload = useCallback(
     (payload: ApplePayTransactionPayload) => {
       if (typeof payload.amount === 'number' && payload.amount > 0) {
         if (payload.autoLog) {
+          // Gating: If bank_sms only, ignore Apple Pay transaction
+          if (dataSettingsRef.current.autoCaptureMode === 'bank_sms') {
+            return;
+          }
+
           // Direct auto-log without modal prompt
           const merchant = payload.merchant || '';
           const { categoryId: predictedCatId } = categorizeMerchant(merchant, data.categories);
@@ -176,6 +227,41 @@ function AppContent() {
           const title = merchant.trim() || catName;
 
           const safeAmount = cleanMoneyAmount(payload.amount);
+
+          // Cross-source deduplication: check if existing SMS expense matches
+          const existingMatch = findCrossSourceMatch(
+            {
+              amount: safeAmount,
+              date: getLocalToday(),
+              at: Date.now(),
+              source: 'apple_pay',
+            },
+            dataExpensesRef.current,
+            { requireWindow: true }
+          );
+
+          if (existingMatch) {
+            const merged = applyCrossMatch(existingMatch, {
+              amount: safeAmount,
+              date: getLocalToday(),
+              at: Date.now(),
+              source: 'apple_pay',
+              title,
+            });
+            setData((prev) => ({
+              ...prev,
+              expenses: prev.expenses.map((e) => (e.id === existingMatch.id ? merged : e)),
+            }));
+            nativeHaptics.success(data.settings.soundEnabled);
+            showToast(
+              isEnLang
+                ? `Pay: Transaction merged with bank SMS (${safeAmount})`
+                : `Pay: تم دمج العملية مع رسالة البنك (${safeAmount})`,
+              'success'
+            );
+            return;
+          }
+
           const newExp: Expense = {
             id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
             title,
@@ -217,6 +303,12 @@ function AppContent() {
     [data.categories, data.settings.language, data.settings.soundEnabled, showToast]
   );
 
+  const processApplePayPayloadRef = useRef(processApplePayPayload);
+  processApplePayPayloadRef.current = processApplePayPayload;
+  useEffect(() => {
+    processApplePayPayloadRef.current = processApplePayPayload;
+  }, [processApplePayPayload]);
+
   useEffect(() => {
     isLockedRef.current = isLocked;
     if (!isLocked) {
@@ -224,13 +316,16 @@ function AppContent() {
         pendingSmartSmsOpenRef.current = false;
         setIsSmartSmsOpen(true);
       }
-      if (pendingApplePayPayloadRef.current) {
+      if (pendingApplePayPayloadRef.current && hasHydratedRef.current) {
         const payload = pendingApplePayPayloadRef.current;
         pendingApplePayPayloadRef.current = null;
-        processApplePayPayload(payload);
+        processApplePayPayloadRef.current(payload);
+      }
+      if (pendingSmsReviewQueueRef.current.length > 0 && !isSmartSmsOpen) {
+        advanceSmsReviewQueue();
       }
     }
-  }, [isLocked, processApplePayPayload]);
+  }, [isLocked, isSmartSmsOpen, advanceSmsReviewQueue]);
 
   // Deep Link listener for halalaqirsh://sms and halalaqirsh://applepay
   useEffect(() => {
@@ -247,23 +342,26 @@ function AppContent() {
       } else if (isApplePayDeepLink(url)) {
         const payload = parseApplePayDeepLink(url);
         if (payload) {
-          if (isLockedRef.current) {
+          if (isLockedRef.current || !hasHydratedRef.current) {
             pendingApplePayPayloadRef.current = payload;
           } else {
-            processApplePayPayload(payload);
+            processApplePayPayloadRef.current(payload);
           }
         }
       }
     };
 
-    // 1. Check launch URL upon cold start
-    CapApp.getLaunchUrl()
-      .then((launchUrl) => {
-        if (launchUrl?.url) {
-          handleDeepLink(launchUrl.url);
-        }
-      })
-      .catch(() => {});
+    // 1. Check launch URL upon cold start (only once)
+    if (!hasHandledLaunchUrlRef.current) {
+      hasHandledLaunchUrlRef.current = true;
+      CapApp.getLaunchUrl()
+        .then((launchUrl) => {
+          if (launchUrl?.url) {
+            handleDeepLink(launchUrl.url);
+          }
+        })
+        .catch(() => {});
+    }
 
     // 2. Listen for URL opens while app is running / foregrounded
     let listenerHandle: PluginListenerHandle | null = null;
@@ -292,7 +390,7 @@ function AppContent() {
         listenerHandle.remove();
       }
     };
-  }, [processApplePayPayload]);
+  }, []);
 
   // Month-end celebration state
   const [showCelebration, setShowCelebration] = useState<boolean>(false);
@@ -368,6 +466,22 @@ function AppContent() {
 
       // Sync categories to preferences for AppIntent
       syncQuickCategories(prefData.categories, prefData.settings.language || 'ar');
+      if (Capacitor.isNativePlatform()) {
+        Preferences.set({
+          key: 'autoCaptureMode',
+          value: prefData.settings.autoCaptureMode || 'apple_pay',
+        }).catch(() => {});
+      }
+
+      if (pendingApplePayPayloadRef.current && (!prefData.settings.isPasscodeEnabled || !hasPass)) {
+        const payload = pendingApplePayPayloadRef.current;
+        pendingApplePayPayloadRef.current = null;
+        processApplePayPayloadRef.current(payload);
+      }
+      if (pendingSmartSmsOpenRef.current && (!prefData.settings.isPasscodeEnabled || !hasPass)) {
+        pendingSmartSmsOpenRef.current = false;
+        setIsSmartSmsOpen(true);
+      }
     });
   }, []);
 
@@ -520,6 +634,7 @@ function AppContent() {
         setIsAppInactive(false);
         runBillNotificationCheck();
         importQuickExpensesRef.current();
+        importBankSmsRef.current();
       }
     });
 
@@ -584,6 +699,9 @@ function AppContent() {
   };
 
   const handleUpdateSettings = (newSettings: Partial<BudgetSettings>) => {
+    if (newSettings.autoCaptureMode && Capacitor.isNativePlatform()) {
+      Preferences.set({ key: 'autoCaptureMode', value: newSettings.autoCaptureMode }).catch(() => {});
+    }
     setData((prev) => ({
       ...prev,
       settings: {
@@ -672,12 +790,19 @@ function AppContent() {
       const ackIds: string[] = [];
       const newExpensesToAdd: Expense[] = [];
       let missingCategoryFound = false;
+      let currentExpenses = [...data.expenses];
+      let mergedApplePayCount = 0;
 
       for (const item of toProcess) {
         processedQuickExpenseIdsRef.current.add(item.id);
         ackIds.push(item.id);
 
         const isApplePay = item.source === 'apple_pay';
+        if (isApplePay && data.settings.autoCaptureMode === 'bank_sms') {
+          // Gating: Discard Apple Pay item silently when in bank_sms only mode
+          continue;
+        }
+
         let category = data.categories.find((c) => c.id === item.categoryId);
 
         if (isApplePay) {
@@ -704,10 +829,39 @@ function AppContent() {
           ? item.merchant.trim()
           : categoryName;
 
+        const safeAmount = cleanMoneyAmount(item.amount);
+
+        // Deduplication for Apple Pay against existing SMS expenses
+        if (isApplePay) {
+          const match = findCrossSourceMatch(
+            {
+              amount: safeAmount,
+              date: item.date || getLocalToday(),
+              at: item.createdAt,
+              source: 'apple_pay',
+            },
+            currentExpenses,
+            { requireWindow: true }
+          );
+
+          if (match) {
+            const merged = applyCrossMatch(match, {
+              amount: safeAmount,
+              date: item.date || getLocalToday(),
+              at: item.createdAt,
+              source: 'apple_pay',
+              title,
+            });
+            currentExpenses = currentExpenses.map((e) => (e.id === match.id ? merged : e));
+            mergedApplePayCount++;
+            continue;
+          }
+        }
+
         const newExp: Expense = {
           id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
           title,
-          amount: cleanMoneyAmount(item.amount),
+          amount: safeAmount,
           categoryId: category.id,
           date: item.date || getLocalToday(),
           paymentMethod: isApplePay ? 'digital' : 'card',
@@ -715,16 +869,18 @@ function AppContent() {
           notes: item.note?.trim() || item.merchant?.trim() || undefined,
           source: isApplePay ? 'apple_pay' : 'quick_intent',
           isAutoLogged: isApplePay ? true : undefined,
-          createdAt: Date.now(),
+          crossMatched: false,
+          createdAt: item.createdAt || Date.now(),
         };
 
         newExpensesToAdd.push(newExp);
+        currentExpenses = [newExp, ...currentExpenses];
       }
 
-      if (newExpensesToAdd.length > 0) {
+      if (newExpensesToAdd.length > 0 || mergedApplePayCount > 0) {
         setData((prev) => ({
           ...prev,
-          expenses: [...newExpensesToAdd, ...prev.expenses],
+          expenses: currentExpenses,
         }));
         nativeHaptics.success(data.settings.soundEnabled);
       }
@@ -759,13 +915,20 @@ function AppContent() {
             'success'
           );
         }
+      } else if (mergedApplePayCount > 0) {
+        showToast(
+          isEnLang
+            ? `Pay: ${mergedApplePayCount} transaction(s) merged with bank SMS`
+            : `Pay: تم دمج ${mergedApplePayCount} عملية مع رسالة البنك لتفادي التكرار`,
+          'success'
+        );
       }
     } catch {
       // Fail safely
     } finally {
       isImportingQuickExpensesRef.current = false;
     }
-  }, [data.categories, data.settings, showToast]);
+  }, [data.categories, data.expenses, data.settings, showToast]);
 
   const importQuickExpensesRef = useRef(importQuickExpenses);
   importQuickExpensesRef.current = importQuickExpenses;
@@ -773,10 +936,163 @@ function AppContent() {
     importQuickExpensesRef.current = importQuickExpenses;
   }, [importQuickExpenses]);
 
+  // Bank SMS Queue processing (from iOS Shortcuts message automation AppIntent)
+  const processedBankSmsIdsRef = useRef<Set<string>>(new Set());
+  const isImportingBankSmsRef = useRef<boolean>(false);
+
+  const importBankSms = useCallback(async () => {
+    if (!hasHydratedRef.current || isImportingBankSmsRef.current) return;
+    if (!Capacitor.isNativePlatform()) return;
+
+    isImportingBankSmsRef.current = true;
+    try {
+      const pending = await readPendingSms();
+      if (!pending || pending.length === 0) return;
+
+      const toProcess = pending.filter(
+        (item) => !processedBankSmsIdsRef.current.has(item.id)
+      );
+
+      if (toProcess.length === 0) {
+        await ackPendingSms(pending.map((p) => p.id));
+        return;
+      }
+
+      const captureMode = data.settings.autoCaptureMode || 'apple_pay';
+      // If mode is 'apple_pay', discard bank SMS immediately without processing
+      if (captureMode === 'apple_pay') {
+        for (const item of toProcess) {
+          processedBankSmsIdsRef.current.add(item.id);
+        }
+        await ackPendingSms(pending.map((p) => p.id));
+        return;
+      }
+
+      for (const item of toProcess) {
+        processedBankSmsIdsRef.current.add(item.id);
+      }
+
+      const learnedRules = getLearnedRules();
+      const { toAdd, toReview } = processPendingSms(
+        toProcess,
+        data.categories,
+        learnedRules
+      );
+
+      let addedCount = 0;
+      let mergedCount = 0;
+      const newExpensesToAdd: Expense[] = [];
+      let currentExpenses = [...data.expenses];
+
+      for (const item of toAdd) {
+        const match = findCrossSourceMatch(
+          {
+            amount: item.amount,
+            date: item.date,
+            at: item.candidateAt,
+            source: 'sms',
+          },
+          currentExpenses,
+          { requireWindow: true }
+        );
+
+        if (match) {
+          const merged = applyCrossMatch(match, {
+            amount: item.amount,
+            date: item.date,
+            at: item.candidateAt,
+            source: 'sms',
+            title: item.title,
+          });
+          currentExpenses = currentExpenses.map((e) => (e.id === match.id ? merged : e));
+          mergedCount++;
+        } else {
+          const newExp: Expense = {
+            id: `exp-${Date.now()}-${Math.random().toString(36).substring(2, 7)}`,
+            title: item.title,
+            amount: cleanMoneyAmount(item.amount),
+            categoryId: item.categoryId,
+            date: item.date,
+            paymentMethod: item.paymentMethod,
+            payer: item.payer,
+            source: 'sms',
+            isAutoLogged: true,
+            crossMatched: false,
+            createdAt: item.candidateAt || Date.now(),
+          };
+          newExpensesToAdd.push(newExp);
+          currentExpenses = [newExp, ...currentExpenses];
+          addedCount++;
+        }
+      }
+
+      if (addedCount > 0 || mergedCount > 0) {
+        setData((prev) => ({
+          ...prev,
+          expenses: currentExpenses,
+        }));
+        nativeHaptics.success(data.settings.soundEnabled);
+      }
+
+      // Handle items that need review (unknown merchant or category not identified)
+      if (toReview.length > 0) {
+        pendingSmsReviewQueueRef.current.push(...toReview);
+        if (!isLockedRef.current && !isSmartSmsOpen) {
+          advanceSmsReviewQueue();
+        }
+      }
+
+      // Acknowledge all processed IDs in this batch
+      await ackPendingSms(pending.map((p) => p.id));
+
+      const isEnLang = data.settings.language === 'en';
+      if (addedCount > 0 && mergedCount > 0) {
+        showToast(
+          isEnLang
+            ? `${addedCount} bank transaction(s) logged, ${mergedCount} duplicate(s) merged with Apple Pay`
+            : `تم تسجيل ${addedCount} عملية بنكية تلقائياً ودُمجت ${mergedCount} عملية مكررة مع Apple Pay`,
+          'success'
+        );
+      } else if (addedCount > 0) {
+        showToast(
+          isEnLang
+            ? `${addedCount} bank transaction(s) logged automatically`
+            : `تم تسجيل ${addedCount} عملية بنكية تلقائياً`,
+          'success'
+        );
+      } else if (mergedCount > 0) {
+        showToast(
+          isEnLang
+            ? `${mergedCount} transaction(s) merged with Apple Pay to prevent duplicates`
+            : `تم دمج ${mergedCount} عملية من رسائل البنك مع عمليات Apple Pay المسجلة مسبقاً لمنع التكرار`,
+          'success'
+        );
+      }
+    } catch {
+      // Fail safely
+    } finally {
+      isImportingBankSmsRef.current = false;
+    }
+  }, [
+    data.categories,
+    data.expenses,
+    data.settings,
+    isSmartSmsOpen,
+    advanceSmsReviewQueue,
+    showToast,
+  ]);
+
+  const importBankSmsRef = useRef(importBankSms);
+  importBankSmsRef.current = importBankSms;
+  useEffect(() => {
+    importBankSmsRef.current = importBankSms;
+  }, [importBankSms]);
+
   // Initial import effect after hydration
   useEffect(() => {
     if (isHydrated) {
       importQuickExpensesRef.current();
+      importBankSmsRef.current();
     }
   }, [isHydrated]);
 
@@ -785,6 +1101,7 @@ function AppContent() {
     if (!isHydrated || isAppInactive) return;
     const interval = setInterval(() => {
       importQuickExpensesRef.current();
+      importBankSmsRef.current();
     }, 3000);
     return () => clearInterval(interval);
   }, [isHydrated, isAppInactive]);
@@ -1510,9 +1827,12 @@ function AppContent() {
           {/* Smart Bank SMS Parser Bottom Sheet */}
           <SmartSmsSheet
             isOpen={isSmartSmsOpen}
-            onClose={() => setIsSmartSmsOpen(false)}
+            onClose={handleCloseSmartSms}
             categories={data.categories}
             currency={data.settings.currency}
+            initialText={currentReviewSmsText}
+            existingExpenses={data.expenses}
+            onCrossMatchExisting={handleCrossMatchExisting}
             onSaveExpense={(exp) => {
               handleSaveExpense(exp);
               showToast(
@@ -1520,6 +1840,7 @@ function AppContent() {
                   ? 'Expense imported from bank SMS successfully!'
                   : 'تم استيراد وحفظ العملية البنكية بنجاح!'
               );
+              handleCloseSmartSms();
             }}
             soundEnabled={data.settings.soundEnabled}
             language={data.settings.language}

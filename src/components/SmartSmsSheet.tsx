@@ -50,6 +50,9 @@ interface SmartSmsSheetProps {
   ) => void;
   soundEnabled?: boolean;
   language?: 'ar' | 'en';
+  initialText?: string;
+  existingExpenses?: Expense[];
+  onCrossMatchExisting?: (matchedExpenseId: string) => void;
 }
 
 export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
@@ -60,6 +63,9 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
   onSaveExpense,
   soundEnabled = true,
   language = 'ar',
+  initialText,
+  existingExpenses,
+  onCrossMatchExisting,
 }) => {
   const isEn = language === 'en';
   const { isKeyboardOpen } = useKeyboardState();
@@ -80,6 +86,7 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
   const [notes, setNotes] = useState<string>('');
   const [isLearnedBadge, setIsLearnedBadge] = useState<boolean>(false);
   const [initialPredictedCategoryId, setInitialPredictedCategoryId] = useState<string>('');
+  const [duplicateWarningMatch, setDuplicateWarningMatch] = useState<Expense | null>(null);
 
   const handleResetAndClose = () => {
     // Zero out raw SMS text immediately for privacy - never persist
@@ -92,8 +99,16 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
     setCategoryId('');
     setDate('');
     setNotes('');
+    setDuplicateWarningMatch(null);
     onClose();
   };
+
+  React.useEffect(() => {
+    if (isOpen && initialText) {
+      setRawSms(initialText);
+      triggerParse(initialText);
+    }
+  }, [isOpen, initialText]);
 
   const handlePasteFromClipboard = async () => {
     nativeHaptics.tap(soundEnabled);
@@ -160,6 +175,28 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
     triggerParse(rawSms);
   };
 
+  const executeSave = () => {
+    const finalAmount = parseFloat(amountStr);
+    nativeHaptics.tap(soundEnabled);
+
+    if (title.trim() && title.trim() !== 'عملية بنكية' && categoryId) {
+      saveLearnedRule(title.trim(), categoryId);
+    }
+
+    onSaveExpense({
+      title: title.trim(),
+      amount: finalAmount,
+      categoryId,
+      date: date || getLocalToday(),
+      paymentMethod,
+      payer,
+      notes: notes.trim() || undefined,
+      source: 'sms',
+    });
+
+    handleResetAndClose();
+  };
+
   const handleSaveParsedExpense = (e: React.FormEvent) => {
     e.preventDefault();
     if (!categoryId) {
@@ -176,24 +213,37 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
       return;
     }
 
-    nativeHaptics.tap(soundEnabled);
+    if (!duplicateWarningMatch && existingExpenses && existingExpenses.length > 0) {
+      const candidateDate = date || getLocalToday();
+      const candidateHalalas = Math.round(finalAmount * 100);
+      const matched = existingExpenses.find((exp) => {
+        if (exp.crossMatched) return false;
+        if (Math.round(exp.amount * 100) !== candidateHalalas) return false;
+        const d1 = new Date(candidateDate).getTime();
+        const d2 = new Date(exp.date).getTime();
+        const diffDays = Math.abs(d1 - d2) / (1000 * 3600 * 24);
+        return !isNaN(diffDays) && diffDays <= 1.05;
+      });
 
-    // Call saveLearnedRule only when merchant !== 'عملية بنكية' and categoryId is non-empty
-    if (title.trim() && title.trim() !== 'عملية بنكية' && categoryId) {
-      saveLearnedRule(title.trim(), categoryId);
+      if (matched) {
+        setDuplicateWarningMatch(matched);
+        return;
+      }
     }
 
-    onSaveExpense({
-      title: title.trim(),
-      amount: finalAmount,
-      categoryId,
-      date: date || getLocalToday(),
-      paymentMethod,
-      payer,
-      notes: notes.trim() || undefined,
-    });
+    executeSave();
+  };
 
+  const handleIgnoreDuplicate = () => {
+    nativeHaptics.tap(soundEnabled);
+    if (duplicateWarningMatch) {
+      onCrossMatchExisting?.(duplicateWarningMatch.id);
+    }
     handleResetAndClose();
+  };
+
+  const handleSaveAnywayDuplicate = () => {
+    executeSave();
   };
 
   const paymentOptions: Array<{ id: PaymentMethod; label: string; icon: any }> = [
@@ -387,6 +437,44 @@ export const SmartSmsSheet: React.FC<SmartSmsSheetProps> = ({
                       </span>
                     )}
                   </div>
+
+                  {/* Duplicate warning notification */}
+                  {duplicateWarningMatch && (
+                    <div
+                      data-testid="duplicate-warning-banner"
+                      className="p-3.5 rounded-2xl bg-amber-50 dark:bg-amber-950/40 border border-amber-300 dark:border-amber-900/60 text-xs text-amber-900 dark:text-amber-200 space-y-2"
+                    >
+                      <div className="flex items-start gap-2">
+                        <AlertCircle size={16} className="text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                        <div className="leading-relaxed">
+                          <p className="font-bold">
+                            {isEn ? 'Possible Duplicate Detected' : 'احتمال تكرار العملية'}
+                          </p>
+                          <p className="text-[11px] opacity-90 mt-0.5">
+                            {isEn
+                              ? `A matching expense of ${duplicateWarningMatch.amount} on ${duplicateWarningMatch.date} is already registered (${duplicateWarningMatch.title}).`
+                              : `يوجد مصروف مطابق بقيمة ${duplicateWarningMatch.amount} مسجل في ${duplicateWarningMatch.date} (${duplicateWarningMatch.title}).`}
+                          </p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 pt-1">
+                        <button
+                          type="button"
+                          onClick={handleIgnoreDuplicate}
+                          className="flex-1 py-2 px-3 rounded-xl bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs cursor-pointer shadow-xs"
+                        >
+                          {isEn ? 'Ignore & Link' : 'تجاهل (دمج)'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={handleSaveAnywayDuplicate}
+                          className="flex-1 py-2 px-3 rounded-xl bg-white dark:bg-[#2C2C2E] border border-amber-300 dark:border-amber-800 text-amber-900 dark:text-amber-200 font-bold text-xs cursor-pointer hover:bg-amber-100/50"
+                        >
+                          {isEn ? 'Save Anyway' : 'حفظ على أي حال'}
+                        </button>
+                      </div>
+                    </div>
+                  )}
 
                   {/* Big Amount Field */}
                   <div className="bg-[#EAF6F0] dark:bg-[#2C2C2E] p-3.5 rounded-3xl border border-emerald-500/20 flex flex-col items-center justify-center text-center">
