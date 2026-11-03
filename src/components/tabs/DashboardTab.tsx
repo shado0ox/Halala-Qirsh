@@ -14,6 +14,7 @@ import {
   Eye,
   EyeOff,
   Sparkles,
+  HandCoins,
 } from 'lucide-react';
 import { motion } from 'motion/react';
 import { Category, Expense, RecurringBill, BudgetSettings, JamiyyaGroup } from '../../types';
@@ -28,6 +29,7 @@ import { cardVariants, reducedCardVariants, useMotionConfig, springs } from '../
 import { HalalaQirshLogo } from '../HalalaQirshLogo';
 import { getLocalToday } from '../../utils/smsParser';
 import { JamiyyaDashboardWidget } from '../jamiyya/JamiyyaDashboardWidget';
+import { getSalaryCycle, isDateInCycle } from '../../utils/salaryCycle';
 
 interface DashboardTabProps {
   categories: Category[];
@@ -57,13 +59,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   onOpenJamiyya,
 }) => {
   const currentMonth = settings.selectedMonth;
+  const salaryDay = settings.salaryDay || 27;
+  const cycle = React.useMemo(() => getSalaryCycle(salaryDay, new Date()), [salaryDay]);
+
   const motionConfig = useMotionConfig(settings.animations);
   const isReduced = motionConfig.isReduced;
   const isHidden = Boolean(settings.hideAmounts);
 
-  // Filter expenses for selected month
-  const monthlyExpenses = expenses.filter((e) => e.date.startsWith(currentMonth));
+  // Filter expenses for selected salary cycle (strictly excluding income!)
+  const monthlyExpenses = React.useMemo(
+    () => expenses.filter((e) => e.type !== 'income' && isDateInCycle(e.date, cycle)),
+    [expenses, cycle]
+  );
+  const monthlyIncomes = React.useMemo(
+    () => expenses.filter((e) => e.type === 'income' && isDateInCycle(e.date, cycle)),
+    [expenses, cycle]
+  );
+
   const totalSpent = sumMoney(monthlyExpenses.map((e) => e.amount));
+  const totalIncomeReceived = sumMoney(monthlyIncomes.map((e) => e.amount));
 
   // Total budget calculation
   const totalBudget =
@@ -75,18 +89,17 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
   const percentageSpent = totalBudget > 0 ? Math.min(Math.round((totalSpent / totalBudget) * 100), 999) : 0;
   const progressRatio = Math.min(percentageSpent, 100) / 100;
 
-  // Days in month & remaining days
+  // Days in cycle & remaining days
   const now = new Date();
   const year = parseInt(currentMonth.split('-')[0], 10);
   const month = parseInt(currentMonth.split('-')[1], 10);
-  const totalDaysInMonth = new Date(year, month, 0).getDate();
-  const currentDay = now.getMonth() + 1 === month ? now.getDate() : 1;
-  const remainingDays = Math.max(totalDaysInMonth - currentDay + 1, 1);
+  const currentDay = now.getDate();
+  const remainingDays = cycle.daysRemaining;
   const dailySuggestedSpend = remainingBudget > 0 ? Math.round(remainingBudget / remainingDays) : 0;
 
-  // Today's expenses
+  // Today's expenses (strictly excluding income)
   const todayStr = getLocalToday(now);
-  const todayExpenses = expenses.filter((e) => e.date === todayStr);
+  const todayExpenses = expenses.filter((e) => e.type !== 'income' && e.date === todayStr);
   const todaySpent = sumMoney(todayExpenses.map((e) => e.amount));
 
   // Unpaid bills due this month
@@ -233,7 +246,7 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
           <div>
             <span className="text-[11px] font-semibold text-[#8E8E93] flex items-center gap-1.5 leading-none">
               <Calendar size={12} className="text-emerald-600 dark:text-emerald-400" />
-              <span>{t.monthlyBudgetTitle} {monthFormatted}</span>
+              <span>{cycle.isSalaryCycle ? (isEn ? cycle.labelEn : cycle.labelAr) : `${t.monthlyBudgetTitle} ${monthFormatted}`}</span>
             </span>
             <h1 className="text-xl sm:text-2xl font-black text-[#1C1C1E] dark:text-white tracking-tight mt-0.5 leading-tight">
               {t.appTitle}
@@ -424,8 +437,11 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
 
           {/* Suggested Daily Spending Card inside Hero */}
           <div className="px-3 py-2 rounded-xl bg-black/15 flex items-center justify-between text-xs">
-            <span className="text-emerald-100 font-medium">
-              {isEn ? 'Daily target spend:' : 'معدل الصرف اليومي المتاح:'}
+            <span className="text-emerald-100 font-medium flex items-center gap-1">
+              <span>{isEn ? 'Daily target spend' : 'معدل الصرف اليومي المتاح'}</span>
+              <span className="text-[10px] text-emerald-200/80">
+                ({isEn ? `${remainingDays}d left` : `متبقي ${remainingDays} يوم`}):
+              </span>
             </span>
             <span className="font-extrabold text-white tabular-nums">
               {isHidden ? (
@@ -443,6 +459,25 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
               )}
             </span>
           </div>
+
+          {/* Extra Income Pill if any received in this cycle */}
+          {totalIncomeReceived > 0 && (
+            <div className="px-3 py-1.5 rounded-xl bg-emerald-500/25 border border-emerald-300/30 flex items-center justify-between text-xs">
+              <span className="text-emerald-100 flex items-center gap-1 font-medium">
+                <HandCoins size={13} className="text-emerald-200" />
+                <span>{isEn ? 'Income received in cycle:' : 'دخل مستلم في هذه الدورة:'}</span>
+              </span>
+              <span className="font-extrabold text-white tabular-nums">
+                <Amount
+                  value={totalIncomeReceived}
+                  currency={settings.currency}
+                  lang={lang}
+                  hideAmounts={isHidden}
+                  prefix="+"
+                />
+              </span>
+            </div>
+          )}
         </div>
       </motion.div>
 
@@ -654,52 +689,69 @@ export const DashboardTab: React.FC<DashboardTabProps> = ({
         </div>
 
         <div className="bg-white dark:bg-[#1C1C1E] rounded-2xl border border-emerald-500/15 dark:border-slate-800 divide-y divide-[#E5E5EA] dark:divide-[#2C2C2E] overflow-hidden shadow-[0_4px_16px_rgba(16,185,129,0.05)] dark:shadow-none">
-          {monthlyExpenses.slice(0, 4).map((exp) => {
-            const cat = catMap.get(exp.categoryId);
-            return (
-              <div
-                key={exp.id}
-                className="p-3 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
-              >
-                <div className="flex items-center gap-3">
-                  <CategoryIcon
-                    iconName={cat?.icon || 'Tag'}
-                    color={cat?.color || '#10B981'}
-                    bgColor={cat?.bgColor}
-                    size="md"
-                  />
-                  <div>
-                    <div className="text-xs font-bold text-[#1C1C1E] dark:text-white flex items-center gap-1.5">
-                      <span className="truncate">{exp.title}</span>
-                      {exp.source === 'apple_pay' && (
-                        <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black text-white dark:bg-white dark:text-black shadow-xs">
-                          Pay
+          {expenses
+            .filter((e) => isDateInCycle(e.date, cycle))
+            .slice(0, 4)
+            .map((exp) => {
+              const isIncome = exp.type === 'income';
+              const cat = isIncome ? undefined : catMap.get(exp.categoryId);
+              return (
+                <div
+                  key={exp.id}
+                  className="p-3 flex items-center justify-between hover:bg-slate-50/50 dark:hover:bg-slate-800/40 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <CategoryIcon
+                      iconName={isIncome ? 'HandCoins' : (cat?.icon || 'Tag')}
+                      color={isIncome ? '#10B981' : (cat?.color || '#10B981')}
+                      bgColor={isIncome ? '#ECFDF5' : cat?.bgColor}
+                      size="md"
+                    />
+                    <div>
+                      <div className="text-xs font-bold text-[#1C1C1E] dark:text-white flex items-center gap-1.5">
+                        <span className="truncate">{exp.title}</span>
+                        {isIncome && (
+                          <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300">
+                            {isEn ? 'Income' : 'دخل'}
+                          </span>
+                        )}
+                        {exp.source === 'apple_pay' && (
+                          <span className="shrink-0 inline-flex items-center px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black text-white dark:bg-white dark:text-black shadow-xs">
+                            Pay
+                          </span>
+                        )}
+                      </div>
+                      <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5">
+                        <span>
+                          {isIncome
+                            ? (isEn ? 'Income / Payout' : 'دخل / استلام')
+                            : isEn
+                            ? (cat?.nameEn || cat?.name || 'General')
+                            : (cat?.name || 'تصنيف عام')}
                         </span>
-                      )}
-                    </div>
-                    <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5">
-                      <span>{isEn ? (cat?.nameEn || cat?.name || 'General') : (cat?.name || 'تصنيف عام')}</span>
-                      <span>·</span>
-                      <span>{exp.payer}</span>
-                      <span>·</span>
-                      <span>{exp.date}</span>
+                        <span>·</span>
+                        <span>{exp.payer}</span>
+                        <span>·</span>
+                        <span>{exp.date}</span>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="text-right">
-                  <Amount
-                    value={exp.amount}
-                    currency={settings.currency}
-                    lang={lang}
-                    hideAmounts={isHidden}
-                    prefix="-"
-                    className="text-xs font-extrabold text-[#1C1C1E] dark:text-white"
-                  />
+                  <div className="text-right">
+                    <Amount
+                      value={exp.amount}
+                      currency={settings.currency}
+                      lang={lang}
+                      hideAmounts={isHidden}
+                      prefix={isIncome ? '+' : '-'}
+                      className={`text-xs font-extrabold tabular-nums ${
+                        isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#1C1C1E] dark:text-white'
+                      }`}
+                    />
+                  </div>
                 </div>
-              </div>
-            );
-          })}
+              );
+            })}
 
           {monthlyExpenses.length === 0 && (
             <div className="p-7 text-center space-y-2">

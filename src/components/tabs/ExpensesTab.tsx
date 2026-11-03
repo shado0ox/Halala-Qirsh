@@ -25,6 +25,7 @@ import { springs, fades, useMotionConfig } from '../../utils/motion';
 import { useCoinFlight } from '../../context/CoinFlightContext';
 import { getLocalToday } from '../../utils/smsParser';
 import { translations } from '../../utils/i18n';
+import { getSalaryCycle, isDateInCycle } from '../../utils/salaryCycle';
 
 interface ExpensesTabProps {
   categories: Category[];
@@ -101,7 +102,13 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
 
       // Time Filter
       if (timeFilter === 'this_month') {
-        if (!exp.date.startsWith(currentMonth)) return false;
+        const salaryDay = settings.salaryDay || 1;
+        if (salaryDay > 1) {
+          const cycle = getSalaryCycle(salaryDay, now);
+          if (!isDateInCycle(exp.date, cycle)) return false;
+        } else {
+          if (!exp.date.startsWith(currentMonth)) return false;
+        }
       } else if (timeFilter === 'today') {
         if (exp.date !== todayStr) return false;
       } else if (timeFilter === 'this_week') {
@@ -112,10 +119,15 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
 
       return true;
     });
-  }, [expenses, searchQuery, selectedCategoryId, selectedPayer, timeFilter, settings.selectedMonth, catMap]);
+  }, [expenses, searchQuery, selectedCategoryId, selectedPayer, timeFilter, settings.selectedMonth, settings.salaryDay, catMap]);
 
   const totalFilteredAmount = useMemo(
-    () => sumMoney(filteredExpenses.map((e) => e.amount)),
+    () => sumMoney(filteredExpenses.filter((e) => e.type !== 'income').map((e) => e.amount)),
+    [filteredExpenses]
+  );
+
+  const totalFilteredIncome = useMemo(
+    () => sumMoney(filteredExpenses.filter((e) => e.type === 'income').map((e) => e.amount)),
     [filteredExpenses]
   );
 
@@ -297,15 +309,22 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
       {/* Filter Summary Banner */}
       <div className="px-3.5 py-2.5 rounded-2xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200/50 dark:border-emerald-900/40 flex items-center justify-between text-xs">
         <span className="text-emerald-800 dark:text-emerald-300 font-semibold">
-          {isEn ? 'Total for selected period:' : 'إجمالي النفقات للمدة المحددة:'}
+          {isEn ? 'Total expenses for selected period:' : 'إجمالي النفقات للمدة المحددة:'}
         </span>
-        <Amount
-          value={totalFilteredAmount}
-          currency={settings.currency}
-          lang={lang}
-          hideAmounts={isHidden}
-          className="text-sm font-black text-emerald-700 dark:text-emerald-300 tabular-nums"
-        />
+        <div className="flex items-center gap-2">
+          {totalFilteredIncome > 0 && (
+            <span className="text-xs font-bold text-emerald-600 dark:text-emerald-400">
+              +{formatMoney(totalFilteredIncome, settings.currency, lang)} {isEn ? 'income' : 'دخل'} ·
+            </span>
+          )}
+          <Amount
+            value={totalFilteredAmount}
+            currency={settings.currency}
+            lang={lang}
+            hideAmounts={isHidden}
+            className="text-sm font-black text-emerald-700 dark:text-emerald-300 tabular-nums"
+          />
+        </div>
       </div>
 
       {/* Grouped Expenses List with Sticky Headers & Swipe Items */}
@@ -315,13 +334,23 @@ export const ExpensesTab: React.FC<ExpensesTabProps> = ({
             {/* Sticky Day Header */}
             <div className="sticky top-0 z-20 bg-[#F4FAF7] dark:bg-black py-1 px-1 flex items-center justify-between text-xs font-extrabold text-[#5C8271] dark:text-[#8E8E93]">
               <span>{group.displayDate}</span>
-              <Amount
-                value={sumMoney(group.items.map((i) => i.amount))}
-                currency={settings.currency}
-                lang={lang}
-                hideAmounts={isHidden}
-                className="tabular-nums text-[11px] font-bold"
-              />
+              <div className="flex items-center gap-2">
+                {group.items.some((i) => i.type === 'income') && (
+                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold text-[11px] tabular-nums">
+                    +{formatMoney(sumMoney(group.items.filter((i) => i.type === 'income').map((i) => i.amount)), settings.currency, lang)}
+                  </span>
+                )}
+                {group.items.some((i) => i.type !== 'income') && (
+                  <Amount
+                    value={sumMoney(group.items.filter((i) => i.type !== 'income').map((i) => i.amount))}
+                    currency={settings.currency}
+                    lang={lang}
+                    hideAmounts={isHidden}
+                    prefix="-"
+                    className="tabular-nums text-[11px] font-bold"
+                  />
+                )}
+              </div>
             </div>
 
             {/* List Group Container */}

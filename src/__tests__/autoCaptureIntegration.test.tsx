@@ -332,7 +332,8 @@ describe('Bank SMS & Cross-Source Auto-Capture Integration Tests', () => {
     });
 
     // Pick a category to satisfy required category selection
-    const entertainmentCatBtn = screen.getByText('ترفيه ومطاعم عائلية');
+    const entertainmentCatBtns = screen.getAllByText('ترفيه ومطاعم عائلية');
+    const entertainmentCatBtn = entertainmentCatBtns[entertainmentCatBtns.length - 1];
     await act(async () => {
       fireEvent.click(entertainmentCatBtn);
     });
@@ -359,5 +360,76 @@ describe('Bank SMS & Cross-Source Auto-Capture Integration Tests', () => {
     // Check that existing expense was marked as crossMatched: true
     const saved = JSON.parse(nativeStore.get(STORAGE_KEY)!);
     expect(saved.expenses[0].crossMatched).toBe(true);
+  });
+
+  // 8. In mode 'both': incoming Apple Pay deep link without autolog=true parameter logs automatically
+  it('automatically logs Apple Pay deep link without autolog parameter when mode is both', async () => {
+    const d = getDefaultAppData();
+    d.settings = { ...d.settings, autoCaptureMode: 'both', hasCompletedOnboarding: true, animations: 'off' };
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    // Simulate incoming Apple Pay URL event from shortcut without autolog=true
+    await act(async () => {
+      if (appListeners['appUrlOpen']) {
+        appListeners['appUrlOpen']({
+          url: 'halalaqirsh://applepay?amount=55.25&merchant=%D8%AA%D9%85%D9%88%D9%8A%D9%86%D8%A7%D8%AA%20%D8%A7%D9%84%D8%AF%D8%A7%D9%86%D9%88%D8%A8',
+        });
+      }
+      await wait(200);
+    });
+
+    // Check toast indicating auto-logging
+    await waitFor(() => {
+      expect(screen.getByText(/تم قيد 55.25 تلقائياً/)).toBeInTheDocument();
+    });
+
+    // Check expense is persisted in store
+    const saved = JSON.parse(nativeStore.get(STORAGE_KEY)!);
+    expect(saved.expenses).toHaveLength(1);
+    expect(saved.expenses[0].amount).toBe(55.25);
+    expect(saved.expenses[0].title).toBe('تموينات الدانوب');
+    expect(saved.expenses[0].source).toBe('apple_pay');
+    expect(saved.expenses[0].isAutoLogged).toBe(true);
+  });
+
+  // 9. Parses formatted currency in Apple Pay deep link (e.g. SAR 120.00) and auto-logs
+  it('parses formatted currency strings in Apple Pay deep links and auto-logs', async () => {
+    const d = getDefaultAppData();
+    d.settings = { ...d.settings, autoCaptureMode: 'both', hasCompletedOnboarding: true, animations: 'off' };
+    d.expenses = [];
+    nativeStore.set(STORAGE_KEY, JSON.stringify(d));
+
+    render(<App />);
+
+    await act(async () => {
+      await wait(350);
+    });
+
+    // Simulate incoming Apple Pay URL with formatted SAR currency
+    await act(async () => {
+      if (appListeners['appUrlOpen']) {
+        appListeners['appUrlOpen']({
+          url: 'halalaqirsh://applepay?amount=SAR%20120.00&merchant=%D8%AC%D8%B1%D9%8A%D8%B1',
+        });
+      }
+      await wait(200);
+    });
+
+    // Check toast indicating auto-logging
+    await waitFor(() => {
+      expect(screen.getByText(/تم قيد 120 تلقائياً/)).toBeInTheDocument();
+    });
+
+    const saved = JSON.parse(nativeStore.get(STORAGE_KEY)!);
+    expect(saved.expenses).toHaveLength(1);
+    expect(saved.expenses[0].amount).toBe(120);
+    expect(saved.expenses[0].title).toBe('جرير');
   });
 });

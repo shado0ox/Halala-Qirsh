@@ -139,6 +139,8 @@ export const getDefaultAppData = (): AppData => ({
     hideAmounts: false,
     hasCompletedOnboarding: false,
     autoCaptureMode: 'apple_pay',
+    icloudSyncEnabled: true,
+    lastIcloudBackupTimestamp: undefined,
   },
 });
 
@@ -329,6 +331,24 @@ export const exportDataAsJSON = async (data: AppData): Promise<boolean> => {
 };
 
 /**
+ * Sanitizes a CSV cell to prevent CSV Formula / DDE Injection (OWASP recommendation).
+ * If a cell string starts with =, +, -, @, \t, or \r, prepend a single quote (')
+ * so spreadsheet applications (Excel, LibreOffice) treat it strictly as text.
+ */
+export const sanitizeCsvCell = (val: string | number | undefined | null): string => {
+  if (val === null || val === undefined) return '""';
+  if (typeof val === 'number') {
+    return isNaN(val) ? '0' : String(val);
+  }
+  let str = String(val);
+  // Check for formula injection triggers on raw or trimmed string (OWASP DDE injection prevention)
+  if (/^[=+\-@\t\r]/.test(str) || /^[=+\-@\t\r]/.test(str.trim())) {
+    str = `'${str}`;
+  }
+  return `"${str.replace(/"/g, '""')}"`;
+};
+
+/**
  * Exports expenses as CSV with UTF-8 BOM and triggers native iOS Share Sheet
  */
 export const exportExpensesToCSV = async (
@@ -343,17 +363,17 @@ export const exportExpensesToCSV = async (
     : ['التاريخ', 'البند', 'المبلغ', 'العملة', 'الفئة', 'طريقة الدفع', 'المسؤول', 'ملاحظات'];
 
   const rows = expenses.map((e) => [
-    `"${e.date}"`,
-    `"${e.title.replace(/"/g, '""')}"`,
-    e.amount,
-    `"${currencySymbol}"`,
-    `"${catMap.get(e.categoryId) || (isEnglish ? 'General' : 'غير محدد')}"`,
-    `"${e.paymentMethod}"`,
-    `"${e.payer}"`,
-    `"${(e.notes || '').replace(/"/g, '""')}"`,
+    sanitizeCsvCell(e.date),
+    sanitizeCsvCell(e.title),
+    cleanMoneyAmount(e.amount),
+    sanitizeCsvCell(currencySymbol),
+    sanitizeCsvCell(catMap.get(e.categoryId) || (isEnglish ? 'General' : 'غير محدد')),
+    sanitizeCsvCell(e.paymentMethod),
+    sanitizeCsvCell(e.payer),
+    sanitizeCsvCell(e.notes || ''),
   ]);
 
-  const csvContent = '\uFEFF' + [headers.join(','), ...rows.map((r) => r.join(','))].join('\n');
+  const csvContent = '\uFEFF' + [headers.map((h) => `"${h}"`).join(','), ...rows.map((r) => r.join(','))].join('\n');
   const fileName = `expenses_report_${new Date().toISOString().split('T')[0]}.csv`;
 
   return await NativeShareService.shareFile(fileName, csvContent, 'text/csv');

@@ -13,6 +13,7 @@ import { Category, Expense, BudgetSettings } from '../types';
 import { CategoryIcon } from './CategoryIcon';
 import { Amount } from './Amount';
 import { nativeHaptics } from '../utils/nativeHaptics';
+import { getSalaryCycle, isDateInCycle } from '../utils/salaryCycle';
 
 interface CategoryExpensesPieChartProps {
   categories: Category[];
@@ -40,13 +41,19 @@ export const CategoryExpensesPieChart: React.FC<CategoryExpensesPieChartProps> =
 
   const selectedYear = currentMonth.split('-')[0] || String(new Date().getFullYear());
 
-  // Filtered expenses based on timeScope
+  // Filtered expenses based on timeScope (strictly excluding income!)
   const filteredExpenses = useMemo(() => {
+    const expenseOnly = expenses.filter((e) => e.type !== 'income');
     if (timeScope === 'month') {
-      return expenses.filter((e) => e.date.startsWith(currentMonth));
+      const salaryDay = settings.salaryDay || 1;
+      if (salaryDay > 1) {
+        const cycle = getSalaryCycle(salaryDay, currentMonth ? `${currentMonth}-15` : new Date());
+        return expenseOnly.filter((e) => isDateInCycle(e.date, cycle));
+      }
+      return expenseOnly.filter((e) => e.date.startsWith(currentMonth));
     }
-    return expenses.filter((e) => e.date.startsWith(`${selectedYear}-`));
-  }, [expenses, timeScope, currentMonth, selectedYear]);
+    return expenseOnly.filter((e) => e.date.startsWith(`${selectedYear}-`));
+  }, [expenses, timeScope, currentMonth, selectedYear, settings.salaryDay]);
 
   // Aggregate by category
   const { chartData, totalSpent } = useMemo(() => {

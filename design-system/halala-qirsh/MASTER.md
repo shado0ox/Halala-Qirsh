@@ -1,213 +1,119 @@
-# Design System Master File
+# Design System Master File — Halala & Qirsh (هللة وقرش)
 
-> **LOGIC:** When building a specific page, first check `design-system/pages/[page-name].md`.
-> If that file exists, its rules **override** this Master file.
-> If not, strictly follow the rules below.
+> **LOGIC:** This Master File defines the authoritative visual language, color tokens, typography, and component specifications for the **Halala & Qirsh (هللة وقرش)** native iOS & Web application. All components and views strictly adhere to these specifications.
 
 ---
 
-**Project:** Halala & Qirsh
-**Generated:** 2026-10-27 20:13:16
-**Category:** Personal Finance Tracker
+**Project:** Halala & Qirsh (هللة وقرش)  
+**Category:** Native iOS & Web Personal Finance & Budget Tracker (Saudi Arabia)  
+**Design Constitution:** Apple iOS Human Interface Guidelines (HIG) + Luminous Emerald Fintech Palette  
+**Languages:** Arabic (RTL First, Primary) & English (LTR, Secondary)  
 
 ---
 
-## Global Rules
+## 1. Global Rules & Foundations
 
-### Color Palette
+### 1.1 Typography (Native iOS & Modern Arabic)
 
-| Role | Hex | CSS Variable |
-|------|-----|--------------|
-| Primary | `#1E40AF` | `--color-primary` |
-| On Primary | `#FFFFFF` | `--color-on-primary` |
-| Secondary | `#3B82F6` | `--color-secondary` |
-| On Secondary | `#000000` | `--color-on-secondary` |
-| Accent/CTA | `#059669` | `--color-accent` |
-| On Accent/CTA | `#000000` | `--color-on-accent` |
-| Background | `#0F172A` | `--color-background` |
-| Foreground | `#FFFFFF` | `--color-foreground` |
-| Card | `#192134` | `--color-card` |
-| Card Foreground | `#FFFFFF` | `--color-card-foreground` |
-| Muted | `#101A34` | `--color-muted` |
-| Muted Foreground | `#94A3B8` | `--color-muted-foreground` |
-| Border | `rgba(255,255,255,0.08)` | `--color-border` |
-| Destructive | `#DC2626` | `--color-destructive` |
-| On Destructive | `#FFFFFF` | `--color-on-destructive` |
-| Ring | `#FFFFFF` | `--color-ring` |
+The application uses native Apple typography with full Arabic script support and tabular numeric figures for financial accuracy:
 
-**Color Notes:** Trust blue + profit green on dark
+- **Primary Font Family:**
+  ```css
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", "SF Pro AR", "IBM Plex Sans Arabic", "Segoe UI", Roboto, sans-serif;
+  ```
+- **Financial Numbers:** `font-variant-numeric: tabular-nums;` (ensures aligned currency digits in lists, summaries, and calculator sheets).
+- **iOS Font Zoom Protection:** All inputs, selects, and textareas enforce `font-size: 16px !important;` to eliminate unwanted WebKit viewport auto-zooming.
+- **Direction & RTL:** Dynamic HTML attributes `dir="rtl"` / `dir="ltr"` and `lang="ar"` / `lang="en"` with mirrored layouts for Arabic and English.
 
-### Typography
+### 1.2 Color System (Saudi Fintech Emerald & True OLED Black)
 
-- **Heading Font:** Caveat
-- **Body Font:** Quicksand
-- **Mood:** handwritten, personal, friendly, casual, warm, charming
-- **Google Fonts:** [Caveat + Quicksand](https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Quicksand:wght@300;400;500;600;700&display=swap)
+#### Brand Primary Palette (Emerald & Mint)
+| Token | Hex | Usage |
+|---|---|---|
+| `--color-primary-950` | `#022C22` | Deepest Forest Accent / Dark contrast |
+| `--color-primary-900` | `#064E3B` | Deep Forest Header / Primary Gradient start |
+| `--color-primary-800` | `#065F46` | Hero card surface / Strong contrast border |
+| `--color-primary-700` | `#047857` | Dark Emerald action button hover |
+| `--color-primary-600` | `#059669` | Primary CTA buttons / High-priority accents |
+| `--color-primary-500` | `#10B981` | Core Brand Emerald / Active toggles / Badges |
+| `--color-primary-400` | `#34D399` | Luminous Mint highlight / Dark mode text pop |
+| `--color-primary-300` | `#6EE7B7` | Glow effect overlays / Metric highlights |
+| `--color-primary-200` | `#A7F3D0` | Soft chip backgrounds |
+| `--color-primary-100` | `#D1FAE5` | Light status pill / Category background |
+| `--color-primary-50`  | `#ECFDF5` | Lightest subtle highlight |
+| `--color-mint`         | `#10B981` | Positive cash flow & income indicator |
+| `--color-warning`      | `#F59E0B` | Budget alert threshold (80%–99%) |
+| `--color-danger`       | `#EF4444` | Over-budget (>100%), debt & destructive actions |
 
-**CSS Import:**
-```css
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@400;500;600;700&family=Quicksand:wght@300;400;500;600;700&display=swap');
-```
+#### Surfaces & Layout Tokens
 
-### Spacing Variables
+| Token | Light Theme (`#F4FAF7`) | Dark Theme (`#000000` True OLED) |
+|---|---|---|
+| `--bg-app` | `#F4FAF7` (Crisp Mint Off-White) | `#000000` (Pitch Black OLED) |
+| `--bg-surface` | `#FFFFFF` (Pure White Card) | `#1C1C1E` (Apple System Dark Gray) |
+| `--bg-surface-glass` | `rgba(255, 255, 255, 0.92)` | `rgba(28, 28, 30, 0.85)` |
+| `--bg-secondary` | `#EAF6F0` (Soft Mint Tint) | `#2C2C2E` (Secondary Elevated Gray) |
+| `--bg-subtle` | `#F0F9F5` (Ultra-subtle container) | `#161618` (Recessed Surface) |
+| `--border-subtle` | `rgba(16, 185, 129, 0.12)` | `rgba(255, 255, 255, 0.08)` |
+| `--border-glass` | `rgba(255, 255, 255, 0.95)` | `rgba(255, 255, 255, 0.10)` |
+| `--text-primary` | `#0B2319` (High Contrast Deep Green-Black) | `#FFFFFF` (Pure White) |
+| `--text-secondary` | `#335C49` (Medium Forest Tone) | `#AEAEB2` (Apple Secondary Label) |
+| `--text-muted` | `#5C8271` (Muted Sage) | `#8E8E93` (Apple Tertiary Label) |
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--space-xs` | `4px` / `0.25rem` | Tight gaps |
-| `--space-sm` | `8px` / `0.5rem` | Icon gaps, inline spacing |
-| `--space-md` | `16px` / `1rem` | Standard padding |
-| `--space-lg` | `24px` / `1.5rem` | Section padding |
-| `--space-xl` | `32px` / `2rem` | Large gaps |
-| `--space-2xl` | `48px` / `3rem` | Section margins |
-| `--space-3xl` | `64px` / `4rem` | Hero padding |
+### 1.3 Safe Area & Full-Bleed Geometry
 
-### Shadow Depths
+The app operates with `viewport-fit=cover` and dynamic environment safe areas:
+- `--sat: env(safe-area-inset-top, 0px);` (Dynamic Island / Status bar padding)
+- `--sab: env(safe-area-inset-bottom, 0px);` (Home indicator bar padding)
+- `--sal: env(safe-area-inset-left, 0px);`
+- `--sar: env(safe-area-inset-right, 0px);`
 
-| Level | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | `0 1px 2px rgba(0,0,0,0.05)` | Subtle lift |
-| `--shadow-md` | `0 4px 6px rgba(0,0,0,0.1)` | Cards, buttons |
-| `--shadow-lg` | `0 10px 15px rgba(0,0,0,0.1)` | Modals, dropdowns |
-| `--shadow-xl` | `0 20px 25px rgba(0,0,0,0.15)` | Hero images, featured cards |
+Full-bleed backgrounds extend into safe areas, while interactive buttons and content remain inside the safe zone.
 
----
+### 1.4 Radii & Elevation Tokens
 
-## Component Specs
-
-### Buttons
-
-```css
-/* Primary Button */
-.btn-primary {
-  background: #059669;
-  color: #000000;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.btn-primary:hover {
-  opacity: 0.9;
-  transform: translateY(-1px);
-}
-
-/* Secondary Button */
-.btn-secondary {
-  background: transparent;
-  color: #FFFFFF;
-  border: 2px solid #1E40AF;
-  padding: 12px 24px;
-  border-radius: 8px;
-  font-weight: 600;
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-```
-
-### Cards
-
-```css
-.card {
-  background: #0F172A;
-  border-radius: 12px;
-  padding: 24px;
-  box-shadow: var(--shadow-md);
-  transition: all 200ms ease;
-  cursor: pointer;
-}
-
-.card:hover {
-  box-shadow: var(--shadow-lg);
-  transform: translateY(-2px);
-}
-```
-
-### Inputs
-
-```css
-.input {
-  padding: 12px 16px;
-  border: 1px solid #E2E8F0;
-  border-radius: 8px;
-  font-size: 16px;
-  transition: border-color 200ms ease;
-}
-
-.input:focus {
-  border-color: #1E40AF;
-  outline: none;
-  box-shadow: 0 0 0 3px #1E40AF20;
-}
-```
-
-### Modals
-
-```css
-.modal-overlay {
-  background: rgba(0, 0, 0, 0.5);
-  backdrop-filter: blur(4px);
-}
-
-.modal {
-  background: white;
-  border-radius: 16px;
-  padding: 32px;
-  box-shadow: var(--shadow-xl);
-  max-width: 500px;
-  width: 90%;
-}
-```
+- `--radius-hero`: `28px` (Top cards, month-end balance banners)
+- `--radius-card`: `20px` (Expense items, category rows, chart wrappers)
+- `--radius-button`: `14px` (iOS pill actions, primary submit triggers)
+- `--radius-input`: `14px` / `16px` (Unified form input fields)
+- `--radius-pill`: `9999px` (Status badges, segmented controls, tab pills)
+- Touch Targets: Minimum `44px × 44px` across all interactive elements.
 
 ---
 
-## Style Guidelines
+## 2. Component Specifications
 
-**Style:** Glassmorphism
+### 2.1 Buttons & Interactive Controls
+- **Primary Action:** Solid Emerald `#059669` or `#10B981`, white text, height $\ge 44$px, font weight `700`, smooth scale active tap `whileTap={{ scale: 0.98 }}` with native haptic feedback (`nativeHaptics.tap` / `nativeHaptics.success`).
+- **Secondary / Ghost:** Soft surface `#EAF6F0` (dark: `#2C2C2E`), border `1px solid var(--border-subtle)`, text `var(--text-primary)`.
+- **Destructive:** Red `#EF4444` background or border, reserved strictly for permanent deletions (e.g. deleting expenses, bills, categories).
 
-**Keywords:** Frosted glass, transparent, blurred background, layered, vibrant background, light source, depth, multi-layer
+### 2.2 Form Input Fields
+- Box sizing `border-box`, `w-full`.
+- Height: Standard 48px to 52px for comfortable thumb entry.
+- Padding: `px-4 py-3`.
+- Background: Light theme `#FFFFFF` with subtle border `rgba(16, 185, 129, 0.15)`, Dark theme `#2C2C2E`.
+- Focus State: Ring `2px solid #10B981` without layout shift.
+- Numbers & Currencies: Right-to-left layout with Saudi Riyal (`ر.س` / `SAR`) symbol neatly anchored.
 
-**Best For:** Modern SaaS, financial dashboards, high-end corporate, lifestyle apps, modal overlays, navigation
+### 2.3 Bottom Sheets & Modals
+- Native iOS Bottom Sheet pattern with drag handle pill (`w-12 h-1.5 rounded-full bg-slate-300 dark:bg-slate-700`).
+- Safe bottom padding: `pb-[calc(1.5rem+var(--sab))]`.
+- Smooth Spring Entrance: Motion `y: '100%' -> 0` with backdrop blur (`backdrop-blur-md bg-black/55`).
+- Keyboard avoidance: Scrollable container using `max-h-[85dvh]` with auto-scroll to active field.
 
-**Key Effects:** Backdrop blur (10-20px), subtle border (1px solid rgba white 0.2), light reflection, Z-depth
-
-### Page Pattern
-
-**Pattern Name:** Product Demo + Features
-
-- **Conversion Strategy:** Use an interactive demo only when it explains value better than static media. Provide captions, transcript, visible play/pause controls, and a non-video fallback; do not autoplay under reduced motion. Pause media when offscreen or hidden and keep the final product state available as static content.
-- **CTA Placement:** Video center + CTA right/bottom
-- **Section Order:** Hero > Product video/mockup (center) > Feature breakdown per section > Comparison (optional) > CTA
-
----
-
-## Anti-Patterns (Do NOT Use)
-
-- ❌ Pure white backgrounds
-
-### Additional Forbidden Patterns
-
-- ❌ **Emojis as icons** — Use SVG icons (Heroicons, Lucide, Simple Icons)
-- ❌ **Missing cursor:pointer** — All clickable elements must have cursor:pointer
-- ❌ **Layout-shifting hovers** — Avoid scale transforms that shift layout
-- ❌ **Low contrast text** — Maintain 4.5:1 minimum contrast ratio
-- ❌ **Instant state changes** — Always use transitions (150-300ms)
-- ❌ **Invisible focus states** — Focus states must be visible for a11y
+### 2.4 Navigation & TabBar
+- Floating iOS Tab Bar anchored above the home indicator (`bottom-0 pb-safe`).
+- Active Tab Indicator: Smooth shared layout pill (`layoutId="activeTabPill"`) in Emerald `#10B981`.
+- Center Action Button: Elevated circular plus button with coin flight animation trigger.
 
 ---
 
-## Pre-Delivery Checklist
+## 3. Anti-Patterns & Quality Constraints
 
-Before delivering any UI code, verify:
-
-- [ ] No emojis used as icons (use SVG instead)
-- [ ] All icons from consistent icon set (Heroicons/Lucide)
-- [ ] `cursor-pointer` on all clickable elements
-- [ ] Hover states with smooth transitions (150-300ms)
-- [ ] Light mode: text contrast 4.5:1 minimum
-- [ ] Focus states visible for keyboard navigation
-- [ ] `prefers-reduced-motion` respected
-- [ ] Responsive: 375px, 768px, 1024px, 1440px
-- [ ] No content hidden behind fixed navbars
-- [ ] No horizontal scroll on mobile
+- ❌ **No Latin-only or cursive decorative fonts** (e.g. Caveat, Quicksand) — only native Apple & Arabic system fonts.
+- ❌ **No navy blue / generic templates** — Halala & Qirsh is defined by its Saudi Emerald financial identity.
+- ❌ **No `transparent` keyword in Framer Motion animations** — use explicit `rgba(255, 255, 255, 0)` or `rgba(0, 0, 0, 0)`.
+- ❌ **No landscape mode on iPhones** — iPhone orientation is locked to Portrait only (`UIInterfaceOrientationPortrait`) to protect financial sheets and keypad layouts.
+- ❌ **No mock or fake backend APIs** — all storage, biometric auth, and SMS automations run 100% on-device.
+- ❌ **No low-contrast text** — minimum WCAG AA 4.5:1 ratio maintained in both light and dark themes.

@@ -24,6 +24,11 @@ import {
   ExternalLink,
   CreditCard,
   Zap,
+  Cloud,
+  CloudUpload,
+  CloudDownload,
+  CheckCircle2,
+  RefreshCw,
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Capacitor } from '@capacitor/core';
@@ -53,6 +58,9 @@ import { NotificationPermissionState } from '../../utils/notifications';
 import { translations } from '../../utils/i18n';
 import { startSystemFlow, endSystemFlow } from '../../utils/systemFlow';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
+import { getSalaryCycle, isDateInCycle } from '../../utils/salaryCycle';
+import { ICloudSyncService, ICloudStatus, ICloudBackupMetadata } from '../../utils/icloudSync';
+import { ICloudRestoreModal } from '../ICloudRestoreModal';
 
 interface AnalyticsSettingsTabProps {
   categories: Category[];
@@ -97,7 +105,10 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   const isEn = lang === 'en';
 
   const currentMonth = settings.selectedMonth;
-  const monthlyExpenses = expenses.filter((e) => e.date.startsWith(currentMonth));
+  const salaryDay = settings.salaryDay || 27;
+  const cycle = React.useMemo(() => getSalaryCycle(salaryDay, new Date()), [salaryDay]);
+
+  const monthlyExpenses = expenses.filter((e) => e.type !== 'income' && isDateInCycle(e.date, cycle));
   const totalSpent = monthlyExpenses.reduce((sum, e) => sum + e.amount, 0);
 
   // Payer breakdown
@@ -124,6 +135,92 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
   const handleAnimationModeChange = (mode: 'full' | 'reduced' | 'off') => {
     nativeHaptics.tap(settings.soundEnabled);
     onUpdateSettings({ animations: mode });
+  };
+
+  // Apple iCloud Sync State
+  const [icloudStatus, setIcloudStatus] = useState<ICloudStatus | null>(null);
+  const [isBackingUpICloud, setIsBackingUpICloud] = useState<boolean>(false);
+  const [isRestoringICloud, setIsRestoringICloud] = useState<boolean>(false);
+  const [restoreModalOpen, setRestoreModalOpen] = useState<boolean>(false);
+  const [restoreMetadata, setRestoreMetadata] = useState<ICloudBackupMetadata | undefined>(undefined);
+
+  React.useEffect(() => {
+    ICloudSyncService.getStatus().then(setIcloudStatus).catch(() => {});
+  }, [settings.lastIcloudBackupTimestamp]);
+
+  const handleToggleICloudSync = (enabled: boolean) => {
+    nativeHaptics.tap(settings.soundEnabled);
+    onUpdateSettings({ icloudSyncEnabled: enabled });
+    if (enabled) {
+      ICloudSyncService.backupNow(fullData).then((res) => {
+        if (res.success) {
+          onUpdateSettings({ lastIcloudBackupTimestamp: res.timestamp });
+          ICloudSyncService.getStatus().then(setIcloudStatus);
+        }
+      });
+    }
+  };
+
+  const handleManualICloudBackup = async () => {
+    nativeHaptics.tap(settings.soundEnabled);
+    setIsBackingUpICloud(true);
+    try {
+      const res = await ICloudSyncService.backupNow(fullData);
+      if (res.success) {
+        nativeHaptics.success(settings.soundEnabled);
+        onUpdateSettings({ lastIcloudBackupTimestamp: res.timestamp });
+        const updatedStatus = await ICloudSyncService.getStatus();
+        setIcloudStatus(updatedStatus);
+        onShowToast?.(
+          isEn ? 'Successfully backed up to Apple iCloud' : 'تم النسخ الاحتياطي إلى iCloud بنجاح',
+          'success'
+        );
+      } else {
+        onShowToast?.(
+          isEn ? 'Failed to backup to iCloud' : 'تعذر النسخ الاحتياطي إلى iCloud',
+          'error'
+        );
+      }
+    } finally {
+      setIsBackingUpICloud(false);
+    }
+  };
+
+  const handleOpenRestoreModal = async () => {
+    nativeHaptics.tap(settings.soundEnabled);
+    setIsRestoringICloud(true);
+    try {
+      const res = await ICloudSyncService.getLatestBackup();
+      if (res.success && res.data) {
+        setRestoreMetadata(res.metadata);
+        setRestoreModalOpen(true);
+      } else {
+        onShowToast?.(
+          isEn ? 'No iCloud backup found linked to your Apple ID' : 'لم يتم العثور على نسخة احتياطية في حسابك Apple (iCloud)',
+          'info'
+        );
+      }
+    } finally {
+      setIsRestoringICloud(false);
+    }
+  };
+
+  const handleConfirmICloudRestore = async () => {
+    setIsRestoringICloud(true);
+    try {
+      const res = await ICloudSyncService.restoreNow();
+      if (res.success && res.data) {
+        nativeHaptics.success(settings.soundEnabled);
+        setRestoreModalOpen(false);
+        onImportData(res.data);
+        onShowToast?.(
+          isEn ? 'Data restored successfully from Apple iCloud' : 'تمت استعادة البيانات بنجاح من iCloud',
+          'success'
+        );
+      }
+    } finally {
+      setIsRestoringICloud(false);
+    }
   };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -336,6 +433,36 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
               </option>
             ))}
           </select>
+        </div>
+
+        {/* Salary Deposit Day Selection */}
+        <div className="flex items-center justify-between text-xs pt-2 border-t border-[#E5E5EA] dark:border-[#2C2C2E]">
+          <div>
+            <span className="font-bold text-[#1C1C1E] dark:text-white block">
+              {isEn ? 'Salary Deposit Day' : 'يوم نزول الراتب'}
+            </span>
+            <span className="text-[10px] text-[#8E8E93] block mt-0.5">
+              {isEn
+                ? `Financial cycle starts day ${settings.salaryDay || 27}`
+                : `تبدأ الدورة المالية يوم ${settings.salaryDay || 27} من كل شهر`}
+            </span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <select
+              value={settings.salaryDay || 27}
+              onChange={(e) => {
+                nativeHaptics.tap(settings.soundEnabled);
+                onUpdateSettings({ salaryDay: parseInt(e.target.value, 10) || 27 });
+              }}
+              className="px-3 py-1.5 rounded-xl bg-[#F2F2F7] dark:bg-[#2C2C2E] border-none font-bold text-slate-800 dark:text-white outline-hidden cursor-pointer tabular-nums text-xs"
+            >
+              {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => (
+                <option key={d} value={d}>
+                  {d} {isEn ? (d === 1 ? 'st (Calendar Month)' : d === 2 ? 'nd' : d === 3 ? 'rd' : 'th') : (d === 1 ? '(أول الشهر الميلادي)' : '')}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -600,10 +727,127 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
         </div>
       </div>
 
+      {/* SECTION: APPLE ICLOUD STORAGE & AUTO-BACKUP */}
+      <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-4">
+        {/* Header */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2.5">
+            <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-950/40 text-blue-600 dark:text-blue-400 flex items-center justify-center shadow-2xs">
+              <Cloud size={20} />
+            </div>
+            <div>
+              <span className="text-xs font-bold text-[#1C1C1E] dark:text-white flex items-center gap-1.5">
+                <span>{isEn ? 'Apple iCloud Sync' : 'سحابة وتخزين Apple iCloud'}</span>
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-blue-100 dark:bg-blue-950/60 text-blue-700 dark:text-blue-300">
+                  <span className="w-1.5 h-1.5 rounded-full bg-blue-500 animate-pulse" />
+                  {isEn ? 'Apple ID' : 'حساب Apple'}
+                </span>
+              </span>
+              <span className="text-[10px] text-[#8E8E93] block mt-0.5">
+                {isEn ? 'Encrypted cloud backup tied to your Apple account' : 'نسخ احتياطي مشفر ومربوط بحساب Apple الخاص بك'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Status Card */}
+        <div className="p-3.5 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] space-y-2 text-xs">
+          <div className="flex items-center justify-between">
+            <span className="text-[#8E8E93]">{isEn ? 'iCloud Status' : 'حالة الاتصال'}</span>
+            <span className="font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+              <CheckCircle2 size={13} />
+              <span>{isEn ? 'Connected to Apple ID' : 'متصل ومفعل بحساب Apple'}</span>
+            </span>
+          </div>
+
+          <div className="flex items-center justify-between">
+            <span className="text-[#8E8E93]">{isEn ? 'Last Cloud Backup' : 'آخر نسخة احتياطية'}</span>
+            <span className="font-bold text-[#1C1C1E] dark:text-white tabular-nums">
+              {settings.lastIcloudBackupTimestamp || icloudStatus?.lastBackupTimestamp
+                ? new Date(settings.lastIcloudBackupTimestamp || icloudStatus?.lastBackupTimestamp!).toLocaleString(
+                    isEn ? 'en-US' : 'ar-SA',
+                    { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }
+                  )
+                : (isEn ? 'No backup yet' : 'لم يتم النسخ بعد')}
+            </span>
+          </div>
+
+          {icloudStatus?.backupMetadata && (
+            <div className="flex items-center justify-between text-[11px] pt-1 border-t border-slate-200/50 dark:border-slate-700/50 text-[#8E8E93]">
+              <span>{isEn ? 'Backup Contents' : 'محتوى النسخة'}</span>
+              <span className="font-semibold text-slate-700 dark:text-slate-300 tabular-nums">
+                {icloudStatus.backupMetadata.expenseCount} {isEn ? 'expenses' : 'مصروف'} · {Math.round(icloudStatus.backupMetadata.sizeBytes / 1024 * 10) / 10} KB
+              </span>
+            </div>
+          )}
+        </div>
+
+        {/* Auto Backup Toggle */}
+        <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E5E5EA] dark:border-[#2C2C2E]">
+          <div className="space-y-0.5">
+            <span className="font-bold text-[#1C1C1E] dark:text-white block">
+              {isEn ? 'Automatic iCloud Backup' : 'النسخ الاحتياطي التلقائي'}
+            </span>
+            <span className="text-[10px] text-[#8E8E93] block leading-tight">
+              {isEn
+                ? 'Syncs automatically in the background when adding expenses or exiting the app'
+                : 'مزامنة تلقائية في الخلفية عند تسجيل العمليات أو مغادرة التطبيق'}
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => handleToggleICloudSync(settings.icloudSyncEnabled === false)}
+            aria-label="Toggle iCloud Auto Backup"
+            className={`w-12 h-7 rounded-full transition-colors relative cursor-pointer ${
+              settings.icloudSyncEnabled !== false ? 'bg-blue-600' : 'bg-slate-300 dark:bg-slate-700'
+            }`}
+          >
+            <div
+              className={`w-5 h-5 rounded-full bg-white shadow-md transform transition-transform absolute top-1 ${
+                settings.icloudSyncEnabled !== false
+                  ? isEn ? 'right-1' : 'left-1'
+                  : isEn ? 'left-1' : 'right-1'
+              }`}
+            />
+          </button>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="grid grid-cols-2 gap-2.5 pt-1">
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            disabled={isBackingUpICloud}
+            onClick={handleManualICloudBackup}
+            className="p-3 rounded-2xl bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40 flex items-center justify-center gap-1.5 text-xs font-bold hover:bg-blue-100/60 dark:hover:bg-blue-900/40 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {isBackingUpICloud ? (
+              <RefreshCw size={14} className="animate-spin" />
+            ) : (
+              <CloudUpload size={14} />
+            )}
+            <span>{isEn ? 'Back Up Now' : 'نسخ احتياطي الآن'}</span>
+          </motion.button>
+
+          <motion.button
+            whileTap={{ scale: 0.95 }}
+            disabled={isRestoringICloud}
+            onClick={handleOpenRestoreModal}
+            className="p-3 rounded-2xl bg-[#F2F2F7] dark:bg-[#2C2C2E] text-slate-800 dark:text-slate-100 border border-slate-200/60 dark:border-slate-800 flex items-center justify-center gap-1.5 text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-700/60 transition-colors disabled:opacity-50 cursor-pointer"
+          >
+            {isRestoringICloud ? (
+              <RefreshCw size={14} className="animate-spin" />
+            ) : (
+              <CloudDownload size={14} />
+            )}
+            <span>{isEn ? 'Restore from iCloud' : 'استرجاع من iCloud'}</span>
+          </motion.button>
+        </div>
+      </div>
+
       {/* SECTION 4: DATA EXPORT & SHARE SHEET */}
       <div className="bg-white dark:bg-[#1C1C1E] p-5 rounded-3xl border border-slate-200/70 dark:border-slate-800 shadow-2xs space-y-3">
         <span className="text-xs font-bold text-[#8E8E93] block">
-          {isEn ? 'Backup & Apple Share Sheet' : 'النسخ الاحتياطي ومشاركة البيانات'}
+          {isEn ? 'Manual Files & Apple Share Sheet' : 'الملفات ومشاركة البيانات يدوياً'}
         </span>
 
         <div className="grid grid-cols-2 gap-2.5">
@@ -711,6 +955,18 @@ export const AnalyticsSettingsTab: React.FC<AnalyticsSettingsTabProps> = ({
           <span>Apple Local Vault</span>
         </div>
       </div>
+
+      {/* iCloud Restore Preview & Confirmation Modal */}
+      <ICloudRestoreModal
+        isOpen={restoreModalOpen}
+        metadata={restoreMetadata}
+        isLoading={isRestoringICloud}
+        isEn={isEn}
+        soundEnabled={settings.soundEnabled}
+        animations={settings.animations}
+        onConfirm={handleConfirmICloudRestore}
+        onClose={() => setRestoreModalOpen(false)}
+      />
     </div>
   );
 };

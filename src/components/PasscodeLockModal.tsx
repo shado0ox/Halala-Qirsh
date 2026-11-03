@@ -1,13 +1,20 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { motion, AnimatePresence } from 'motion/react';
-import { Lock, Delete, ScanFace, Fingerprint, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { motion } from 'motion/react';
+import { Lock, Delete, ScanFace, Fingerprint, AlertCircle, CheckCircle2, ShieldCheck } from 'lucide-react';
 import { nativeHaptics } from '../utils/nativeHaptics';
 import { SecurityService, BiometryStatus } from '../utils/security';
-import { springs, fades } from '../utils/motion';
+import { springs } from '../utils/motion';
 
-interface PasscodeLockModalProps {
+export interface PasscodeLockModalProps {
   isOpen: boolean;
-  mode: 'unlock' | 'set' | 'change';
+  mode: 'unlock' | 'set' | 'change' | 'verify';
+  verifyTitle?: string;
+  verifySubtitle?: string;
   onSuccess: (newPasscode?: string) => void;
   onCancel?: () => void;
   isDark?: boolean;
@@ -18,6 +25,8 @@ interface PasscodeLockModalProps {
 export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
   isOpen,
   mode,
+  verifyTitle,
+  verifySubtitle,
   onSuccess,
   onCancel,
   soundEnabled = true,
@@ -25,6 +34,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
 }) => {
   const [enteredPin, setEnteredPin] = useState<string>('');
   const [firstEnteredPin, setFirstEnteredPin] = useState<string>('');
+  const [isVerifyingCurrent, setIsVerifyingCurrent] = useState<boolean>(mode === 'change');
   const [isConfirming, setIsConfirming] = useState<boolean>(false);
   const [errorShake, setErrorShake] = useState<boolean>(false);
   const [errorMessage, setErrorMessage] = useState<string>('');
@@ -36,17 +46,20 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
   // Tracks if the automatic biometric prompt has already run for this presentation
   const hasAutoPromptedRef = useRef<boolean>(false);
 
-  // Reset auto-prompt flag whenever modal closes
+  // Reset states whenever modal opens or closes
   useEffect(() => {
     if (!isOpen) {
       hasAutoPromptedRef.current = false;
       setEnteredPin('');
       setFirstEnteredPin('');
+      setIsVerifyingCurrent(mode === 'change');
       setIsConfirming(false);
       setErrorMessage('');
       setIsUnlockedSuccess(false);
+    } else {
+      setIsVerifyingCurrent(mode === 'change');
     }
-  }, [isOpen]);
+  }, [isOpen, mode]);
 
   // Check biometric availability and existing lockout on modal mount
   useEffect(() => {
@@ -79,26 +92,42 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
     if (lockoutSeconds > 0 || isVerifying) return;
     setIsVerifying(true);
     nativeHaptics.tap(soundEnabled);
-    const reason = isEnglish ? 'Authenticate to unlock Halala & Qirsh' : 'المصادقة لفتح تطبيق هللة وقرش';
+    const reason = isEnglish
+      ? (mode === 'verify'
+          ? (verifyTitle || 'Authenticate to proceed')
+          : mode === 'change'
+          ? 'Authenticate to change passcode'
+          : 'Authenticate to unlock Halala & Qirsh')
+      : (mode === 'verify'
+          ? (verifyTitle || 'المصادقة لتأكيد هذا الإجراء')
+          : mode === 'change'
+          ? 'المصادقة لتغيير رمز الدخول'
+          : 'المصادقة لفتح تطبيق هللة وقرش');
     const cancelTitle = isEnglish ? 'Cancel' : 'إلغاء';
     const success = await SecurityService.authenticateBiometric(reason, cancelTitle);
     setIsVerifying(false);
 
     if (success) {
-      setIsUnlockedSuccess(true);
       nativeHaptics.success(soundEnabled);
-      setTimeout(() => {
+      if (mode === 'change' && isVerifyingCurrent) {
+        setIsVerifyingCurrent(false);
         setEnteredPin('');
-        onSuccess();
-      }, 350);
+        setErrorMessage('');
+      } else {
+        setIsUnlockedSuccess(true);
+        setTimeout(() => {
+          setEnteredPin('');
+          onSuccess();
+        }, 350);
+      }
     }
-  }, [lockoutSeconds, isVerifying, soundEnabled, isEnglish, onSuccess]);
+  }, [lockoutSeconds, isVerifying, soundEnabled, isEnglish, mode, verifyTitle, isVerifyingCurrent, onSuccess]);
 
-  // Auto-prompt biometric ONCE per time the lock screen appears
+  // Auto-prompt biometric ONCE per time the screen appears for unlock, verify, or change verification
   useEffect(() => {
     if (
       isOpen &&
-      mode === 'unlock' &&
+      (mode === 'unlock' || mode === 'verify' || (mode === 'change' && isVerifyingCurrent)) &&
       biometry.isAvailable &&
       lockoutSeconds === 0 &&
       !hasAutoPromptedRef.current
@@ -106,7 +135,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
       hasAutoPromptedRef.current = true;
       handleRealBiometricAuth();
     }
-  }, [isOpen, mode, biometry.isAvailable, lockoutSeconds, handleRealBiometricAuth]);
+  }, [isOpen, mode, isVerifyingCurrent, biometry.isAvailable, lockoutSeconds, handleRealBiometricAuth]);
 
   // Keypad numbers with iOS subtitles
   const keypadNumbers = [
@@ -138,7 +167,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
     setEnteredPin(nextPin);
 
     if (nextPin.length === 4) {
-      if (mode === 'unlock') {
+      if (mode === 'unlock' || mode === 'verify') {
         const isMatch = await SecurityService.verifyPasscode(nextPin);
         if (isMatch) {
           setIsUnlockedSuccess(true);
@@ -164,7 +193,32 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
             );
           }
         }
-      } else if (mode === 'set' || mode === 'change') {
+      } else if (mode === 'change' && isVerifyingCurrent) {
+        // Enforce current passcode check before allowing change
+        const isMatch = await SecurityService.verifyPasscode(nextPin);
+        if (isMatch) {
+          nativeHaptics.success(soundEnabled);
+          setEnteredPin('');
+          setIsVerifyingCurrent(false);
+          setErrorMessage('');
+        } else {
+          const lockout = await SecurityService.getLockoutRemainingSeconds();
+          if (lockout > 0) {
+            setLockoutSeconds(lockout);
+            triggerError(
+              isEnglish
+                ? `Too many attempts. Locked for ${lockout}s`
+                : `محاولات خاطئة كثيرة. مقفل لمدة ${lockout} ثانية`
+            );
+          } else {
+            triggerError(
+              isEnglish
+                ? 'Incorrect current passcode'
+                : 'رمز الدخول الحالي غير صحيح'
+            );
+          }
+        }
+      } else if (mode === 'set' || (mode === 'change' && !isVerifyingCurrent)) {
         if (!isConfirming) {
           setFirstEnteredPin(nextPin);
           setEnteredPin('');
@@ -201,6 +255,45 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
 
   if (!isOpen) return null;
 
+  const modalTitle = isUnlockedSuccess
+    ? (isEnglish ? 'Verified!' : 'تم التحقق بنجاح!')
+    : mode === 'unlock'
+    ? (isEnglish ? 'Enter Passcode' : 'أدخل رمز الدخول')
+    : mode === 'verify'
+    ? (verifyTitle || (isEnglish ? 'Security Verification' : 'التحقق الأمني'))
+    : mode === 'change'
+    ? (isVerifyingCurrent
+        ? (isEnglish ? 'Enter Current Passcode' : 'أدخل رمز الدخول الحالي')
+        : isConfirming
+        ? (isEnglish ? 'Confirm New Passcode' : 'تأكيد الرمز الجديد')
+        : (isEnglish ? 'Enter New Passcode' : 'تعيين رمز سري جديد'))
+    : isConfirming
+    ? (isEnglish ? 'Confirm Passcode' : 'تأكيد الرمز السري')
+    : (isEnglish ? 'Create 4-Digit Passcode' : 'تعيين رمز سري جديد');
+
+  const modalSubtitle = errorMessage || (
+    lockoutSeconds > 0
+      ? ''
+      : mode === 'unlock'
+      ? (isEnglish ? 'Personal expense & budget data' : 'حماية بيانات المصاريف وميزانيتك')
+      : mode === 'verify'
+      ? (verifySubtitle || (isEnglish ? 'Verify your identity to proceed' : 'أثبت هويتك لتأكيد هذا الإجراء'))
+      : mode === 'change'
+      ? (isVerifyingCurrent
+          ? (isEnglish ? 'Verify your identity before changing passcode' : 'أثبت هويتك أولاً للمتابعة وتغيير الرمز')
+          : isConfirming
+          ? (isEnglish ? 'Re-enter your 4 digits' : 'أعد إدخال الرمز المكون من 4 أرقام')
+          : (isEnglish ? 'Choose a new 4-digit passcode' : 'اختر 4 أرقام جديدة لقفل التطبيق'))
+      : isConfirming
+      ? (isEnglish ? 'Re-enter your 4 digits' : 'أعد إدخال الرمز المكون من 4 أرقام')
+      : (isEnglish ? 'Enter 4 digits to lock app' : 'اختر 4 أرقام لقفل التطبيق')
+  );
+
+  const canShowBiometrics =
+    biometry.isAvailable &&
+    lockoutSeconds === 0 &&
+    (mode === 'unlock' || mode === 'verify' || (mode === 'change' && isVerifyingCurrent));
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center select-none bg-gradient-to-b from-[#064E3B] via-[#047857] to-black text-white px-4">
       <div className="w-full max-w-sm flex flex-col items-center">
@@ -214,18 +307,18 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
               : 'bg-white/20 text-white border border-white/20'
           }`}
         >
-          {isUnlockedSuccess ? <CheckCircle2 size={34} /> : <Lock size={30} />}
+          {isUnlockedSuccess ? (
+            <CheckCircle2 size={34} />
+          ) : mode === 'verify' ? (
+            <ShieldCheck size={32} />
+          ) : (
+            <Lock size={30} />
+          )}
         </motion.div>
 
         {/* Title */}
-        <h2 className="text-xl font-black mb-1">
-          {isUnlockedSuccess
-            ? isEnglish ? 'Unlocked!' : 'تم التحقق بنجاح!'
-            : mode === 'unlock'
-            ? isEnglish ? 'Enter Passcode' : 'أدخل رمز الدخول'
-            : isConfirming
-            ? isEnglish ? 'Confirm Passcode' : 'تأكيد الرمز السري'
-            : isEnglish ? 'Create 4-Digit Passcode' : 'تعيين رمز سري جديد'}
+        <h2 className="text-xl font-black mb-1 text-center">
+          {modalTitle}
         </h2>
 
         {/* Lockout banner or subtitle */}
@@ -239,13 +332,8 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
             </span>
           </div>
         ) : (
-          <p className="text-xs text-white/75 mb-6">
-            {errorMessage ||
-              (mode === 'unlock'
-                ? isEnglish ? 'Personal expense & budget data' : 'حماية بيانات المصاريف وميزانيتك'
-                : isConfirming
-                ? isEnglish ? 'Re-enter your 4 digits' : 'أعد إدخال الرمز المكون من 4 أرقام'
-                : isEnglish ? 'Enter 4 digits to lock app' : 'اختر 4 أرقام لقفل التطبيق')}
+          <p className="text-xs text-white/75 mb-6 text-center max-w-xs">
+            {modalSubtitle}
           </p>
         )}
 
@@ -266,7 +354,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
                     ? '#34D399'
                     : isFilled
                     ? '#FFFFFF'
-                    : 'transparent',
+                    : 'rgba(255, 255, 255, 0)',
                 }}
                 transition={springs.bouncy}
                 className={`w-4 h-4 rounded-full border-2 ${
@@ -295,7 +383,7 @@ export const PasscodeLockModal: React.FC<PasscodeLockModalProps> = ({
 
           {/* Bottom Left: Real Biometric Trigger */}
           <div className="flex items-center justify-center">
-            {mode === 'unlock' && biometry.isAvailable && lockoutSeconds === 0 ? (
+            {canShowBiometrics ? (
               <motion.button
                 whileTap={{ scale: 0.88 }}
                 type="button"

@@ -45,6 +45,7 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = React.memo(({
   const hasVibratedRef = useRef(false);
   const [isSwipedOpen, setIsSwipedOpen] = useState(false);
   const [showActionMenu, setShowActionMenu] = useState(false);
+  const isIncome = expense.type === 'income';
 
   // Drag boundaries: In RTL swipe to the right (positive), in LTR swipe to the left (negative)
   const dragMin = isRTL ? 0 : -130;
@@ -137,7 +138,6 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = React.memo(({
         onDrag={handleDrag}
         onDragEnd={handleDragEnd}
         animate={{ x: isSwipedOpen ? (isRTL ? 110 : -110) : 0 }}
-        transition={isReduced ? { duration: 0.1 } : springs.smooth}
         onClick={() => {
           if (isSwipedOpen) {
             setIsSwipedOpen(false);
@@ -149,14 +149,19 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = React.memo(({
       >
         <div className="flex items-center gap-3 min-w-0">
           <CategoryIcon
-            iconName={category?.icon || 'Tag'}
-            color={category?.color || '#10B981'}
-            bgColor={category?.bgColor}
+            iconName={isIncome ? 'HandCoins' : (category?.icon || 'Tag')}
+            color={isIncome ? '#10B981' : (category?.color || '#10B981')}
+            bgColor={isIncome ? '#ECFDF5' : category?.bgColor}
             size="md"
           />
           <div className="min-w-0">
             <div className="text-xs font-bold text-[#1C1C1E] dark:text-white truncate flex items-center gap-1.5">
               <span className="truncate">{expense.title}</span>
+              {isIncome && (
+                <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-emerald-100 dark:bg-emerald-950/70 text-emerald-700 dark:text-emerald-300 tracking-tight shadow-2xs">
+                  {isEn ? 'Income' : 'دخل'}
+                </span>
+              )}
               {expense.source === 'apple_pay' && (
                 <span className="shrink-0 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-md text-[9px] font-bold bg-black text-white dark:bg-white dark:text-black tracking-tight shadow-xs">
                   Pay
@@ -164,7 +169,11 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = React.memo(({
               )}
             </div>
             <div className="text-[11px] text-[#8E8E93] flex items-center gap-1.5 mt-0.5 truncate">
-              <span>{isEn && category?.nameEn ? category.nameEn : (category?.name || (isEn ? 'General' : 'عام'))}</span>
+              <span>
+                {isIncome
+                  ? (isEn ? 'Income / Payout' : 'دخل / استلام')
+                  : (isEn && category?.nameEn ? category.nameEn : (category?.name || (isEn ? 'General' : 'عام')))}
+              </span>
               <span>·</span>
               <span className="flex items-center gap-1">
                 {getPaymentIcon(expense.paymentMethod)}
@@ -175,12 +184,12 @@ export const ExpenseListItem: React.FC<ExpenseListItemProps> = React.memo(({
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
-          <span className="text-xs font-black text-[#1C1C1E] dark:text-white tabular-nums">
+          <span className={`text-xs font-black tabular-nums ${isIncome ? 'text-emerald-600 dark:text-emerald-400' : 'text-[#1C1C1E] dark:text-white'}`}>
             <Amount
               value={expense.amount}
               currency={currency}
               hideAmounts={hideAmounts}
-              prefix="-"
+              prefix={isIncome ? '+' : '-'}
               language={language}
             />
           </span>

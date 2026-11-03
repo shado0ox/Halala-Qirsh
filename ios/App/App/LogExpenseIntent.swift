@@ -6,6 +6,8 @@ enum QuickStore {
     static let prefix = "CapacitorStorage."
     static let categoriesKey = prefix + "quickCategories"
     static let pendingKey = prefix + "pendingExpenses"
+    static let modeKey = prefix + "autoCaptureMode"
+    static let pendingSmsKey = prefix + "pendingSms"
 
     struct Cat: Codable { let id: String; let name: String }
     struct Pending: Codable {
@@ -60,7 +62,7 @@ enum QuickStore {
     ]
 
     static func categories() -> [Cat] {
-        if let s = UserDefaults.standard.string(forKey: categoriesKey),
+        if let s = UserDefaults.standard.string(forKey: categoriesKey) ?? UserDefaults.standard.string(forKey: "quickCategories"),
            let d = s.data(using: .utf8),
            let list = try? JSONDecoder().decode([Cat].self, from: d), !list.isEmpty { return list }
         return fallback
@@ -77,28 +79,35 @@ enum QuickStore {
 
     static func enqueue(amount: Double, categoryId: String, note: String?, merchant: String? = nil, source: String? = nil) {
         var items: [Pending] = []
-        if let s = UserDefaults.standard.string(forKey: pendingKey),
+        let rawKey = UserDefaults.standard.string(forKey: pendingKey) != nil ? pendingKey : "pendingExpenses"
+        if let s = UserDefaults.standard.string(forKey: rawKey) ?? UserDefaults.standard.string(forKey: "pendingExpenses"),
            let d = s.data(using: .utf8),
            let old = try? JSONDecoder().decode([Pending].self, from: d) { items = old }
         items.append(Pending(id: UUID().uuidString, amount: amount, categoryId: categoryId,
                              note: (note?.isEmpty ?? true) ? nil : note,
-                             date: localDateString(), createdAt: Date().timeIntervalSince1970,
+                             date: localDateString(), createdAt: Date().timeIntervalSince1970 * 1000,
                              merchant: merchant, source: source))
         if let d = try? JSONEncoder().encode(items), let s = String(data: d, encoding: .utf8) {
             UserDefaults.standard.set(s, forKey: pendingKey)
+            UserDefaults.standard.set(s, forKey: "pendingExpenses")
+            UserDefaults.standard.synchronize()
         }
     }
 
-    static let modeKey = prefix + "autoCaptureMode"
-    static let pendingSmsKey = prefix + "pendingSms"
-
-    /// source: "apple_pay" or "bank_sms". Default mode when the app never wrote it: "apple_pay".
+    /// source: "apple_pay" or "bank_sms". Default mode: "apple_pay".
     static func isEnabled(_ source: String) -> Bool {
-        let mode = UserDefaults.standard.string(forKey: modeKey) ?? "apple_pay"
+        var raw = UserDefaults.standard.string(forKey: modeKey)?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        if raw == nil || raw?.isEmpty == true {
+            raw = UserDefaults.standard.string(forKey: "autoCaptureMode")?.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        }
+        let mode = (raw?.isEmpty ?? true) ? "apple_pay" : raw!
         switch source {
-        case "apple_pay": return mode == "apple_pay" || mode == "both"
-        case "bank_sms":  return mode == "bank_sms" || mode == "both"
-        default: return true
+        case "apple_pay":
+            return mode == "apple_pay" || mode == "both" || mode.contains("apple") || mode.contains("both")
+        case "bank_sms":
+            return mode == "bank_sms" || mode == "both" || mode.contains("sms") || mode.contains("both")
+        default:
+            return true
         }
     }
 
@@ -108,13 +117,16 @@ enum QuickStore {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, trimmed.count <= 4000 else { return }
         var items: [PendingSms] = []
-        if let s = UserDefaults.standard.string(forKey: pendingSmsKey),
+        let rawKey = UserDefaults.standard.string(forKey: pendingSmsKey) != nil ? pendingSmsKey : "pendingSms"
+        if let s = UserDefaults.standard.string(forKey: rawKey) ?? UserDefaults.standard.string(forKey: "pendingSms"),
            let d = s.data(using: .utf8),
            let old = try? JSONDecoder().decode([PendingSms].self, from: d) { items = old }
         if items.count >= 50 { items.removeFirst(items.count - 49) }
-        items.append(PendingSms(id: UUID().uuidString, text: trimmed, createdAt: Date().timeIntervalSince1970))
+        items.append(PendingSms(id: UUID().uuidString, text: trimmed, createdAt: Date().timeIntervalSince1970 * 1000))
         if let d = try? JSONEncoder().encode(items), let s = String(data: d, encoding: .utf8) {
             UserDefaults.standard.set(s, forKey: pendingSmsKey)
+            UserDefaults.standard.set(s, forKey: "pendingSms")
+            UserDefaults.standard.synchronize()
         }
     }
 }
@@ -171,13 +183,13 @@ struct QuickAddExpenseIntent: AppIntent {
 struct LogApplePayTransactionIntent: AppIntent {
     static var title: LocalizedStringResource = "تسجيل عملية Apple Pay تلقائياً"
     static var description = IntentDescription("تسجيل عملية شراء عبر Apple Pay تلقائياً باسم التاجر والمبلغ")
-    static var openAppWhenRun: Bool = false
+    static var openAppWhenRun: Bool = true
 
     @Parameter(title: "المبلغ", requestValueDialog: "كم المبلغ؟")
-    var amount: Double
+    var amount: Double?
 
-    @Parameter(title: "التاجر", requestValueDialog: "اسم التاجر أو المتجر")
-    var merchant: String
+    @Parameter(title: "التاجر", default: "Apple Pay")
+    var merchant: String?
 
     @Parameter(title: "التصنيف", default: nil)
     var category: QuickCategory?
@@ -189,17 +201,30 @@ struct LogApplePayTransactionIntent: AppIntent {
         Summary("تسجيل عملية Apple Pay بقيمة \(\.$amount) لدى \(\.$merchant)")
     }
 
+    @MainActor
     func perform() async throws -> some IntentResult & ProvidesDialog {
         guard QuickStore.isEnabled("apple_pay") else {
             return .result(dialog: "التسجيل التلقائي لـ Apple Pay غير مفعّل في الإعدادات")
         }
-        guard amount > 0, amount < 1_000_000 else {
+        guard let validAmount = amount, validAmount > 0, validAmount < 1_000_000 else {
             throw $amount.needsValueError("اكتب مبلغاً صحيحاً")
         }
+        let cleanMerchant = (merchant?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true) ? "Apple Pay" : merchant!
         let catId = category?.id ?? ""
-        QuickStore.enqueue(amount: amount, categoryId: catId, note: note ?? merchant, merchant: merchant, source: "apple_pay")
-        let shown = String(format: "%g", amount)
-        return .result(dialog: "تم تسجيل عملية Apple Pay بقيمة \(shown) في \(merchant)")
+        
+        // 1. Enqueue in shared store
+        QuickStore.enqueue(amount: validAmount, categoryId: catId, note: note ?? cleanMerchant, merchant: cleanMerchant, source: "apple_pay")
+        
+        // 2. Direct deep link trigger for instant UI update
+        let encMerchant = cleanMerchant.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let encNote = (note ?? "").addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? ""
+        let urlStr = "halalaqirsh://applepay?amount=\(validAmount)&merchant=\(encMerchant)&categoryId=\(catId)&autolog=true&note=\(encNote)"
+        if let url = URL(string: urlStr) {
+            await UIApplication.shared.open(url)
+        }
+        
+        let shown = String(format: "%g", validAmount)
+        return .result(dialog: "تم تسجيل عملية Apple Pay بقيمة \(shown) في \(cleanMerchant)")
     }
 }
 

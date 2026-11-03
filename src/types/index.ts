@@ -75,6 +75,8 @@ export interface BudgetSettings {
   lastCelebratedMonth?: string;
   annualBudget?: number;
   autoCaptureMode: 'apple_pay' | 'bank_sms' | 'both';
+  icloudSyncEnabled?: boolean;
+  lastIcloudBackupTimestamp?: number;
 }
 
 export interface InAppNotification {

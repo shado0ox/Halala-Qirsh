@@ -31,6 +31,7 @@ import { SegmentedControl } from '../SegmentedControl';
 import { formatMoney } from '../../utils/storage';
 import { nativeHaptics } from '../../utils/nativeHaptics';
 import { springs, fades, useMotionConfig } from '../../utils/motion';
+import { getSalaryCycle, isDateInCycle } from '../../utils/salaryCycle';
 
 interface BudgetsTabProps {
   categories: Category[];
@@ -58,10 +59,12 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
   const isRTL = settings.language !== 'en';
   const lang = settings.language || 'ar';
   const isHidden = Boolean(settings.hideAmounts);
+  const salaryDay = settings.salaryDay || 27;
+  const cycle = useMemo(() => getSalaryCycle(salaryDay, new Date()), [salaryDay]);
 
   const monthlyExpenses = useMemo(
-    () => expenses.filter((e) => e.date.startsWith(currentMonth)),
-    [expenses, currentMonth]
+    () => expenses.filter((e) => e.type !== 'income' && isDateInCycle(e.date, cycle)),
+    [expenses, cycle]
   );
 
   // Spending per category map
@@ -150,7 +153,7 @@ export const BudgetsTab: React.FC<BudgetsTabProps> = ({
   // Annual expenses for selected year
   const annualExpenses = useMemo(() => {
     const prefix = `${selectedYear}-`;
-    return expenses.filter((e) => e.date.startsWith(prefix));
+    return expenses.filter((e) => e.type !== 'income' && e.date.startsWith(prefix));
   }, [expenses, selectedYear]);
 
   const totalAnnualSpent = useMemo(

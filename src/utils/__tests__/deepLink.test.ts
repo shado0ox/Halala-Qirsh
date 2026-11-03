@@ -59,7 +59,7 @@ describe('Apple Pay deep link unit tests', () => {
       categoryId: undefined,
       card: undefined,
       note: undefined,
-      autoLog: false,
+      autoLog: undefined,
     });
     expect(parseApplePayDeepLink('invalid://url')).toBeNull();
   });
